@@ -51,8 +51,11 @@ else
     git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
 fi
 
-# Python Dependencies
-pip3 install --user -q anthropic 2>/dev/null || pip install --user -q anthropic 2>/dev/null || true
+# Python Dependencies (--break-system-packages für Debian/Ubuntu mit PEP 668)
+pip3 install --user --break-system-packages -q anthropic 2>/dev/null || \
+pip3 install --user -q anthropic 2>/dev/null || \
+pip install --user --break-system-packages -q anthropic 2>/dev/null || \
+pip install --user -q anthropic 2>/dev/null || true
 
 # Symlink erstellen
 chmod +x "$INSTALL_DIR/dirigent.py"
