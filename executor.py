@@ -43,7 +43,7 @@ class Executor:
     """Führt alle Claude Code Operationen aus."""
 
     MAX_TASK_RETRIES = 3
-    CLAUDE_TIMEOUT = 600  # 10 Minuten pro Task
+    CLAUDE_TIMEOUT = 900  # 15 Minuten pro Task
 
     def __init__(self, repo_path: str, spec_path: str, dry_run: bool = False):
         self.repo_path = Path(repo_path).resolve()
