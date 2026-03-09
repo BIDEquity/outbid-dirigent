@@ -121,58 +121,56 @@ class Router:
         self.repo_path = Path(repo_path)
         self.logger = get_logger()
 
-    def determine_route(self, analysis: AnalysisResult) -> Route:
+    def determine_route(self, analysis) -> Route:
         """Bestimmt den optimalen Ausführungspfad."""
 
-        route_type = RouteType(analysis.route)
+        # Handle both AnalysisResult object and dict (from cache)
+        if isinstance(analysis, dict):
+            route_str = analysis.get("route", "hybrid")
+            route_reason = analysis.get("route_reason", "")
+            estimated_scope = analysis.get("estimated_scope", "medium")
+            file_count = analysis.get("file_count", 0)
+            commit_count = analysis.get("commit_count", 0)
+        else:
+            route_str = analysis.route
+            route_reason = analysis.route_reason
+            estimated_scope = analysis.spec.estimated_scope
+            file_count = analysis.repo.file_count
+            commit_count = analysis.repo.commit_count
+
+        route_type = RouteType(route_str)
 
         if route_type == RouteType.GREENFIELD:
-            return self._build_greenfield_route(analysis)
+            return self._build_route_from_data(
+                RouteType.GREENFIELD, route_reason, estimated_scope,
+                file_count, commit_count, self.GREENFIELD_STEPS
+            )
         elif route_type == RouteType.LEGACY:
-            return self._build_legacy_route(analysis)
+            return self._build_route_from_data(
+                RouteType.LEGACY, route_reason, estimated_scope,
+                file_count, commit_count, self.LEGACY_STEPS
+            )
         else:
-            return self._build_hybrid_route(analysis)
+            return self._build_route_from_data(
+                RouteType.HYBRID, route_reason, estimated_scope,
+                file_count, commit_count, self.HYBRID_STEPS
+            )
 
-    def _build_greenfield_route(self, analysis: AnalysisResult) -> Route:
-        """Baut den Greenfield-Pfad."""
-        # Task-Schätzung basierend auf Spec-Scope
-        estimated_tasks = self._estimate_tasks(analysis.spec.estimated_scope)
-
-        return Route(
-            route_type=RouteType.GREENFIELD,
-            reason=analysis.route_reason,
-            steps=self.GREENFIELD_STEPS.copy(),
-            estimated_tasks=estimated_tasks,
-            oracle_needed=False,  # Greenfield braucht selten Oracle
-            repo_context_needed=analysis.repo.file_count > 10,
-        )
-
-    def _build_legacy_route(self, analysis: AnalysisResult) -> Route:
-        """Baut den Legacy-Pfad."""
-        # Mehr Tasks bei Legacy wegen zusätzlicher Komplexität
-        estimated_tasks = self._estimate_tasks(analysis.spec.estimated_scope) + 2
+    def _build_route_from_data(self, route_type: RouteType, reason: str,
+                                estimated_scope: str, file_count: int,
+                                commit_count: int, steps: list) -> Route:
+        """Baut eine Route aus den Daten."""
+        estimated_tasks = self._estimate_tasks(estimated_scope)
 
         return Route(
-            route_type=RouteType.LEGACY,
-            reason=analysis.route_reason,
-            steps=self.LEGACY_STEPS.copy(),
+            route_type=route_type,
+            reason=reason,
+            steps=steps.copy(),
             estimated_tasks=estimated_tasks,
-            oracle_needed=True,  # Legacy braucht oft architekturelle Entscheidungen
-            repo_context_needed=True,
+            oracle_needed=route_type == RouteType.LEGACY or commit_count > 200,
+            repo_context_needed=file_count > 10,
         )
 
-    def _build_hybrid_route(self, analysis: AnalysisResult) -> Route:
-        """Baut den Hybrid-Pfad."""
-        estimated_tasks = self._estimate_tasks(analysis.spec.estimated_scope)
-
-        return Route(
-            route_type=RouteType.HYBRID,
-            reason=analysis.route_reason,
-            steps=self.HYBRID_STEPS.copy(),
-            estimated_tasks=estimated_tasks,
-            oracle_needed=analysis.repo.commit_count > 200,
-            repo_context_needed=True,
-        )
 
     def _estimate_tasks(self, scope: str) -> int:
         """Schätzt die Anzahl der Tasks basierend auf dem Scope."""
