@@ -533,7 +533,13 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
                 "completed_phases": [],
                 "completed_tasks": [],
             }
-            save_state(str(self.repo_path), state)
+        else:
+            # Ensure required keys exist (for backwards compatibility)
+            if "completed_phases" not in state:
+                state["completed_phases"] = []
+            if "completed_tasks" not in state:
+                state["completed_tasks"] = []
+        save_state(str(self.repo_path), state)
         return state
 
     # ========================================
