@@ -47,9 +47,10 @@ class DirigentLogger:
         "stop": "🛑",
     }
 
-    def __init__(self, repo_path: str, verbose: bool = True):
+    def __init__(self, repo_path: str, verbose: bool = True, output_json: bool = False):
         self.repo_path = Path(repo_path)
         self.verbose = verbose
+        self.output_json = output_json
         self.log_dir = self.repo_path / ".dirigent" / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,11 +58,35 @@ class DirigentLogger:
         self.log_file = self.log_dir / f"run-{timestamp}.log"
         self.json_log_file = self.log_dir / f"run-{timestamp}.jsonl"
 
+        # Tracking state for JSON output
+        self._start_time = datetime.now()
+        self._phases_complete = 0
+        self._tasks_complete = 0
+        self._total_tasks = 0
+        self._total_phases = 0
+        self._total_commits = 0
+        self._total_deviations = 0
+
         # Initialisiere Log-Dateien
         self._write_to_file(f"# Outbid Dirigent Log - {timestamp}\n")
 
     def _timestamp(self) -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def _iso_timestamp(self) -> str:
+        return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.") + f"{datetime.utcnow().microsecond // 1000:03d}Z"
+
+    def _emit_json(self, event_type: str, data: dict):
+        """Emits a @@JSON@@ prefixed line to stdout if --output json is active."""
+        if not self.output_json:
+            return
+        event = {
+            "type": event_type,
+            "ts": self._iso_timestamp(),
+            "data": data,
+        }
+        print(f"@@JSON@@{json.dumps(event, ensure_ascii=False)}")
+        sys.stdout.flush()
 
     def _write_to_file(self, message: str):
         """Schreibt in die Text-Log-Datei."""
@@ -128,23 +153,72 @@ class DirigentLogger:
     def plan_start(self):
         self._log("plan", "Erstelle Ausführungsplan...")
 
-    def plan_done(self, phases: int, tasks: int):
+    def plan_done(self, phases: int, tasks: int, phase_details: Optional[list] = None):
         self._log("rules", f"Plan: {phases} Phasen, {tasks} Tasks",
                   data={"phases": phases, "tasks": tasks})
+        self._total_phases = phases
+        self._total_tasks = tasks
+        plan_data = {
+            "totalPhases": phases,
+            "totalTasks": tasks,
+        }
+        if phase_details:
+            plan_data["phases"] = phase_details
+        self._emit_json("plan", plan_data)
 
-    def phase_start(self, phase_id: str, phase_name: str):
+    def phase_start(self, phase_id: str, phase_name: str, task_count: int = 0):
         self._log("phase", f"Starte Ausführung: Phase {phase_id} – {phase_name}",
                   data={"phase_id": phase_id, "phase_name": phase_name})
+        self._emit_json("phase_start", {
+            "phase": int(phase_id) if phase_id.isdigit() else phase_id,
+            "name": phase_name,
+            "taskCount": task_count,
+        })
 
-    def task_start(self, task_id: str, task_name: str):
+    def task_start(self, task_id: str, task_name: str, phase: Optional[int] = None):
         self._log("task", f"Task {task_id}: {task_name}",
                   data={"task_id": task_id, "task_name": task_name})
+        data = {"taskId": task_id, "name": task_name}
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("task_start", data)
 
-    def task_done(self, task_id: str, commit_hash: Optional[str] = None):
+    def task_done(self, task_id: str, commit_hash: Optional[str] = None,
+                  task_name: Optional[str] = None, phase: Optional[int] = None):
         msg = f"Task {task_id} abgeschlossen"
         if commit_hash:
             msg += f" (Commit: {commit_hash[:7]})"
         self._log("task_done", msg, data={"task_id": task_id, "commit": commit_hash})
+        self._tasks_complete += 1
+        # Emit commit event
+        if commit_hash:
+            self._total_commits += 1
+            commit_data = {"taskId": task_id, "hash": commit_hash[:7], "message": f"Task {task_id} abgeschlossen"}
+            if phase is not None:
+                commit_data["phase"] = phase
+            self._emit_json("commit", commit_data)
+        # Emit task_complete event
+        complete_data = {"taskId": task_id}
+        if task_name:
+            complete_data["name"] = task_name
+        if commit_hash:
+            complete_data["commitHash"] = commit_hash[:7]
+        if phase is not None:
+            complete_data["phase"] = phase
+        self._emit_json("task_complete", complete_data)
+        # Emit progress event
+        if self._total_tasks > 0:
+            progress_data = {
+                "phasesComplete": self._phases_complete,
+                "tasksComplete": self._tasks_complete,
+                "totalTasks": self._total_tasks,
+                "percentComplete": round(self._tasks_complete / self._total_tasks * 100),
+            }
+            if task_id:
+                progress_data["taskId"] = task_id
+            if phase is not None:
+                progress_data["phase"] = phase
+            self._emit_json("progress", progress_data)
 
     def task_failed(self, task_id: str, error: str, attempt: int):
         self._log("error", f"Task {task_id} fehlgeschlagen (Versuch {attempt}): {error}",
@@ -160,9 +234,68 @@ class DirigentLogger:
         self._log("decision", f"Oracle-Entscheidung: {decision} – {reason[:100]}",
                   data={"decision": decision, "reason": reason})
 
-    def deviation(self, deviation_type: str, description: str):
+    def deviation(self, deviation_type: str, description: str,
+                  task_id: Optional[str] = None, phase: Optional[int] = None):
         self._log("deviation", f"Deviation ({deviation_type}): {description}",
                   level=LogLevel.WARN, data={"type": deviation_type, "description": description})
+        self._total_deviations += 1
+        severity_map = {
+            "Bug-Fix": "bug-fix", "bug-fix": "bug-fix", "bugfix": "bug-fix",
+            "Added-Missing": "missing", "Added Missing": "missing", "missing": "missing",
+            "Resolved-Blocker": "resolved", "Resolved Blocker": "resolved", "resolved": "resolved",
+        }
+        severity = severity_map.get(deviation_type, deviation_type.lower())
+        data = {"severity": severity, "message": description}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("deviation", data)
+
+    def phase_complete(self, phase_id: str, phase_name: str, tasks_completed: int,
+                       deviation_count: int, commit_count: int):
+        """Emits a phase_complete JSON event."""
+        self._phases_complete += 1
+        self._emit_json("phase_complete", {
+            "phase": int(phase_id) if phase_id.isdigit() else phase_id,
+            "name": phase_name,
+            "tasksCompleted": tasks_completed,
+            "deviationCount": deviation_count,
+            "commitCount": commit_count,
+        })
+
+    def run_complete(self, success: bool):
+        """Emits the final complete JSON event."""
+        elapsed = datetime.now() - self._start_time
+        total_seconds = int(elapsed.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        if hours > 0:
+            duration_str = f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            duration_str = f"{minutes}m {seconds}s"
+        else:
+            duration_str = f"{seconds}s"
+        self._emit_json("complete", {
+            "success": success,
+            "totalPhases": self._total_phases,
+            "totalTasks": self._total_tasks,
+            "totalCommits": self._total_commits,
+            "totalDeviations": self._total_deviations,
+            "duration": duration_str,
+            "durationMs": int(elapsed.total_seconds() * 1000),
+        })
+
+    def error_json(self, message: str, phase: Optional[int] = None,
+                   task_id: Optional[str] = None, fatal: bool = False):
+        """Emits a structured error JSON event."""
+        data = {"message": message, "fatal": fatal}
+        if phase is not None:
+            data["phase"] = phase
+        if task_id:
+            data["taskId"] = task_id
+        self._emit_json("error", data)
 
     def ship_start(self, branch_name: str):
         self._log("ship", f"Shipping: Branch {branch_name}")
@@ -201,10 +334,10 @@ class DirigentLogger:
 _logger_instance: Optional[DirigentLogger] = None
 
 
-def init_logger(repo_path: str, verbose: bool = True) -> DirigentLogger:
+def init_logger(repo_path: str, verbose: bool = True, output_json: bool = False) -> DirigentLogger:
     """Initialisiert den globalen Logger."""
     global _logger_instance
-    _logger_instance = DirigentLogger(repo_path, verbose)
+    _logger_instance = DirigentLogger(repo_path, verbose, output_json)
     return _logger_instance
 
 

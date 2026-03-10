@@ -251,6 +251,13 @@ Beispiele:
         help="Nutze Proteus für tiefgehende Domain-Extraktion (empfohlen für Legacy-Migrationen)",
     )
 
+    parser.add_argument(
+        "--output",
+        choices=["json"],
+        default=None,
+        help="Zusätzlich JSON Lines (@@JSON@@-prefixed) nach stdout ausgeben",
+    )
+
     args = parser.parse_args()
 
     # Pfade auflösen
@@ -263,7 +270,8 @@ Beispiele:
 
     # Logger initialisieren
     verbose = not args.quiet
-    logger = init_logger(str(repo_path), verbose)
+    output_json = args.output == "json"
+    logger = init_logger(str(repo_path), verbose, output_json)
     logger.start()
 
     try:
@@ -307,10 +315,14 @@ Beispiele:
 
     except KeyboardInterrupt:
         logger.stop("Unterbrochen durch Benutzer")
+        logger.error_json("Unterbrochen durch Benutzer", fatal=True)
+        logger.run_complete(success=False)
         sys.exit(130)
 
     except Exception as e:
         logger.error(f"Unerwarteter Fehler: {e}", e)
+        logger.error_json(str(e), fatal=True)
+        logger.run_complete(success=False)
         if verbose:
             import traceback
             traceback.print_exc()

@@ -401,8 +401,17 @@ Erstelle den Plan jetzt.
             with open(plan_file, encoding="utf-8") as f:
                 plan = json.load(f)
 
-            total_tasks = sum(len(phase.get("tasks", [])) for phase in plan.get("phases", []))
-            self.logger.plan_done(len(plan.get("phases", [])), total_tasks)
+            phases = plan.get("phases", [])
+            total_tasks = sum(len(phase.get("tasks", [])) for phase in phases)
+            phase_details = [
+                {
+                    "phase": int(p["id"]) if p["id"].isdigit() else p["id"],
+                    "name": p["name"],
+                    "taskCount": len(p.get("tasks", [])),
+                }
+                for p in phases
+            ]
+            self.logger.plan_done(len(phases), total_tasks, phase_details)
             return True
 
         except json.JSONDecodeError as e:
@@ -425,27 +434,38 @@ Erstelle den Plan jetzt.
         for phase in plan.get("phases", []):
             phase_id = phase["id"]
             phase_name = phase["name"]
+            phase_tasks = phase.get("tasks", [])
+            phase_num = int(phase_id) if phase_id.isdigit() else phase_id
 
             # Prüfe ob Phase bereits abgeschlossen
             if phase_id in state.get("completed_phases", []):
                 self.logger.skip(phase_id, "bereits abgeschlossen")
                 continue
 
-            self.logger.phase_start(phase_id, phase_name)
+            self.logger.phase_start(phase_id, phase_name, len(phase_tasks))
 
-            for task in phase.get("tasks", []):
+            phase_deviation_count = 0
+            phase_commit_count = 0
+            phase_tasks_completed = 0
+
+            for task in phase_tasks:
                 task_id = task["id"]
 
                 # Prüfe ob Task bereits abgeschlossen
                 if task_id in state.get("completed_tasks", []):
                     self.logger.skip(task_id, "bereits abgeschlossen")
+                    phase_tasks_completed += 1
                     continue
 
-                result = self._execute_task(task)
+                result = self._execute_task(task, phase_num=phase_num)
 
                 if result.success:
                     state["completed_tasks"].append(task_id)
                     save_state(str(self.repo_path), state)
+                    phase_tasks_completed += 1
+                    phase_deviation_count += len(result.deviations)
+                    if result.commit_hash:
+                        phase_commit_count += 1
                 else:
                     # Task fehlgeschlagen nach allen Retries
                     state["failed_tasks"] = state.get("failed_tasks", [])
@@ -457,22 +477,32 @@ Erstelle den Plan jetzt.
                     save_state(str(self.repo_path), state)
 
                     self.logger.stop(f"Task {task_id} fehlgeschlagen nach {result.attempts} Versuchen")
+                    self.logger.error_json(
+                        f"Task {task_id} fehlgeschlagen nach {result.attempts} Versuchen",
+                        phase=phase_num, task_id=task_id, fatal=True,
+                    )
+                    self.logger.run_complete(success=False)
                     return False
 
             # Phase abgeschlossen
             state["completed_phases"] = state.get("completed_phases", [])
             state["completed_phases"].append(phase_id)
             save_state(str(self.repo_path), state)
+            self.logger.phase_complete(
+                phase_id, phase_name, phase_tasks_completed,
+                phase_deviation_count, phase_commit_count,
+            )
 
+        self.logger.run_complete(success=True)
         return True
 
-    def _execute_task(self, task: Dict) -> TaskResult:
+    def _execute_task(self, task: Dict, phase_num=None) -> TaskResult:
         """Führt einen einzelnen Task aus."""
         task_id = task["id"]
         task_name = task["name"]
         start_time = datetime.now()
 
-        self.logger.task_start(task_id, task_name)
+        self.logger.task_start(task_id, task_name, phase=phase_num)
 
         # Vorherige Summaries laden
         previous_summaries = self._load_previous_summaries()
@@ -551,10 +581,12 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
                 # Deviations extrahieren
                 deviations = self._extract_deviations(summary)
                 for dev in deviations:
-                    self.logger.deviation(dev["type"], dev["description"])
+                    self.logger.deviation(dev["type"], dev["description"],
+                                          task_id=task_id, phase=phase_num)
 
                 duration = (datetime.now() - start_time).total_seconds()
-                self.logger.task_done(task_id, commit_hash)
+                self.logger.task_done(task_id, commit_hash,
+                                      task_name=task_name, phase=phase_num)
 
                 return TaskResult(
                     task_id=task_id,
