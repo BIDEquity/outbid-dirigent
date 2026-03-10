@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from logger import get_logger
 from oracle import Oracle, create_oracle
 from router import load_state, save_state, mark_step_complete
+from proteus_integration import ProteusIntegration, create_proteus_integration
 
 
 @dataclass
@@ -45,9 +46,10 @@ class Executor:
     MAX_TASK_RETRIES = 3
     CLAUDE_TIMEOUT = 1800  # 30 Minuten pro Task
 
-    def __init__(self, repo_path: str, spec_path: str, dry_run: bool = False):
+    def __init__(self, repo_path: str, spec_path: str, dry_run: bool = False, use_proteus: bool = False):
         self.repo_path = Path(repo_path).resolve()
         self.spec_path = Path(spec_path).resolve()
+        self.use_proteus = use_proteus
         self.dry_run = dry_run
         self.logger = get_logger()
         self.oracle = create_oracle(str(self.repo_path))
@@ -135,6 +137,10 @@ class Executor:
         """Extrahiert Business Rules aus der Codebase (für Legacy-Route)."""
         self.logger.extract_start()
 
+        # Wenn Proteus aktiviert ist, nutze Proteus für tiefere Extraktion
+        if self.use_proteus:
+            return self._extract_with_proteus()
+
         # Primäre Sprache aus Analyse laden
         analysis_file = self.dirigent_dir / "ANALYSIS.json"
         language = "unbekannt"
@@ -196,6 +202,77 @@ Erstelle die Datei jetzt.
         else:
             self.logger.error("BUSINESS_RULES.md wurde nicht erstellt")
             return False
+
+    def _extract_with_proteus(self) -> bool:
+        """Nutzt Proteus für tiefgehende Domain-Extraktion."""
+        self.logger.info("Nutze Proteus für Domain-Extraktion...")
+
+        proteus = create_proteus_integration(str(self.repo_path), self.dry_run)
+
+        # Führe Proteus Extraktion durch
+        if not proteus.run_full_extraction():
+            self.logger.error("Proteus Extraktion fehlgeschlagen")
+            return False
+
+        # Zusammenfassung loggen
+        summary = proteus.get_extraction_summary()
+        self.logger.info(
+            f"Proteus: {summary['fields_count']} Fields, "
+            f"{summary['rules_count']} Rules, "
+            f"{summary['events_count']} Events, "
+            f"{summary['dependencies_count']} Dependencies"
+        )
+
+        # Erstelle auch BUSINESS_RULES.md für Kompatibilität
+        self._create_business_rules_from_proteus(proteus)
+
+        return True
+
+    def _create_business_rules_from_proteus(self, proteus: ProteusIntegration):
+        """Erstellt BUSINESS_RULES.md aus Proteus-Daten für Abwärtskompatibilität."""
+        proteus_dir = self.repo_path / ".proteus"
+        rules_content = [f"# Business Rules – {self.repo_path.name}\n"]
+        rules_content.append("*Extrahiert mit Proteus*\n")
+
+        # Arch einbinden
+        arch_file = proteus_dir / "arch.md"
+        if arch_file.exists():
+            rules_content.append("## Architektur\n")
+            rules_content.append(arch_file.read_text(encoding="utf-8")[:3000])
+            rules_content.append("\n")
+
+        # Rules einbinden
+        rules_file = proteus_dir / "rules.json"
+        if rules_file.exists():
+            try:
+                with open(rules_file) as f:
+                    data = json.load(f)
+                rules_content.append("## Business Rules\n")
+                for rule in data.get("rules", []):
+                    rules_content.append(f"- **{rule.get('name', 'Unknown')}**: {rule.get('description', '')}\n")
+                    if rule.get('logic'):
+                        rules_content.append(f"  - Logic: {rule.get('logic')}\n")
+            except Exception:
+                pass
+
+        # Events einbinden
+        events_file = proteus_dir / "events.json"
+        if events_file.exists():
+            try:
+                with open(events_file) as f:
+                    data = json.load(f)
+                rules_content.append("\n## Domain Events\n")
+                for event in data.get("events", []):
+                    rules_content.append(f"- **{event.get('name', 'Unknown')}**: {event.get('trigger', '')}\n")
+            except Exception:
+                pass
+
+        # Speichern
+        business_rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
+        with open(business_rules_file, "w", encoding="utf-8") as f:
+            f.write("".join(rules_content))
+
+        self.logger.info("BUSINESS_RULES.md aus Proteus-Daten erstellt")
 
     # ========================================
     # QUICK SCAN (Hybrid Route)
@@ -646,6 +723,6 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
         return "\n".join(body_parts)
 
 
-def create_executor(repo_path: str, spec_path: str, dry_run: bool = False) -> Executor:
+def create_executor(repo_path: str, spec_path: str, dry_run: bool = False, use_proteus: bool = False) -> Executor:
     """Factory-Funktion für Executor-Instanz."""
-    return Executor(repo_path, spec_path, dry_run)
+    return Executor(repo_path, spec_path, dry_run, use_proteus)

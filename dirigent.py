@@ -74,10 +74,10 @@ def run_routing(repo_path: Path, analysis) -> Route:
     return route
 
 
-def run_execution(repo_path: Path, spec_path: Path, route: Route, dry_run: bool = False) -> bool:
+def run_execution(repo_path: Path, spec_path: Path, route: Route, dry_run: bool = False, use_proteus: bool = False) -> bool:
     """Führt alle Schritte basierend auf der Route aus."""
     logger = get_logger()
-    executor = create_executor(str(repo_path), str(spec_path), dry_run)
+    executor = create_executor(str(repo_path), str(spec_path), dry_run, use_proteus)
 
     state = load_state(str(repo_path)) or {"completed_steps": []}
     completed_steps = state.get("completed_steps", [])
@@ -116,7 +116,7 @@ def run_execution(repo_path: Path, spec_path: Path, route: Route, dry_run: bool 
     return True
 
 
-def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False) -> bool:
+def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, use_proteus: bool = False) -> bool:
     """Setzt eine unterbrochene Ausführung fort."""
     logger = get_logger()
 
@@ -172,7 +172,7 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False) ->
         last_task = state["completed_tasks"][-1]
         logger.resume(last_task)
 
-    return run_execution(repo_path, spec_path, route, dry_run)
+    return run_execution(repo_path, spec_path, route, dry_run, use_proteus)
 
 
 def main():
@@ -245,6 +245,12 @@ Beispiele:
         help="Minimale Ausgabe",
     )
 
+    parser.add_argument(
+        "--use-proteus",
+        action="store_true",
+        help="Nutze Proteus für tiefgehende Domain-Extraktion (empfohlen für Legacy-Migrationen)",
+    )
+
     args = parser.parse_args()
 
     # Pfade auflösen
@@ -263,7 +269,7 @@ Beispiele:
     try:
         # Resume-Modus
         if args.resume:
-            success = resume_execution(repo_path, spec_path, args.dry_run)
+            success = resume_execution(repo_path, spec_path, args.dry_run, args.use_proteus)
             sys.exit(0 if success else 1)
 
         # Normale Ausführung
@@ -286,13 +292,13 @@ Beispiele:
                 logger.info(f"Schritte: {[s.name for s in route.steps]}")
                 logger.info(f"Geschätzte Tasks: {route.estimated_tasks}")
             else:
-                success = run_execution(repo_path, spec_path, route, args.dry_run)
+                success = run_execution(repo_path, spec_path, route, args.dry_run, args.use_proteus)
                 if not success:
                     sys.exit(1)
 
         # Ship only
         if args.phase == "ship":
-            executor = create_executor(str(repo_path), str(spec_path), args.dry_run)
+            executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus)
             success = executor.ship()
             sys.exit(0 if success else 1)
 
