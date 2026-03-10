@@ -1,40 +1,104 @@
-# Outbid Dirigent
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.8+-blue?logo=python&logoColor=white" alt="Python 3.8+">
+  <img src="https://img.shields.io/badge/claude-code-blueviolet?logo=anthropic&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
+  <img src="https://img.shields.io/badge/status-production-brightgreen" alt="Production">
+</p>
 
-Ein headless Python Control Plane das eine SPEC.md liest, das Ziel-Repo analysiert,
-den richtigen Ausführungspfad wählt und dann autonom durcharbeitet.
+<h1 align="center">Outbid Dirigent</h1>
 
-**Kein Mensch in der Loop. Kein interaktives Terminal. Kein Warten auf Input.**
+<p align="center">
+  <strong>A headless Python control plane that reads a spec, analyzes the target repo, picks the optimal execution path, and autonomously works through every task.</strong>
+</p>
+
+<p align="center">
+  No human in the loop. No interactive terminal. No waiting for input.
+</p>
+
+---
+
+## How It Works
+
+```
+                         +-----------+
+                         |  SPEC.md  |
+                         +-----+-----+
+                               |
+                         +-----v-----+
+                         |  Analyze   |  Repo structure, language, history
+                         +-----+-----+
+                               |
+                         +-----v-----+
+                         |   Route    |  Greenfield / Legacy / Hybrid
+                         +-----+-----+
+                               |
+                    +----------+----------+
+                    |          |          |
+              +-----v--+ +----v---+ +---v----+
+              |Greenfield| |Legacy  | |Hybrid  |
+              +-----+--+ +----+---+ +---+----+
+                    |          |          |
+                    |    +-----v-----+   |
+                    |    | Proteus   |   |
+                    |    | Extraction|   |
+                    |    +-----+-----+   |
+                    |          |          |
+                    +----------+----------+
+                               |
+                         +-----v-----+
+                         |   Plan     |  Phased execution plan
+                         +-----+-----+
+                               |
+                         +-----v-----+
+                         |  Execute   |  One Claude Code process per task
+                         +-----+-----+
+                               |
+                         +-----v-----+
+                         |   Ship     |  Branch, push, PR
+                         +-----------+
+```
+
+## Quick Start
+
+```bash
+# Full autonomous run
+dirigent --spec .planning/SPEC.md --repo /path/to/repo
+
+# With deep domain extraction (recommended for legacy migrations)
+dirigent --spec .planning/SPEC.md --repo /path/to/repo --use-proteus
+
+# Resume after interruption
+dirigent --spec .planning/SPEC.md --repo /path/to/repo --resume
+
+# Dry run (no changes)
+dirigent --spec .planning/SPEC.md --repo /path/to/repo --dry-run
+```
 
 ## Installation
 
-### Lokale Installation
+### Local
 
 ```bash
 ./install.sh
 ```
 
-### Globale Installation
+### Global
 
 ```bash
-# Klone das Repo
 git clone https://github.com/BIDEquity/outbid-dirigent.git ~/.local/share/outbid-dirigent
 
-# Dependencies installieren
 pip3 install --user anthropic
 
-# Symlink erstellen
 mkdir -p ~/.local/bin
 ln -s ~/.local/share/outbid-dirigent/dirigent.py ~/.local/bin/dirigent
 
-# PATH erweitern (in .bashrc oder .zshrc)
+# Add to .bashrc or .zshrc
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### Coder Workspaces (Privates Repo)
+### Coder Workspaces
 
-**Option A: Standalone Script im Template (Empfohlen)**
-
-Kopiere `coder/standalone-install.sh` in dein Coder Template:
+**Option A: Standalone script in template (recommended)**
 
 ```hcl
 resource "coder_script" "dirigent" {
@@ -45,9 +109,7 @@ resource "coder_script" "dirigent" {
 }
 ```
 
-Coder's Git Auth klont das private Repo automatisch.
-
-**Option B: Inline im Template**
+**Option B: Inline in template**
 
 ```hcl
 resource "coder_script" "dirigent" {
@@ -72,186 +134,265 @@ resource "coder_script" "dirigent" {
 
 **Option C: Devcontainer**
 
-Das Repo enthält `.devcontainer/devcontainer.json` für VS Code / GitHub Codespaces.
+The repo ships with `.devcontainer/devcontainer.json` for VS Code / GitHub Codespaces.
 
-### Voraussetzungen
+### Prerequisites
 
-- Python 3.8+
-- [Claude Code CLI](https://claude.ai/claude-code) (`claude` Befehl)
-- `ANTHROPIC_API_KEY` Environment Variable
-- Optional: GitHub CLI (`gh`) für automatische PR-Erstellung
+| Requirement | Purpose |
+|---|---|
+| Python 3.8+ | Runtime |
+| [Claude Code CLI](https://claude.ai/claude-code) | AI execution engine |
+| `ANTHROPIC_API_KEY` env var | Authentication |
+| GitHub CLI (`gh`) | *Optional* — auto-creates PRs |
 
-## Usage
+---
 
-### Kompletter Durchlauf
+## Routing Engine
+
+The Dirigent automatically selects one of three execution paths based on repo analysis and spec content.
+
+### Route A — Greenfield
+
+> New features on existing or new projects.
+
+**Triggers:** Spec contains "add", "build", "create", "implement", "new feature" — actively developed project (last commit < 90 days) — modern stack (TypeScript, JavaScript, Python, Go, Rust)
+
+**Pipeline:**
+```
+Plan  -->  Execute  -->  Ship
+```
+
+### Route B — Legacy
+
+> Refactors, migrations, rewrites.
+
+**Triggers:** Spec contains "refactor", "migrate", "rewrite", "port", "legacy" — inactive project (last commit > 1 year) — language migration detected (e.g. Java to PHP) — large project (> 500 commits)
+
+**Pipeline:**
+```
+Business Rule Extraction  -->  Plan (with guardrails)  -->  Execute  -->  Ship
+```
+
+### Route C — Hybrid
+
+> New features on existing projects that need to be understood first.
+
+**Triggers:** Mix of greenfield and legacy signals — new feature on an existing, complex project
+
+**Pipeline:**
+```
+Quick Scan  -->  Plan (with repo context)  -->  Execute  -->  Ship
+```
+
+---
+
+## Proteus Integration
+
+For legacy migrations, the `--use-proteus` flag enables **deep domain extraction** powered by [Proteus](https://github.com/BIDEquity/proteus-alpha) — a multi-phase domain knowledge extractor that goes far beyond simple business rule scanning.
+
+### What Proteus Does
+
+Instead of a single Claude Code pass to extract business rules, Proteus runs **5 dedicated extraction phases**, each with its own 30-minute timeout:
+
+| Phase | Output | Description |
+|---|---|---|
+| **1. Survey** | `arch.md` | Architecture profile — entry points, data models, service layers, API clients, tech stack |
+| **2. Extract Fields** | `fields.json` | Every data field across entities, DTOs, API objects, and config |
+| **3. Extract Rules** | `rules.json` | Business rules — validations, calculations, constraints, workflows, permissions |
+| **4. Extract Events** | `events.json` | Domain events — triggers, consequences, state changes, side effects, notifications |
+| **5. Map Dependencies** | `dependencies.json` | CRUD dependency map between rules and fields |
+
+### Why It Matters
+
+On a real-world legacy codebase, Proteus typically extracts:
+
+```
+1214 Fields  ·  62 Rules  ·  33 Events  ·  129 Dependencies
+```
+
+This rich domain model is then fed into the planning phase as guardrails, ensuring that **no business logic is lost** during migration.
+
+### Proteus Output Structure
+
+```
+{repo}/.proteus/
+├── arch.md              # Architecture profile
+├── fields.json          # All extracted data fields
+├── rules.json           # Business rules with source locations
+├── events.json          # Domain events and their flows
+├── dependencies.json    # CRUD dependency map
+└── pipeline.json        # Extraction progress tracker
+```
+
+### Usage
 
 ```bash
-python3 dirigent.py --spec .planning/SPEC.md --repo /path/to/repo
+# Legacy migration with deep extraction
+dirigent --spec .planning/SPEC.md --repo . --use-proteus
+
+# Resume if interrupted (skips completed phases)
+dirigent --spec .planning/SPEC.md --repo . --use-proteus --resume
 ```
 
-### Nur Analyse
+---
 
-```bash
-python3 dirigent.py --spec SPEC.md --repo /path/to/repo --phase analyze
-```
-
-### Fortsetzen nach Unterbrechung
-
-```bash
-python3 dirigent.py --spec SPEC.md --repo /path/to/repo --resume
-```
-
-### Dry-Run (keine Änderungen)
-
-```bash
-python3 dirigent.py --spec SPEC.md --repo /path/to/repo --dry-run
-```
-
-## Architektur
+## Architecture
 
 ```
-dirigent.py          # Einstiegspunkt + Orchestrierung
+dirigent.py                  # Entry point + orchestration
     │
-    ├─ analyzer.py   # Repo + Spec analysieren, Pfad entscheiden
-    ├─ router.py     # Routing-Logik (Greenfield / Legacy / Hybrid)
-    ├─ executor.py   # Claude Code Aufrufe ausführen
-    ├─ oracle.py     # Architektur-Entscheidungen (Claude API direkt)
-    └─ logger.py     # Strukturiertes Logging in .dirigent/logs/
+    ├── analyzer.py          # Repo + spec analysis, path selection
+    ├── router.py            # Routing logic (Greenfield / Legacy / Hybrid)
+    ├── executor.py          # Claude Code invocations
+    ├── proteus_integration.py  # Deep domain extraction (5-phase pipeline)
+    ├── oracle.py            # Architecture decisions (direct Claude API)
+    └── logger.py            # Structured logging to .dirigent/logs/
 ```
 
-### Dateien im Ziel-Repo
-
-Der Dirigent erstellt folgende Dateien im Ziel-Repository:
+### Generated Files
 
 ```
-{repo}/
-└── .dirigent/
-    ├── ANALYSIS.json     # Ergebnis der Repo-Analyse
-    ├── ROUTE.json        # Gewählter Pfad + Begründung
-    ├── PLAN.json         # Ausführungsplan (Phasen + Tasks)
-    ├── STATE.json        # Aktueller Fortschritt
-    ├── DECISIONS.json    # Oracle-Entscheidungen (Cache)
-    ├── BUSINESS_RULES.md # Extrahierte Business Rules (nur Legacy)
-    ├── CONTEXT.md        # Relevante Dateien (nur Hybrid)
-    ├── summaries/        # Task-Summaries
-    │   └── 01-01-SUMMARY.md
-    └── logs/
-        └── run-{timestamp}.log
+{repo}/.dirigent/
+├── ANALYSIS.json        # Repo analysis result
+├── ROUTE.json           # Chosen path + reasoning
+├── PLAN.json            # Execution plan (phases + tasks)
+├── STATE.json           # Current progress (resumable)
+├── DECISIONS.json       # Oracle decisions (cached)
+├── BUSINESS_RULES.md    # Extracted business rules (Legacy route)
+├── CONTEXT.md           # Relevant files (Hybrid route)
+├── summaries/           # Per-task summaries
+│   └── 01-01-SUMMARY.md
+└── logs/
+    └── run-{timestamp}.log
 ```
 
-## Routing-Logik
-
-Der Dirigent wählt automatisch einen von drei Ausführungspfaden:
-
-### Pfad A: GREENFIELD
-
-Für neue Features auf bestehenden oder neuen Projekten.
-
-**Wann:**
-- Spec enthält "add", "build", "create", "implement", "new feature"
-- Aktiv entwickeltes Projekt (letzer Commit < 90 Tage)
-- Moderner Stack (TypeScript, JavaScript, Python, Go, Rust)
-
-**Ablauf:**
-1. Plan erstellen
-2. Tasks ausführen (ein frischer Claude Code Prozess pro Task)
-3. Commit + Push + PR
-
-### Pfad B: LEGACY
-
-Für Refactors, Migrationen, Rewrites.
-
-**Wann:**
-- Spec enthält "refactor", "migrate", "rewrite", "port", "legacy"
-- Inaktives Projekt (letzter Commit > 1 Jahr)
-- Sprach-Migration erkannt (z.B. Java → PHP)
-- Großes Projekt (> 500 Commits)
-
-**Ablauf:**
-1. Business Rule Extraktion (komplette Codebase analysieren)
-2. Plan erstellen mit Business Rules als Guardrails
-3. Tasks ausführen mit Rule-Check
-4. Commit + Push + PR
-
-### Pfad C: HYBRID
-
-Für neue Features auf bestehenden Projekten die verstanden werden müssen.
-
-**Wann:**
-- Mischung aus Greenfield- und Legacy-Signalen
-- Neues Feature auf existierendem Projekt
-
-**Ablauf:**
-1. Quick Scan (nur relevante Dateien)
-2. Plan erstellen mit Repo-Kontext
-3. Tasks ausführen
-4. Commit + Push + PR
+---
 
 ## Deviation Rules
 
-Während der Ausführung folgt Claude Code diesen Regeln:
+During execution, Claude Code follows strict deviation rules:
 
-| Rule | Trigger | Aktion |
-|------|---------|--------|
-| 1 | Bug gefunden | Automatisch fixen, als Deviation loggen |
-| 2 | Kritisches fehlt | Hinzufügen, als Deviation loggen |
-| 3 | Blocker entdeckt | Beheben, als Deviation loggen |
-| 4 | Architektur-Frage | STOPP – Oracle fragen |
+| # | Trigger | Action |
+|---|---|---|
+| 1 | Bug discovered | Auto-fix, log as `DEVIATION: Bug-Fix` |
+| 2 | Critical missing piece | Add it, log as `DEVIATION` |
+| 3 | Blocker encountered | Resolve it, log as `DEVIATION` |
+| 4 | Architecture question | **STOP** — ask the Oracle |
 
 ## Oracle
 
-Das Oracle beantwortet architekturelle Fragen autonom via Claude API:
+The Oracle answers architectural questions autonomously via the Claude API:
 
-- Liest: SPEC.md, PLAN.json, DECISIONS.json, BUSINESS_RULES.md
-- Cached alle Entscheidungen in DECISIONS.json
-- Verwendet Claude Sonnet für schnelle Antworten
+- **Reads:** SPEC.md, PLAN.json, DECISIONS.json, BUSINESS_RULES.md
+- **Caches:** All decisions in DECISIONS.json (no duplicate API calls)
+- **Model:** Claude Sonnet for fast, cost-effective answers
 
-## Prinzipien
+---
 
-- **Headless by design**: Keine stdin reads, keine input() Aufrufe, kein Warten
-- **Fresh context per task**: Jeder Task = neuer Claude Code Prozess
-- **Oracle statt Mensch**: Bei architekturellen Fragen → Oracle, niemals Rückfrage an User
-- **Atomic commits**: Ein Commit pro Task, niemals alles auf einmal
-- **Fail fast**: Wenn ein Task 3x fehlschlägt → stoppen, Status in STATE.json loggen
-- **Resumable**: Wenn STATE.json existiert → dort weitermachen wo aufgehört wurde
+## Timeouts
 
-## Beispiel-Ausgabe
+| Step | Timeout | Notes |
+|---|---|---|
+| Codebase analysis | 15 min | Full repo scan |
+| Quick scan | 5 min | Targeted file scan (Hybrid route) |
+| Plan creation | 30 min | Scales with domain complexity |
+| Task execution | 30 min | Per task, up to 3 retries |
+| Proteus phases | 30 min | Per phase (5 phases total) |
 
-```
-[2026-03-06 11:30:00] 🎼 Outbid Dirigent gestartet
-[2026-03-06 11:30:01] 🔍 Analysiere Repo: medicheck-portal
-[2026-03-06 11:30:02] 📊 Erkannt: Java/Spring Boot, 1205 Commits, 4 Jahre alt
-[2026-03-06 11:30:02] 🗺️  Route: LEGACY (confidence: high)
-[2026-03-06 11:30:02] 📋 Grund: Java Migration-Spec, inaktives Repo
-[2026-03-06 11:30:03] 📖 Starte Business Rule Extraktion...
-[2026-03-06 11:45:00] ✅ Business Rules extrahiert (47 Regeln gefunden)
-[2026-03-06 11:45:01] 📝 Erstelle Ausführungsplan...
-[2026-03-06 11:46:00] ✅ Plan: 3 Phasen, 9 Tasks
-[2026-03-06 11:46:01] ⚡ Starte Ausführung: Phase 1 – Setup
-[2026-03-06 11:46:01] 🔨 Task 01-01: PHP Projektstruktur anlegen
-[2026-03-06 11:52:00] ✅ Task 01-01 abgeschlossen (Commit: abc1234)
-...
-[2026-03-08 14:30:00] 🚢 Shipping: Branch feature/dirigent-20260306
-[2026-03-08 14:30:15] 🎉 PR erstellt: https://github.com/org/repo/pull/42
-```
+## Resumability
 
-## Fehlerbehandlung
-
-- **Task fehlgeschlagen**: Bis zu 3 Retries, dann Stopp
-- **Oracle Error**: Fehler loggen, sicherere Option wählen
-- **Unterbrechung**: Mit `--resume` fortsetzen
-- **Claude CLI fehlt**: Fehlermeldung mit Installationshinweis
-
-## Entwicklung
+Dirigent is fully resumable. Every completed step is tracked in `STATE.json`. If execution is interrupted — timeout, crash, network failure — just run with `--resume`:
 
 ```bash
-# Tests ausführen
+dirigent --spec .planning/SPEC.md --repo . --resume
+```
+
+It picks up exactly where it left off. Completed analysis, extraction, and tasks are skipped automatically.
+
+---
+
+## CLI Reference
+
+```
+dirigent --spec <path> --repo <path> [options]
+```
+
+| Flag | Description |
+|---|---|
+| `--spec` | Path to the SPEC.md file (required) |
+| `--repo` | Path to the target repository (required) |
+| `--phase` | Run specific phase: `analyze`, `execute`, `ship`, or `all` (default: `all`) |
+| `--use-proteus` | Enable Proteus deep domain extraction |
+| `--resume` | Resume interrupted execution |
+| `--dry-run` | Analyze only, no changes |
+| `--force` | Re-run analysis (ignore cache) |
+| `--quiet` | Minimal output |
+
+---
+
+## Design Principles
+
+- **Headless by design** — No stdin reads, no `input()` calls, no waiting
+- **Fresh context per task** — Each task spawns a new Claude Code process
+- **Oracle over human** — Architecture questions go to the Oracle, never to the user
+- **Atomic commits** — One commit per task, never everything at once
+- **Fail fast** — 3 retries per task, then stop and log to STATE.json
+- **Resumable** — STATE.json tracks progress; pick up where you left off
+
+---
+
+## Example Output
+
+```
+[2026-03-10 11:30:00] 🎼 Outbid Dirigent gestartet
+[2026-03-10 11:30:01] 🔍 Analysiere Repo: medicheck-portal
+[2026-03-10 11:30:02] 📊 Erkannt: Java/Spring Boot, 1205 Commits, 4 Jahre alt
+[2026-03-10 11:30:02] 🗺️  Route: LEGACY (confidence: high)
+[2026-03-10 11:30:02] 📋 Grund: Java Migration-Spec, inaktives Repo
+[2026-03-10 11:30:03] 📊 Nutze Proteus für Domain-Extraktion...
+[2026-03-10 11:30:03] 📊 Proteus Phase 1: Survey...
+[2026-03-10 11:35:30] 📊 Proteus Survey abgeschlossen
+[2026-03-10 11:35:30] 📊 Proteus Phase 2: Extract Fields...
+[2026-03-10 11:46:45] 📊 Proteus Fields Extraktion abgeschlossen
+[2026-03-10 11:46:45] 📊 Proteus Phase 3: Extract Rules...
+[2026-03-10 11:52:00] 📊 Proteus Rules Extraktion abgeschlossen
+[2026-03-10 11:52:00] 📊 Proteus Phase 4: Extract Events...
+[2026-03-10 11:54:15] 📊 Proteus Events Extraktion abgeschlossen
+[2026-03-10 11:54:15] 📊 Proteus Phase 5: Map Dependencies...
+[2026-03-10 11:59:00] 📊 Proteus Dependencies Mapping abgeschlossen
+[2026-03-10 11:59:00] 📊 Proteus: 1214 Fields, 62 Rules, 33 Events, 129 Dependencies
+[2026-03-10 11:59:00] 📝 Erstelle Ausführungsplan...
+[2026-03-10 12:05:00] ✅ Plan: 4 Phasen, 12 Tasks
+[2026-03-10 12:05:01] ⚡ Starte Ausführung: Phase 1 – Setup
+[2026-03-10 12:05:01] 🔨 Task 01-01: PHP Projektstruktur anlegen
+[2026-03-10 12:12:00] ✅ Task 01-01 abgeschlossen (Commit: abc1234)
+...
+[2026-03-10 16:30:00] 🚢 Shipping: Branch feature/dirigent-20260310
+[2026-03-10 16:30:15] 🎉 PR erstellt: https://github.com/org/repo/pull/42
+```
+
+---
+
+## Error Handling
+
+| Scenario | Behavior |
+|---|---|
+| Task fails | Up to 3 retries, then stop |
+| Oracle error | Log error, pick safer option |
+| Interruption | Resume with `--resume` |
+| Claude CLI missing | Error message with install instructions |
+| Timeout | Logged with duration, resumable |
+
+## Development
+
+```bash
+# Run tests
 python3 -m pytest tests/
 
 # Linting
 python3 -m flake8 *.py
 ```
 
-## Lizenz
+## License
 
 MIT
