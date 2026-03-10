@@ -385,7 +385,7 @@ Regeln:
 Erstelle den Plan jetzt.
 """
 
-        success, stdout, stderr = self._run_claude(prompt, timeout=300)
+        success, stdout, stderr = self._run_claude(prompt, timeout=1800)  # 30 Minuten
 
         if not success:
             self.logger.error(f"Plan-Erstellung fehlgeschlagen: {stderr}")
