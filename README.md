@@ -7,76 +7,53 @@ den richtigen Ausführungspfad wählt und dann autonom durcharbeitet.
 
 ## Installation
 
-### Lokale Installation
+### Via uvx (empfohlen)
+
+Keine Installation nötig. Direkt ausführen:
 
 ```bash
-./install.sh
+uvx --from git+https://github.com/BIDEquity/outbid-dirigent.git dirigent \
+  --spec .planning/SPEC.md --repo /path/to/repo
 ```
 
-### Globale Installation
+### Via uv
 
 ```bash
-# Klone das Repo
-git clone https://github.com/BIDEquity/outbid-dirigent.git ~/.local/share/outbid-dirigent
+uv tool install git+https://github.com/BIDEquity/outbid-dirigent.git
+```
 
-# Dependencies installieren
-pip3 install --user anthropic
+### Via pip
 
-# Symlink erstellen
-mkdir -p ~/.local/bin
-ln -s ~/.local/share/outbid-dirigent/dirigent.py ~/.local/bin/dirigent
+```bash
+pip install git+https://github.com/BIDEquity/outbid-dirigent.git
+```
 
-# PATH erweitern (in .bashrc oder .zshrc)
-export PATH="$HOME/.local/bin:$PATH"
+### Entwicklung
+
+```bash
+git clone https://github.com/BIDEquity/outbid-dirigent.git
+cd outbid-dirigent
+uv sync
 ```
 
 ### Coder Workspaces (Privates Repo)
-
-**Option A: Standalone Script im Template (Empfohlen)**
-
-Kopiere `coder/standalone-install.sh` in dein Coder Template:
-
-```hcl
-resource "coder_script" "dirigent" {
-  agent_id     = coder_agent.main.id
-  script       = file("${path.module}/standalone-install.sh")
-  display_name = "Install Dirigent"
-  run_on_start = true
-}
-```
-
-Coder's Git Auth klont das private Repo automatisch.
-
-**Option B: Inline im Template**
 
 ```hcl
 resource "coder_script" "dirigent" {
   agent_id     = coder_agent.main.id
   script       = <<-EOF
-    REPO="https://github.com/BIDEquity/outbid-dirigent.git"
-    INSTALL_DIR="$HOME/.local/share/outbid-dirigent"
-    BIN_DIR="$HOME/.local/bin"
-
-    if [ ! -x "$BIN_DIR/dirigent" ]; then
-      mkdir -p "$INSTALL_DIR" "$BIN_DIR"
-      git clone --depth 1 "$REPO" "$INSTALL_DIR"
-      pip3 install --user -q anthropic
-      ln -sf "$INSTALL_DIR/dirigent.py" "$BIN_DIR/dirigent"
-      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-    fi
+    uv tool install git+https://github.com/BIDEquity/outbid-dirigent.git
   EOF
   display_name = "Install Dirigent"
   run_on_start = true
 }
 ```
 
-**Option C: Devcontainer**
-
-Das Repo enthält `.devcontainer/devcontainer.json` für VS Code / GitHub Codespaces.
+Das Repo enthält auch `.devcontainer/devcontainer.json` für VS Code / GitHub Codespaces.
 
 ### Voraussetzungen
 
-- Python 3.8+
+- Python 3.10+
 - [Claude Code CLI](https://claude.ai/claude-code) (`claude` Befehl)
 - `ANTHROPIC_API_KEY` Environment Variable
 - Optional: GitHub CLI (`gh`) für automatische PR-Erstellung
@@ -86,37 +63,38 @@ Das Repo enthält `.devcontainer/devcontainer.json` für VS Code / GitHub Codesp
 ### Kompletter Durchlauf
 
 ```bash
-python3 dirigent.py --spec .planning/SPEC.md --repo /path/to/repo
+dirigent --spec .planning/SPEC.md --repo /path/to/repo
 ```
 
 ### Nur Analyse
 
 ```bash
-python3 dirigent.py --spec SPEC.md --repo /path/to/repo --phase analyze
+dirigent --spec SPEC.md --repo /path/to/repo --phase analyze
 ```
 
 ### Fortsetzen nach Unterbrechung
 
 ```bash
-python3 dirigent.py --spec SPEC.md --repo /path/to/repo --resume
+dirigent --spec SPEC.md --repo /path/to/repo --resume
 ```
 
 ### Dry-Run (keine Änderungen)
 
 ```bash
-python3 dirigent.py --spec SPEC.md --repo /path/to/repo --dry-run
+dirigent --spec SPEC.md --repo /path/to/repo --dry-run
 ```
 
 ## Architektur
 
 ```
-dirigent.py          # Einstiegspunkt + Orchestrierung
-    │
-    ├─ analyzer.py   # Repo + Spec analysieren, Pfad entscheiden
-    ├─ router.py     # Routing-Logik (Greenfield / Legacy / Hybrid)
-    ├─ executor.py   # Claude Code Aufrufe ausführen
-    ├─ oracle.py     # Architektur-Entscheidungen (Claude API direkt)
-    └─ logger.py     # Strukturiertes Logging in .dirigent/logs/
+src/outbid_dirigent/
+    ├─ dirigent.py              # Einstiegspunkt + Orchestrierung
+    ├─ analyzer.py              # Repo + Spec analysieren, Pfad entscheiden
+    ├─ router.py                # Routing-Logik (Greenfield / Legacy / Hybrid)
+    ├─ executor.py              # Claude Code Aufrufe ausführen
+    ├─ oracle.py                # Architektur-Entscheidungen (Claude API direkt)
+    ├─ logger.py                # Strukturiertes Logging in .dirigent/logs/
+    └─ proteus_integration.py   # Proteus Domain-Extraktion
 ```
 
 ### Dateien im Ziel-Repo
@@ -246,10 +224,10 @@ Das Oracle beantwortet architekturelle Fragen autonom via Claude API:
 
 ```bash
 # Tests ausführen
-python3 -m pytest tests/
+uv run pytest tests/
 
 # Linting
-python3 -m flake8 *.py
+uv run ruff check
 ```
 
 ## Lizenz

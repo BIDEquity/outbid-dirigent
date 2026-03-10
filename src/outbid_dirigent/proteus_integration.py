@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
 
-from logger import get_logger
+from outbid_dirigent.logger import get_logger
 
 
 class ProteusIntegration:

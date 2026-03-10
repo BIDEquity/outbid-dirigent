@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from collections import Counter
 
-from logger import get_logger
+from outbid_dirigent.logger import get_logger
 
 
 @dataclass

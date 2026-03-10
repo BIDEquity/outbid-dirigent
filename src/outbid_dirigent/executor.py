@@ -14,10 +14,10 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 
-from logger import get_logger
-from oracle import Oracle, create_oracle
-from router import load_state, save_state, mark_step_complete
-from proteus_integration import ProteusIntegration, create_proteus_integration
+from outbid_dirigent.logger import get_logger
+from outbid_dirigent.oracle import Oracle, create_oracle
+from outbid_dirigent.router import load_state, save_state, mark_step_complete
+from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
 
 
 @dataclass

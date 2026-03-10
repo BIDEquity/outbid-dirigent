@@ -11,8 +11,8 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from enum import Enum
 
-from analyzer import AnalysisResult
-from logger import get_logger
+from outbid_dirigent.analyzer import AnalysisResult
+from outbid_dirigent.logger import get_logger
 
 
 class RouteType(Enum):
