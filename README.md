@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.8+-blue?logo=python&logoColor=white" alt="Python 3.8+">
+  <img src="https://img.shields.io/badge/python-3.10+-blue?logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/claude-code-blueviolet?logo=anthropic&logoColor=white" alt="Claude Code">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
   <img src="https://img.shields.io/badge/status-production-brightgreen" alt="Production">
@@ -76,63 +76,47 @@ dirigent --spec .planning/SPEC.md --repo /path/to/repo --dry-run
 
 ## Installation
 
-### Local
+### Via uvx (recommended)
+
+No installation needed. Run directly:
 
 ```bash
-./install.sh
+uvx --from git+https://github.com/BIDEquity/outbid-dirigent.git dirigent \
+  --spec .planning/SPEC.md --repo /path/to/repo
 ```
 
-### Global
+### Via uv
 
 ```bash
-git clone https://github.com/BIDEquity/outbid-dirigent.git ~/.local/share/outbid-dirigent
+uv tool install git+https://github.com/BIDEquity/outbid-dirigent.git
+```
 
-pip3 install --user anthropic
+### Via pip
 
-mkdir -p ~/.local/bin
-ln -s ~/.local/share/outbid-dirigent/dirigent.py ~/.local/bin/dirigent
+```bash
+pip install git+https://github.com/BIDEquity/outbid-dirigent.git
+```
 
-# Add to .bashrc or .zshrc
-export PATH="$HOME/.local/bin:$PATH"
+### Development
+
+```bash
+git clone https://github.com/BIDEquity/outbid-dirigent.git
+cd outbid-dirigent
+uv sync
 ```
 
 ### Coder Workspaces
-
-**Option A: Standalone script in template (recommended)**
-
-```hcl
-resource "coder_script" "dirigent" {
-  agent_id     = coder_agent.main.id
-  script       = file("${path.module}/standalone-install.sh")
-  display_name = "Install Dirigent"
-  run_on_start = true
-}
-```
-
-**Option B: Inline in template**
 
 ```hcl
 resource "coder_script" "dirigent" {
   agent_id     = coder_agent.main.id
   script       = <<-EOF
-    REPO="https://github.com/BIDEquity/outbid-dirigent.git"
-    INSTALL_DIR="$HOME/.local/share/outbid-dirigent"
-    BIN_DIR="$HOME/.local/bin"
-
-    if [ ! -x "$BIN_DIR/dirigent" ]; then
-      mkdir -p "$INSTALL_DIR" "$BIN_DIR"
-      git clone --depth 1 "$REPO" "$INSTALL_DIR"
-      pip3 install --user -q anthropic
-      ln -sf "$INSTALL_DIR/dirigent.py" "$BIN_DIR/dirigent"
-      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
-    fi
+    uv tool install git+https://github.com/BIDEquity/outbid-dirigent.git
   EOF
   display_name = "Install Dirigent"
   run_on_start = true
 }
 ```
-
-**Option C: Devcontainer**
 
 The repo ships with `.devcontainer/devcontainer.json` for VS Code / GitHub Codespaces.
 
@@ -140,7 +124,7 @@ The repo ships with `.devcontainer/devcontainer.json` for VS Code / GitHub Codes
 
 | Requirement | Purpose |
 |---|---|
-| Python 3.8+ | Runtime |
+| Python 3.10+ | Runtime |
 | [Claude Code CLI](https://claude.ai/claude-code) | AI execution engine |
 | `ANTHROPIC_API_KEY` env var | Authentication |
 | GitHub CLI (`gh`) | *Optional* — auto-creates PRs |
@@ -239,14 +223,14 @@ dirigent --spec .planning/SPEC.md --repo . --use-proteus --resume
 ## Architecture
 
 ```
-dirigent.py                  # Entry point + orchestration
-    │
-    ├── analyzer.py          # Repo + spec analysis, path selection
-    ├── router.py            # Routing logic (Greenfield / Legacy / Hybrid)
-    ├── executor.py          # Claude Code invocations
-    ├── proteus_integration.py  # Deep domain extraction (5-phase pipeline)
-    ├── oracle.py            # Architecture decisions (direct Claude API)
-    └── logger.py            # Structured logging to .dirigent/logs/
+src/outbid_dirigent/
+    ├─ dirigent.py              # Entry point + orchestration
+    ├─ analyzer.py              # Repo + spec analysis, path selection
+    ├─ router.py                # Routing logic (Greenfield / Legacy / Hybrid)
+    ├─ executor.py              # Claude Code invocations
+    ├─ oracle.py                # Architecture decisions (direct Claude API)
+    ├─ logger.py                # Structured logging to .dirigent/logs/
+    └─ proteus_integration.py   # Proteus domain extraction
 ```
 
 ### Generated Files
@@ -344,31 +328,31 @@ dirigent --spec <path> --repo <path> [options]
 ## Example Output
 
 ```
-[2026-03-10 11:30:00] 🎼 Outbid Dirigent gestartet
-[2026-03-10 11:30:01] 🔍 Analysiere Repo: medicheck-portal
-[2026-03-10 11:30:02] 📊 Erkannt: Java/Spring Boot, 1205 Commits, 4 Jahre alt
-[2026-03-10 11:30:02] 🗺️  Route: LEGACY (confidence: high)
-[2026-03-10 11:30:02] 📋 Grund: Java Migration-Spec, inaktives Repo
-[2026-03-10 11:30:03] 📊 Nutze Proteus für Domain-Extraktion...
-[2026-03-10 11:30:03] 📊 Proteus Phase 1: Survey...
-[2026-03-10 11:35:30] 📊 Proteus Survey abgeschlossen
-[2026-03-10 11:35:30] 📊 Proteus Phase 2: Extract Fields...
-[2026-03-10 11:46:45] 📊 Proteus Fields Extraktion abgeschlossen
-[2026-03-10 11:46:45] 📊 Proteus Phase 3: Extract Rules...
-[2026-03-10 11:52:00] 📊 Proteus Rules Extraktion abgeschlossen
-[2026-03-10 11:52:00] 📊 Proteus Phase 4: Extract Events...
-[2026-03-10 11:54:15] 📊 Proteus Events Extraktion abgeschlossen
-[2026-03-10 11:54:15] 📊 Proteus Phase 5: Map Dependencies...
-[2026-03-10 11:59:00] 📊 Proteus Dependencies Mapping abgeschlossen
-[2026-03-10 11:59:00] 📊 Proteus: 1214 Fields, 62 Rules, 33 Events, 129 Dependencies
-[2026-03-10 11:59:00] 📝 Erstelle Ausführungsplan...
-[2026-03-10 12:05:00] ✅ Plan: 4 Phasen, 12 Tasks
-[2026-03-10 12:05:01] ⚡ Starte Ausführung: Phase 1 – Setup
-[2026-03-10 12:05:01] 🔨 Task 01-01: PHP Projektstruktur anlegen
-[2026-03-10 12:12:00] ✅ Task 01-01 abgeschlossen (Commit: abc1234)
+[2026-03-10 11:30:00] Outbid Dirigent gestartet
+[2026-03-10 11:30:01] Analysiere Repo: medicheck-portal
+[2026-03-10 11:30:02] Erkannt: Java/Spring Boot, 1205 Commits, 4 Jahre alt
+[2026-03-10 11:30:02] Route: LEGACY (confidence: high)
+[2026-03-10 11:30:02] Grund: Java Migration-Spec, inaktives Repo
+[2026-03-10 11:30:03] Nutze Proteus für Domain-Extraktion...
+[2026-03-10 11:30:03] Proteus Phase 1: Survey...
+[2026-03-10 11:35:30] Proteus Survey abgeschlossen
+[2026-03-10 11:35:30] Proteus Phase 2: Extract Fields...
+[2026-03-10 11:46:45] Proteus Fields Extraktion abgeschlossen
+[2026-03-10 11:46:45] Proteus Phase 3: Extract Rules...
+[2026-03-10 11:52:00] Proteus Rules Extraktion abgeschlossen
+[2026-03-10 11:52:00] Proteus Phase 4: Extract Events...
+[2026-03-10 11:54:15] Proteus Events Extraktion abgeschlossen
+[2026-03-10 11:54:15] Proteus Phase 5: Map Dependencies...
+[2026-03-10 11:59:00] Proteus Dependencies Mapping abgeschlossen
+[2026-03-10 11:59:00] Proteus: 1214 Fields, 62 Rules, 33 Events, 129 Dependencies
+[2026-03-10 11:59:00] Erstelle Ausführungsplan...
+[2026-03-10 12:05:00] Plan: 4 Phasen, 12 Tasks
+[2026-03-10 12:05:01] Starte Ausführung: Phase 1 – Setup
+[2026-03-10 12:05:01] Task 01-01: PHP Projektstruktur anlegen
+[2026-03-10 12:12:00] Task 01-01 abgeschlossen (Commit: abc1234)
 ...
-[2026-03-10 16:30:00] 🚢 Shipping: Branch feature/dirigent-20260310
-[2026-03-10 16:30:15] 🎉 PR erstellt: https://github.com/org/repo/pull/42
+[2026-03-10 16:30:00] Shipping: Branch feature/dirigent-20260310
+[2026-03-10 16:30:15] PR erstellt: https://github.com/org/repo/pull/42
 ```
 
 ---
@@ -387,10 +371,10 @@ dirigent --spec <path> --repo <path> [options]
 
 ```bash
 # Run tests
-python3 -m pytest tests/
+uv run pytest tests/
 
 # Linting
-python3 -m flake8 *.py
+uv run ruff check
 ```
 
 ## License

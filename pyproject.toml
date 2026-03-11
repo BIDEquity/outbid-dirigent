@@ -1,0 +1,17 @@
+[project]
+name = "outbid-dirigent"
+version = "0.1.0"
+description = "Headless autonomous coding agent controller"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.20.0",
+]
+
+[project.scripts]
+dirigent = "outbid_dirigent.dirigent:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

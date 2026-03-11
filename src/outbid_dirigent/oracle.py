@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Any
 
 import anthropic
 
-from logger import get_logger
+from outbid_dirigent.logger import get_logger
 
 
 class Oracle:

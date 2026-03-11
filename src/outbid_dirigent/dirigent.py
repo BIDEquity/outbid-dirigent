@@ -18,10 +18,10 @@ from pathlib import Path
 from datetime import datetime
 
 # Eigene Module
-from logger import init_logger, get_logger
-from analyzer import Analyzer, load_analysis
-from router import Router, Route, RouteType, StepType, load_route, load_state, mark_step_complete
-from executor import Executor, create_executor
+from outbid_dirigent.logger import init_logger, get_logger
+from outbid_dirigent.analyzer import Analyzer, load_analysis
+from outbid_dirigent.router import Router, Route, RouteType, StepType, load_route, load_state, mark_step_complete
+from outbid_dirigent.executor import Executor, create_executor
 
 
 def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
@@ -131,7 +131,7 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
     router = Router(str(repo_path))
 
     # Dummy-Analyse für Route-Bestimmung (wir haben ja schon die Route)
-    from analyzer import AnalysisResult, RepoAnalysis, SpecAnalysis
+    from outbid_dirigent.analyzer import AnalysisResult, RepoAnalysis, SpecAnalysis
     analysis = load_analysis(str(repo_path))
 
     if not analysis:

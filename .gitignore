@@ -42,5 +42,8 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# uv
+uv.lock
+
 # Dirigent output (these are created in target repos, not here)
 # .dirigent/
