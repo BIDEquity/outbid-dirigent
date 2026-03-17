@@ -170,10 +170,35 @@ Wichtig:
 
         # API-Aufruf
         try:
+            start_time = datetime.now()
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=500,
                 messages=[{"role": "user", "content": prompt}],
+            )
+            duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+
+            # Token Usage extrahieren und loggen
+            usage = response.usage
+            input_tokens = usage.input_tokens
+            output_tokens = usage.output_tokens
+            cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+            cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+
+            # Kosten berechnen (Sonnet 4: $3/M input, $15/M output)
+            cost_cents = int((input_tokens * 3 + output_tokens * 15) / 10000)
+
+            # API Usage Event emittieren
+            self.logger.api_usage(
+                component="oracle",
+                model=self.model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_read_tokens=cache_read,
+                cache_write_tokens=cache_write,
+                cost_cents=cost_cents,
+                operation="decision",
+                duration_ms=duration_ms,
             )
 
             # Response parsen
@@ -199,6 +224,12 @@ Wichtig:
                 "decision": decision,
                 "reason": reason,
                 "confidence": confidence,
+                "tokens": {
+                    "input": input_tokens,
+                    "output": output_tokens,
+                    "cache_read": cache_read,
+                    "cost_cents": cost_cents,
+                },
                 "timestamp": datetime.now().isoformat(),
             })
             self._save_decisions()

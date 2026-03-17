@@ -258,6 +258,40 @@ Beispiele:
         help="Zusätzlich JSON Lines (@@JSON@@-prefixed) nach stdout ausgeben",
     )
 
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Erlaubt interaktive Fragen an den User via Portal",
+    )
+
+    parser.add_argument(
+        "--question-timeout",
+        type=int,
+        default=30,
+        help="Timeout in Minuten für interaktive Fragen (default: 30)",
+    )
+
+    parser.add_argument(
+        "--portal-url",
+        type=str,
+        default=os.environ.get("PORTAL_URL", "https://outbid-portal.vercel.app"),
+        help="URL des Outbid Portals für API-Calls",
+    )
+
+    parser.add_argument(
+        "--execution-id",
+        type=str,
+        default=os.environ.get("EXECUTION_ID"),
+        help="Execution-ID für Portal-Integration (env: EXECUTION_ID)",
+    )
+
+    parser.add_argument(
+        "--reporter-token",
+        type=str,
+        default=os.environ.get("REPORTER_TOKEN"),
+        help="Reporter-Token für Portal-Integration (env: REPORTER_TOKEN)",
+    )
+
     args = parser.parse_args()
 
     # Pfade auflösen
@@ -303,6 +337,10 @@ Beispiele:
                 success = run_execution(repo_path, spec_path, route, args.dry_run, args.use_proteus)
                 if not success:
                     sys.exit(1)
+
+                # Summary generieren nach erfolgreicher Execution
+                executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus)
+                executor.generate_summary()
 
         # Ship only
         if args.phase == "ship":

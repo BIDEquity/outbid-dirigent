@@ -67,6 +67,12 @@ class DirigentLogger:
         self._total_commits = 0
         self._total_deviations = 0
 
+        # Token/Cost tracking
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
+        self._total_cache_tokens = 0
+        self._total_cost_cents = 0
+
         # Initialisiere Log-Dateien
         self._write_to_file(f"# Outbid Dirigent Log - {timestamp}\n")
 
@@ -263,6 +269,87 @@ class DirigentLogger:
             "deviationCount": deviation_count,
             "commitCount": commit_count,
         })
+
+    def api_usage(
+        self,
+        component: str,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int = 0,
+        cache_write_tokens: int = 0,
+        cost_cents: int = 0,
+        operation: Optional[str] = None,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+        duration_ms: Optional[int] = None,
+    ):
+        """Emits API usage tracking event."""
+        self._total_input_tokens += input_tokens
+        self._total_output_tokens += output_tokens
+        self._total_cache_tokens += cache_read_tokens
+        self._total_cost_cents += cost_cents
+
+        data = {
+            "component": component,
+            "model": model,
+            "inputTokens": input_tokens,
+            "outputTokens": output_tokens,
+            "cacheReadTokens": cache_read_tokens,
+            "cacheWriteTokens": cache_write_tokens,
+            "costCents": cost_cents,
+        }
+        if operation:
+            data["operation"] = operation
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        if duration_ms is not None:
+            data["durationMs"] = duration_ms
+
+        self._emit_json("api_usage", data)
+
+        # Log to text file
+        cost_usd = cost_cents / 100
+        self._log(
+            "stats",
+            f"API Usage ({component}): {input_tokens} in / {output_tokens} out = ${cost_usd:.4f}",
+            data=data,
+        )
+
+    def summary(
+        self,
+        markdown: str,
+        files_changed: list,
+        decisions: list,
+        deviations: list,
+        total_cost_cents: int,
+        total_input_tokens: int,
+        total_output_tokens: int,
+    ):
+        """Emits the final summary event with execution report."""
+        self._emit_json("summary", {
+            "markdown": markdown,
+            "filesChanged": files_changed,
+            "decisions": decisions,
+            "deviations": deviations,
+            "totalCostCents": total_cost_cents,
+            "totalInputTokens": total_input_tokens,
+            "totalOutputTokens": total_output_tokens,
+        })
+
+        # Log summary to file
+        self._log("done", f"Summary: ${total_cost_cents/100:.2f}, {len(files_changed)} Dateien, {len(decisions)} Entscheidungen")
+
+    def get_cost_totals(self) -> dict:
+        """Returns accumulated token/cost totals."""
+        return {
+            "total_input_tokens": self._total_input_tokens,
+            "total_output_tokens": self._total_output_tokens,
+            "total_cache_tokens": self._total_cache_tokens,
+            "total_cost_cents": self._total_cost_cents,
+        }
 
     def run_complete(self, success: bool):
         """Emits the final complete JSON event."""

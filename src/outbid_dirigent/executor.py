@@ -727,6 +727,170 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
             self.logger.error(f"Shipping fehlgeschlagen: {e}")
             return False
 
+    def generate_summary(self) -> Dict[str, Any]:
+        """
+        Generiert das Abschlussprotokoll mit allen gesammelten Daten.
+        Wird nach execute_plan() aufgerufen.
+        """
+        self.logger.info("Generiere Abschlussprotokoll...")
+
+        plan = self._load_plan()
+        plan_title = plan.get("title", "Feature") if plan else "Feature"
+
+        # Sammle Task-Summaries
+        summaries = []
+        for summary_file in sorted(self.summaries_dir.glob("*-SUMMARY.md")):
+            summaries.append(summary_file.read_text(encoding="utf-8"))
+
+        # Oracle-Entscheidungen laden
+        decisions = self.oracle.get_all_decisions()
+
+        # Git diff für geänderte Dateien
+        files_changed = self._get_files_changed()
+
+        # Deviations sammeln
+        deviations = self._collect_all_deviations(summaries)
+
+        # Kosten-Totals vom Logger holen
+        cost_totals = self.logger.get_cost_totals()
+
+        # Markdown generieren
+        markdown = self._generate_summary_markdown(
+            plan_title, summaries, decisions, files_changed, deviations, cost_totals
+        )
+
+        # Event emittieren
+        self.logger.summary(
+            markdown=markdown,
+            files_changed=files_changed,
+            decisions=[{
+                "question": d["question"][:200],
+                "decision": d["decision"],
+                "reason": d["reason"]
+            } for d in decisions],
+            deviations=deviations,
+            total_cost_cents=cost_totals["total_cost_cents"],
+            total_input_tokens=cost_totals["total_input_tokens"],
+            total_output_tokens=cost_totals["total_output_tokens"],
+        )
+
+        return {
+            "markdown": markdown,
+            "files_changed": files_changed,
+            "decisions": decisions,
+            "deviations": deviations,
+            "cost_totals": cost_totals,
+        }
+
+    def _get_files_changed(self) -> List[Dict]:
+        """Holt geänderte Dateien via git diff."""
+        try:
+            # Anzahl Commits aus dem Plan ermitteln
+            result = subprocess.run(
+                ["git", "diff", "--numstat", "HEAD~20..HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            files = []
+            for line in result.stdout.strip().split("\n"):
+                if line:
+                    parts = line.split("\t")
+                    if len(parts) == 3:
+                        added = int(parts[0]) if parts[0] != '-' else 0
+                        removed = int(parts[1]) if parts[1] != '-' else 0
+                        files.append({
+                            "path": parts[2],
+                            "lines_added": added,
+                            "lines_removed": removed,
+                        })
+            return files
+        except Exception as e:
+            self.logger.debug(f"Git diff Fehler: {e}")
+            return []
+
+    def _collect_all_deviations(self, summaries: List[str]) -> List[Dict]:
+        """Sammelt alle Deviations aus den Task-Summaries."""
+        all_deviations = []
+        for summary in summaries:
+            deviations = self._extract_deviations(summary)
+            all_deviations.extend(deviations)
+        return all_deviations
+
+    def _generate_summary_markdown(
+        self,
+        title: str,
+        summaries: List[str],
+        decisions: List[Dict],
+        files: List[Dict],
+        deviations: List[Dict],
+        cost_totals: Dict,
+    ) -> str:
+        """Erstellt lesbares Abschlussprotokoll."""
+        plan = self._load_plan()
+        phases_count = len(plan.get("phases", [])) if plan else 0
+        tasks_count = sum(len(p.get("tasks", [])) for p in plan.get("phases", [])) if plan else 0
+
+        md = [f"# Abschlussprotokoll: {title}\n"]
+        md.append(f"**Datum:** {datetime.now().strftime('%d.%m.%Y %H:%M')}\n")
+
+        # Übersicht
+        md.append("## Übersicht\n")
+        cost_usd = cost_totals["total_cost_cents"] / 100
+        md.append(f"- **Phasen:** {phases_count}")
+        md.append(f"- **Tasks:** {tasks_count}")
+        md.append(f"- **Dateien geändert:** {len(files)}")
+        md.append(f"- **Deviations:** {len(deviations)}")
+        md.append(f"- **Oracle-Entscheidungen:** {len(decisions)}")
+        md.append(f"- **API-Kosten:** ${cost_usd:.2f}")
+        md.append(f"- **Tokens:** {cost_totals['total_input_tokens']:,} in / {cost_totals['total_output_tokens']:,} out\n")
+
+        # Geänderte Dateien
+        if files:
+            md.append("## Geänderte Dateien\n")
+            for f in files[:30]:  # Max 30
+                md.append(f"- `{f['path']}` (+{f['lines_added']}/-{f['lines_removed']})")
+            if len(files) > 30:
+                md.append(f"- ... und {len(files) - 30} weitere Dateien")
+            md.append("")
+
+        # Oracle-Entscheidungen
+        if decisions:
+            md.append("## Oracle-Entscheidungen\n")
+            for d in decisions[:15]:  # Max 15
+                question_short = d['question'][:100] + "..." if len(d['question']) > 100 else d['question']
+                md.append(f"**Q:** {question_short}")
+                md.append(f"**A:** {d['decision']}")
+                md.append(f"*{d['reason']}*\n")
+            if len(decisions) > 15:
+                md.append(f"... und {len(decisions) - 15} weitere Entscheidungen\n")
+
+        # Deviations
+        if deviations:
+            md.append("## Deviations\n")
+            for dev in deviations:
+                md.append(f"- **{dev['type']}:** {dev['description']}")
+            md.append("")
+
+        # Task-Summaries (komprimiert)
+        if summaries:
+            md.append("## Task-Details\n")
+            for i, summary in enumerate(summaries[:10], 1):
+                # Nur erste Zeilen pro Summary
+                lines = summary.strip().split("\n")
+                title_line = lines[0] if lines else f"Task {i}"
+                md.append(f"### {title_line}")
+                # Nur "Was wurde gemacht" Sektion
+                match = re.search(r"## Was wurde gemacht\n(.+?)(?=\n##|\Z)", summary, re.DOTALL)
+                if match:
+                    md.append(match.group(1).strip()[:300])
+                md.append("")
+            if len(summaries) > 10:
+                md.append(f"... und {len(summaries) - 10} weitere Tasks\n")
+
+        return "\n".join(md)
+
     def _generate_pr_body(self) -> str:
         """Generiert den PR Body."""
         plan = self._load_plan()
