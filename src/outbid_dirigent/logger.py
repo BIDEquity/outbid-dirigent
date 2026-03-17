@@ -91,8 +91,12 @@ class DirigentLogger:
             "ts": self._iso_timestamp(),
             "data": data,
         }
-        print(f"@@JSON@@{json.dumps(event, ensure_ascii=False)}")
-        sys.stdout.flush()
+        try:
+            print(f"@@JSON@@{json.dumps(event, ensure_ascii=False)}")
+            sys.stdout.flush()
+        except BrokenPipeError:
+            # Pipe closed - ignore
+            pass
 
     def _write_to_file(self, message: str):
         """Schreibt in die Text-Log-Datei."""
@@ -115,8 +119,12 @@ class DirigentLogger:
 
         # Stdout
         if self.verbose or level in [LogLevel.ERROR, LogLevel.WARN]:
-            print(formatted)
-            sys.stdout.flush()
+            try:
+                print(formatted)
+                sys.stdout.flush()
+            except BrokenPipeError:
+                # Pipe closed (e.g., daemon stopped reading) - ignore
+                pass
 
         # Text-Log
         self._write_to_file(formatted)
