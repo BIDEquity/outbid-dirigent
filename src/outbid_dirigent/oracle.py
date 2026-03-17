@@ -17,6 +17,15 @@ import anthropic
 from outbid_dirigent.logger import get_logger
 
 
+def _get_questioner():
+    """Lazy import um circular imports zu vermeiden."""
+    try:
+        from outbid_dirigent.dirigent import get_questioner
+        return get_questioner()
+    except ImportError:
+        return None
+
+
 class Oracle:
     """
     Oracle für architekturelle Entscheidungen.
@@ -252,6 +261,76 @@ Wichtig:
                 "reason": f"Oracle API Fehler: {e}",
                 "confidence": "low",
             }
+
+    def ask_user_or_decide(
+        self,
+        question: str,
+        options: List[str],
+        context: Optional[str] = None,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Fragt zuerst den User (via Interactive Mode), fällt zurück auf AI-Entscheidung.
+
+        Args:
+            question: Die zu beantwortende Frage
+            options: Liste von Optionen
+            context: Zusätzlicher Kontext für den User
+            task_id: Aktuelle Task-ID (für Portal-Anzeige)
+            phase: Aktuelle Phase (für Portal-Anzeige)
+
+        Returns:
+            Dict mit 'decision', 'reason' und 'source' ('user' oder 'oracle')
+        """
+        questioner = _get_questioner()
+
+        # Versuche User zu fragen
+        if questioner and questioner.is_active():
+            self.logger.info(f"Frage User: {question[:80]}...")
+
+            result = questioner.ask(
+                question=question,
+                options=options,
+                context=context,
+                task_id=task_id,
+                phase=phase,
+            )
+
+            if result.answered and result.answer:
+                self.logger.info(f"User-Antwort: {result.answer}")
+
+                # Cache auch User-Entscheidungen
+                cache_key = self._get_cache_key(question, options)
+                self.decisions["decisions"].append({
+                    "cache_key": cache_key,
+                    "question": question,
+                    "options": options,
+                    "decision": result.answer,
+                    "reason": "Vom User entschieden",
+                    "confidence": "high",
+                    "source": "user",
+                    "timestamp": datetime.now().isoformat(),
+                })
+                self._save_decisions()
+
+                return {
+                    "decision": result.answer,
+                    "reason": "Vom User entschieden",
+                    "confidence": "high",
+                    "source": "user",
+                }
+
+            elif result.timed_out:
+                self.logger.warn(f"User-Frage Timeout nach {result.wait_time_seconds}s")
+            else:
+                self.logger.debug("Questioner nicht verfügbar oder keine Antwort")
+
+        # Fallback: Oracle entscheidet
+        self.logger.info("Fallback auf Oracle-Entscheidung...")
+        result = self.query(question, options, context)
+        result["source"] = "oracle"
+        return result
 
     def decide_architecture(
         self,

@@ -22,6 +22,20 @@ from outbid_dirigent.logger import init_logger, get_logger
 from outbid_dirigent.analyzer import Analyzer, load_analysis
 from outbid_dirigent.router import Router, Route, RouteType, StepType, load_route, load_state, mark_step_complete
 from outbid_dirigent.executor import Executor, create_executor
+from outbid_dirigent.questioner import create_questioner, create_dummy_questioner
+
+# Global questioner instance (set in main)
+_questioner = None
+
+def get_questioner():
+    """Gibt die globale Questioner-Instanz zurück."""
+    global _questioner
+    return _questioner
+
+def set_questioner(questioner):
+    """Setzt die globale Questioner-Instanz."""
+    global _questioner
+    _questioner = questioner
 
 
 def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
@@ -307,6 +321,22 @@ Beispiele:
     output_json = args.output == "json"
     logger = init_logger(str(repo_path), verbose, output_json)
     logger.start()
+
+    # Questioner initialisieren (für interaktive Fragen)
+    if args.interactive and args.portal_url and args.execution_id and args.reporter_token:
+        questioner = create_questioner(
+            portal_url=args.portal_url,
+            reporter_token=args.reporter_token,
+            execution_id=args.execution_id,
+            timeout_minutes=args.question_timeout,
+        )
+        questioner.set_logger(logger)
+        set_questioner(questioner)
+        logger.info(f"Interactive Mode aktiviert (Timeout: {args.question_timeout}min)")
+    else:
+        set_questioner(create_dummy_questioner())
+        if args.interactive:
+            logger.warn("Interactive Mode angefordert aber Portal-Credentials fehlen")
 
     try:
         # Resume-Modus
