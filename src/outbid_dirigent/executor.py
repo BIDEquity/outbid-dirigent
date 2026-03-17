@@ -431,6 +431,21 @@ Erstelle den Plan jetzt.
 
         state = self._load_or_init_state()
 
+        # Interactive Mode: Frage User vor Execution-Start
+        total_phases = len(plan.get("phases", []))
+        total_tasks = sum(len(p.get("tasks", [])) for p in plan.get("phases", []))
+
+        result = self.oracle.ask_user_or_decide(
+            question=f"Der Plan enthält {total_phases} Phasen mit {total_tasks} Tasks. Soll die Ausführung gestartet werden?",
+            options=["Ja, starten", "Nein, abbrechen"],
+            context=f"Dieser Vorgang kann nicht rückgängig gemacht werden. Geschätzte Zeit: {total_tasks * 5} Minuten.",
+            phase=0,
+        )
+
+        if "abbrechen" in result.get("decision", "").lower() or "nein" in result.get("decision", "").lower():
+            self.logger.info("Ausführung vom User abgebrochen")
+            return False
+
         for phase in plan.get("phases", []):
             phase_id = phase["id"]
             phase_name = phase["name"]
