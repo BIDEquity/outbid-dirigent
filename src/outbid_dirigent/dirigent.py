@@ -356,6 +356,23 @@ Beispiele:
         analysis = run_analysis(repo_path, spec_path, force=False)
         route = run_routing(repo_path, analysis)
 
+        # Interactive Mode: Frage User vor dem Start
+        questioner = get_questioner()
+        if questioner and questioner.is_active():
+            from outbid_dirigent.oracle import Oracle
+            oracle = Oracle(str(repo_path))
+
+            result = oracle.ask_user_or_decide(
+                question=f"Route: {route.route_type.value}. Soll die Ausführung gestartet werden?",
+                options=["Ja, starten", "Nein, abbrechen"],
+                context=f"Geschätzte Tasks: {route.estimated_tasks}. Dies kann nicht rückgängig gemacht werden.",
+                phase=0,
+            )
+
+            if "abbrechen" in result.get("decision", "").lower() or "nein" in result.get("decision", "").lower():
+                logger.info("Ausführung vom User abgebrochen")
+                sys.exit(0)
+
         # Execution
         if args.phase in ["execute", "all"]:
             if args.dry_run:
