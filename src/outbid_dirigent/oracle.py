@@ -321,8 +321,8 @@ Wichtig:
                     "source": "user",
                 }
 
-            elif result.timed_out:
-                self.logger.warn(f"User-Frage Timeout nach {result.wait_time_seconds}s")
+            elif result.timeout:
+                self.logger.warn("User-Frage Timeout")
             else:
                 self.logger.debug("Questioner nicht verfügbar oder keine Antwort")
 
