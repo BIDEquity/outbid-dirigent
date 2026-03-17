@@ -49,6 +49,14 @@ class Questioner:
         """Prüft ob der Questioner aktiviert ist."""
         return self._enabled
 
+    def is_active(self) -> bool:
+        """Alias für is_enabled() - für Kompatibilität mit Oracle."""
+        return self._enabled
+
+    def set_logger(self, logger):
+        """Setzt den Logger (optional, da bereits in __init__ gesetzt)."""
+        self.logger = logger
+
     def ask(
         self,
         question: str,
