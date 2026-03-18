@@ -273,9 +273,16 @@ Beispiele:
     )
 
     parser.add_argument(
+        "--execution-mode",
+        choices=["autonomous", "plan_first", "interactive"],
+        default="autonomous",
+        help="Execution Mode: autonomous (keine Fragen), plan_first (Plan bestätigen), interactive (Rückfragen)",
+    )
+
+    parser.add_argument(
         "--interactive",
         action="store_true",
-        help="Erlaubt interaktive Fragen an den User via Portal",
+        help="[DEPRECATED] Nutze --execution-mode interactive",
     )
 
     parser.add_argument(
@@ -356,30 +363,12 @@ Beispiele:
         analysis = run_analysis(repo_path, spec_path, force=False)
         route = run_routing(repo_path, analysis)
 
-        # Interactive Mode: Frage User vor dem Start
-        questioner = get_questioner()
-        if questioner and questioner.is_active():
-            logger.info("Interactive Mode: Frage User vor Start...")
+        # Determine execution mode (--execution-mode takes precedence over --interactive)
+        execution_mode = args.execution_mode
+        if execution_mode == "autonomous" and args.interactive:
+            execution_mode = "interactive"  # Backwards compatibility
 
-            # Direkt den Questioner nutzen, nicht Oracle
-            question_result = questioner.ask(
-                question=f"Route: {route.route_type.value}. Soll die Ausführung gestartet werden?",
-                options=["Ja, starten", "Nein, abbrechen"],
-                context=f"Geschätzte Tasks: {route.estimated_tasks}. Dies kann nicht rückgängig gemacht werden.",
-                phase=0,
-                default_on_timeout="Ja, starten",  # Bei Fehler/Timeout: weitermachen
-            )
-
-            if question_result.answered and question_result.answer:
-                if "abbrechen" in question_result.answer.lower() or "nein" in question_result.answer.lower():
-                    logger.info("Ausführung vom User abgebrochen")
-                    sys.exit(0)
-                else:
-                    logger.info(f"User bestätigt: {question_result.answer}")
-            elif question_result.timeout:
-                logger.warn("Keine Antwort erhalten, fahre fort (Default: Ja)")
-            else:
-                logger.info("Frage konnte nicht gestellt werden, fahre fort")
+        logger.info(f"Execution Mode: {execution_mode}")
 
         # Execution
         if args.phase in ["execute", "all"]:
