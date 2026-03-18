@@ -9,6 +9,8 @@ import re
 import json
 import subprocess
 import shutil
+import time
+import requests
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
@@ -92,6 +94,10 @@ class Executor:
 
         # Spec-Inhalt laden
         self.spec_content = self.spec_path.read_text(encoding="utf-8")
+
+        # Ship-Ergebnisse (werden von ship() gesetzt und von generate_summary() gelesen)
+        self.shipped_branch_name: Optional[str] = None
+        self.shipped_pr_url: Optional[str] = None
 
     def _run_claude(self, prompt: str, timeout: int = None) -> Tuple[bool, str, str]:
         """
@@ -563,7 +569,70 @@ Erstelle den Plan jetzt.
         """Führt einen einzelnen Task aus."""
         task_id = task["id"]
         task_name = task["name"]
+        task_description = task.get("description", "")
         start_time = datetime.now()
+
+        # Interactive Mode: Frage VOR dem Task ob er so ausgeführt werden soll
+        from outbid_dirigent.dirigent import get_questioner, get_execution_mode
+        questioner = get_questioner()
+        execution_mode = get_execution_mode()
+
+        if execution_mode == "interactive" and questioner and questioner.is_active():
+            # Frage vor Task-Ausführung
+            result = questioner.ask(
+                question=f"Task '{task_name}' soll jetzt ausgeführt werden. Wie soll ich vorgehen?",
+                options=[
+                    "Ausführen wie geplant",
+                    "Mit anderem Ansatz ausführen",
+                    "Task überspringen",
+                    "Ausführung abbrechen"
+                ],
+                context=f"Beschreibung: {task_description[:500]}" if task_description else None,
+                task_id=task_id,
+                phase=phase_num,
+                question_type="choice",
+                default_on_timeout="Ausführen wie geplant",
+            )
+
+            if result.answered and result.answer:
+                answer = result.answer.lower()
+                if "abbrechen" in answer:
+                    self.logger.info(f"Task {task_id} vom User abgebrochen")
+                    return TaskResult(
+                        task_id=task_id,
+                        success=False,
+                        commit_hash=None,
+                        summary="Vom User abgebrochen",
+                        deviations=[],
+                        duration_seconds=0,
+                        attempts=0,
+                    )
+                elif "überspringen" in answer or "skip" in answer:
+                    self.logger.skip(task_id, "vom User übersprungen")
+                    return TaskResult(
+                        task_id=task_id,
+                        success=True,  # Task gilt als "erledigt" durch Überspringen
+                        commit_hash=None,
+                        summary="Vom User übersprungen",
+                        deviations=[],
+                        duration_seconds=0,
+                        attempts=0,
+                    )
+                elif "anderem ansatz" in answer or "anders" in answer:
+                    # Frage nach dem alternativen Ansatz
+                    alt_result = questioner.ask_text(
+                        question=f"Wie soll Task '{task_name}' stattdessen ausgeführt werden?",
+                        context=f"Ursprüngliche Beschreibung: {task_description[:300]}",
+                        task_id=task_id,
+                        phase=phase_num,
+                        default_on_timeout="",
+                    )
+                    if alt_result:
+                        # Überschreibe die Task-Beschreibung
+                        task = dict(task)
+                        task["description"] = alt_result
+                        task_description = alt_result
+                        self.logger.info(f"Task {task_id} mit alternativer Beschreibung: {alt_result[:100]}...")
 
         self.logger.task_start(task_id, task_name, phase=phase_num)
 
@@ -646,6 +715,50 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
                 for dev in deviations:
                     self.logger.deviation(dev["type"], dev["description"],
                                           task_id=task_id, phase=phase_num)
+
+                # Interactive Mode: Bei Deviations den User fragen ob das ok ist
+                if deviations and execution_mode == "interactive" and questioner and questioner.is_active():
+                    deviation_summary = "\n".join([
+                        f"- {d['type']}: {d['description'][:100]}"
+                        for d in deviations[:5]  # Max 5 zeigen
+                    ])
+
+                    dev_result = questioner.ask(
+                        question=f"Task '{task_name}' hatte {len(deviations)} Abweichung(en). Ist das ok?",
+                        options=[
+                            "Ja, weiter",
+                            "Nein, Task wiederholen",
+                            "Nein, Ausführung abbrechen"
+                        ],
+                        context=f"Abweichungen:\n{deviation_summary}",
+                        task_id=task_id,
+                        phase=phase_num,
+                        question_type="choice",
+                        default_on_timeout="Ja, weiter",
+                    )
+
+                    if dev_result.answered and dev_result.answer:
+                        answer = dev_result.answer.lower()
+                        if "wiederholen" in answer or "retry" in answer:
+                            self.logger.info(f"Task {task_id} wird auf User-Wunsch wiederholt")
+                            # Git reset zum vorherigen Stand
+                            subprocess.run(
+                                ["git", "reset", "--hard", "HEAD~1"],
+                                cwd=self.repo_path,
+                                capture_output=True,
+                            )
+                            continue  # Nächster Versuch
+                        elif "abbrechen" in answer:
+                            self.logger.info(f"Ausführung auf User-Wunsch abgebrochen")
+                            return TaskResult(
+                                task_id=task_id,
+                                success=False,
+                                commit_hash=None,
+                                summary="Vom User abgebrochen wegen Deviations",
+                                deviations=deviations,
+                                duration_seconds=(datetime.now() - start_time).total_seconds(),
+                                attempts=attempt,
+                            )
 
                 duration = (datetime.now() - start_time).total_seconds()
                 self.logger.task_done(task_id, commit_hash,
@@ -741,6 +854,9 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
 
         self.logger.ship_start(branch_name)
 
+        # Branch-Name speichern für Summary
+        self.shipped_branch_name = branch_name
+
         if self.dry_run:
             self.logger.info("[DRY-RUN] Würde Branch erstellen und pushen")
             return True
@@ -789,6 +905,7 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
                 if result.returncode == 0:
                     # PR URL extrahieren
                     pr_url = result.stdout.strip()
+                    self.shipped_pr_url = pr_url
                     self.logger.ship_done(pr_url)
                 else:
                     self.logger.info(f"PR-Erstellung fehlgeschlagen: {result.stderr}")
@@ -803,7 +920,7 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
             self.logger.error(f"Shipping fehlgeschlagen: {e}")
             return False
 
-    def generate_summary(self) -> Dict[str, Any]:
+    def generate_summary(self, branch_name: str = None, pr_url: str = None) -> Dict[str, Any]:
         """
         Generiert das Abschlussprotokoll mit allen gesammelten Daten.
         Wird nach execute_plan() aufgerufen.
@@ -830,12 +947,27 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
         # Kosten-Totals vom Logger holen
         cost_totals = self.logger.get_cost_totals()
 
+        # Branch-Name ermitteln falls nicht übergeben
+        if not branch_name:
+            branch_name = self.shipped_branch_name or self._get_current_branch()
+
+        # PR-URL aus ship() übernehmen falls nicht übergeben
+        if not pr_url:
+            pr_url = self.shipped_pr_url
+
+        # Commit-Count ermitteln
+        total_commits = self.logger._total_commits
+
+        # Duration berechnen
+        elapsed = datetime.now() - self.logger._start_time
+        duration_ms = int(elapsed.total_seconds() * 1000)
+
         # Markdown generieren
         markdown = self._generate_summary_markdown(
             plan_title, summaries, decisions, files_changed, deviations, cost_totals
         )
 
-        # Event emittieren
+        # Event emittieren (stdout)
         self.logger.summary(
             markdown=markdown,
             files_changed=files_changed,
@@ -850,13 +982,98 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
             total_output_tokens=cost_totals["total_output_tokens"],
         )
 
+        # Summary auch via HTTP ans Portal senden
+        self._send_summary_to_portal(
+            markdown=markdown,
+            files_changed=files_changed,
+            decisions=decisions,
+            deviations=deviations,
+            branch_name=branch_name,
+            pr_url=pr_url,
+            total_commits=total_commits,
+            duration_ms=duration_ms,
+        )
+
         return {
             "markdown": markdown,
             "files_changed": files_changed,
             "decisions": decisions,
             "deviations": deviations,
             "cost_totals": cost_totals,
+            "branch_name": branch_name,
+            "pr_url": pr_url,
         }
+
+    def _get_current_branch(self) -> Optional[str]:
+        """Holt den aktuellen Branch-Namen."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception:
+            pass
+        return None
+
+    def _send_summary_to_portal(
+        self,
+        markdown: str,
+        files_changed: List[Dict],
+        decisions: List[Dict],
+        deviations: List[Dict],
+        branch_name: Optional[str],
+        pr_url: Optional[str],
+        total_commits: int,
+        duration_ms: int,
+    ):
+        """Sendet Summary via HTTP an das Portal."""
+        from outbid_dirigent.dirigent import get_questioner
+
+        questioner = get_questioner()
+        if not questioner or not hasattr(questioner, 'portal_url'):
+            self.logger.debug("Kein Questioner mit Portal-Credentials verfügbar")
+            return
+
+        try:
+            response = requests.post(
+                f"{questioner.portal_url}/api/execution-event",
+                headers={"X-Reporter-Token": questioner.reporter_token},
+                json={
+                    "execution_id": questioner.execution_id,
+                    "event": {
+                        "type": "summary",
+                        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "data": {
+                            "markdown": markdown,
+                            "filesChanged": files_changed,
+                            "decisions": [{
+                                "question": d["question"][:200],
+                                "decision": d["decision"],
+                                "reason": d["reason"]
+                            } for d in decisions],
+                            "deviations": deviations,
+                            "branchName": branch_name,
+                            "prUrl": pr_url,
+                            "totalCommits": total_commits,
+                            "durationMs": duration_ms,
+                        }
+                    }
+                },
+                timeout=30,
+            )
+
+            if response.status_code == 200:
+                self.logger.info("Summary ans Portal gesendet")
+            else:
+                self.logger.debug(f"Summary-Übertragung fehlgeschlagen: {response.status_code}")
+
+        except requests.RequestException as e:
+            self.logger.debug(f"Summary-Übertragung fehlgeschlagen: {e}")
 
     def _get_files_changed(self) -> List[Dict]:
         """Holt geänderte Dateien via git diff."""
