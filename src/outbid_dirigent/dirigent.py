@@ -26,6 +26,8 @@ from outbid_dirigent.questioner import create_questioner, create_dummy_questione
 
 # Global questioner instance (set in main)
 _questioner = None
+# Global execution mode (autonomous, plan_first, interactive)
+_execution_mode = "autonomous"
 
 def get_questioner():
     """Gibt die globale Questioner-Instanz zurück."""
@@ -36,6 +38,16 @@ def set_questioner(questioner):
     """Setzt die globale Questioner-Instanz."""
     global _questioner
     _questioner = questioner
+
+def get_execution_mode():
+    """Gibt den aktuellen Execution Mode zurück."""
+    global _execution_mode
+    return _execution_mode
+
+def set_execution_mode(mode: str):
+    """Setzt den Execution Mode."""
+    global _execution_mode
+    _execution_mode = mode
 
 
 def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
@@ -416,6 +428,8 @@ Beispiele:
         if execution_mode == "autonomous" and args.interactive:
             execution_mode = "interactive"  # Backwards compatibility
 
+        # Set global execution mode for other modules to access
+        set_execution_mode(execution_mode)
         logger.info(f"Execution Mode: {execution_mode}")
 
         # Execution

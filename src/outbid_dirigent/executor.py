@@ -465,11 +465,15 @@ Erstelle den Plan jetzt.
         total_phases = len(plan.get("phases", []))
         total_tasks = sum(len(p.get("tasks", [])) for p in plan.get("phases", []))
 
-        # Nur im Interactive Mode User fragen - im Autonomous Mode einfach starten
-        from outbid_dirigent.dirigent import get_questioner
+        # Nur im Interactive Mode User fragen - im Autonomous und Plan-First Mode einfach starten
+        from outbid_dirigent.dirigent import get_questioner, get_execution_mode
         questioner = get_questioner()
+        execution_mode = get_execution_mode()
 
-        if questioner and questioner.is_active():
+        # In plan_first mode: User hat bereits beim Plan-Approval zugestimmt
+        # In interactive mode: Frage vor Start stellen
+        # In autonomous mode: Einfach starten
+        if execution_mode == "interactive" and questioner and questioner.is_active():
             # Interactive Mode: User fragen
             result = questioner.ask(
                 question=f"Der Plan enthält {total_phases} Phasen mit {total_tasks} Tasks. Soll die Ausführung gestartet werden?",
@@ -486,12 +490,13 @@ Erstelle den Plan jetzt.
                 self.logger.info("Frage-Timeout, starte Ausführung...")
             # Bei skipped oder no answer: weitermachen
         else:
-            # Autonomous Mode: Einfach starten ohne zu fragen
-            self.logger.info(f"Starte autonome Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
+            # Autonomous/Plan-First Mode: Einfach starten ohne zu fragen
+            self.logger.info(f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
 
         for phase in plan.get("phases", []):
-            phase_id = phase["id"]
-            phase_name = phase["name"]
+            # Support both "id" and "phase" field names for compatibility
+            phase_id = str(phase.get("id") or phase.get("phase", "1"))
+            phase_name = phase.get("name", f"Phase {phase_id}")
             phase_tasks = phase.get("tasks", [])
             phase_num = int(phase_id) if phase_id.isdigit() else phase_id
 
