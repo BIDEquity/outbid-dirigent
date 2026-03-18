@@ -462,20 +462,32 @@ Erstelle den Plan jetzt.
 
         state = self._load_or_init_state()
 
-        # Interactive Mode: Frage User vor Execution-Start
         total_phases = len(plan.get("phases", []))
         total_tasks = sum(len(p.get("tasks", [])) for p in plan.get("phases", []))
 
-        result = self.oracle.ask_user_or_decide(
-            question=f"Der Plan enthält {total_phases} Phasen mit {total_tasks} Tasks. Soll die Ausführung gestartet werden?",
-            options=["Ja, starten", "Nein, abbrechen"],
-            context=f"Dieser Vorgang kann nicht rückgängig gemacht werden. Geschätzte Zeit: {total_tasks * 5} Minuten.",
-            phase=0,
-        )
+        # Nur im Interactive Mode User fragen - im Autonomous Mode einfach starten
+        from outbid_dirigent.dirigent import get_questioner
+        questioner = get_questioner()
 
-        if "abbrechen" in result.get("decision", "").lower() or "nein" in result.get("decision", "").lower():
-            self.logger.info("Ausführung vom User abgebrochen")
-            return False
+        if questioner and questioner.is_active():
+            # Interactive Mode: User fragen
+            result = questioner.ask(
+                question=f"Der Plan enthält {total_phases} Phasen mit {total_tasks} Tasks. Soll die Ausführung gestartet werden?",
+                options=["Ja, starten", "Nein, abbrechen"],
+                context=f"Geschätzte Zeit: {total_tasks * 5} Minuten.",
+                phase=0,
+            )
+
+            if result.answered and result.answer:
+                if "abbrechen" in result.answer.lower() or "nein" in result.answer.lower():
+                    self.logger.info("Ausführung vom User abgebrochen")
+                    return False
+            elif result.timeout:
+                self.logger.info("Frage-Timeout, starte Ausführung...")
+            # Bei skipped oder no answer: weitermachen
+        else:
+            # Autonomous Mode: Einfach starten ohne zu fragen
+            self.logger.info(f"Starte autonome Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
 
         for phase in plan.get("phases", []):
             phase_id = phase["id"]
