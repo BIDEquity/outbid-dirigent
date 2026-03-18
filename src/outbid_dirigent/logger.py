@@ -420,6 +420,9 @@ class DirigentLogger:
     def info(self, message: str):
         self._log("stats", message)
 
+    def warn(self, message: str):
+        self._log("deviation", message, LogLevel.WARN)
+
     def debug(self, message: str, data: Optional[dict] = None):
         if self.verbose:
             self._log("stats", f"[DEBUG] {message}", level=LogLevel.DEBUG, data=data)
