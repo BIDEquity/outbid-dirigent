@@ -88,10 +88,19 @@ def run_routing(repo_path: Path, analysis) -> Route:
     return route
 
 
-def run_execution(repo_path: Path, spec_path: Path, route: Route, dry_run: bool = False, use_proteus: bool = False) -> bool:
+def run_execution(
+    repo_path: Path,
+    spec_path: Path,
+    route: Route,
+    dry_run: bool = False,
+    use_proteus: bool = False,
+    execution_mode: str = "autonomous",
+) -> bool:
     """Führt alle Schritte basierend auf der Route aus."""
+    import json
     logger = get_logger()
     executor = create_executor(str(repo_path), str(spec_path), dry_run, use_proteus)
+    questioner = get_questioner()
 
     state = load_state(str(repo_path)) or {"completed_steps": []}
     completed_steps = state.get("completed_steps", [])
@@ -114,6 +123,42 @@ def run_execution(repo_path: Path, spec_path: Path, route: Route, dry_run: bool 
 
         elif step.step_type == StepType.PLANNING:
             success = executor.create_plan()
+
+            # plan_first: Nach Plan-Erstellung auf Genehmigung warten
+            if success and execution_mode == "plan_first" and questioner and questioner.is_enabled():
+                plan_file = repo_path / ".dirigent" / "PLAN.json"
+                if plan_file.exists():
+                    try:
+                        with open(plan_file, encoding="utf-8") as f:
+                            plan_content = json.load(f)
+
+                        logger.info("Warte auf Plan-Genehmigung...")
+                        result = questioner.submit_plan_for_approval(plan_content)
+
+                        if result["status"] == "rejected":
+                            logger.stop(f"Plan abgelehnt: {result.get('message', 'Keine Begründung')}")
+                            return False
+
+                        elif result["status"] == "timeout":
+                            logger.stop("Plan-Genehmigung Timeout - breche ab")
+                            return False
+
+                        elif result["status"] == "error":
+                            logger.error(f"Plan-Approval Fehler: {result.get('message')}")
+                            return False
+
+                        elif result["status"] == "edited":
+                            # Editierten Plan speichern
+                            edited_plan = result["plan"]
+                            with open(plan_file, "w", encoding="utf-8") as f:
+                                json.dump(edited_plan, f, indent=2, ensure_ascii=False)
+                            logger.info("Editierter Plan gespeichert")
+
+                        # approved oder edited -> weiter
+
+                    except Exception as e:
+                        logger.error(f"Fehler beim Plan-Approval: {e}")
+                        return False
 
         elif step.step_type == StepType.EXECUTION:
             success = executor.execute_plan()
@@ -329,8 +374,11 @@ Beispiele:
     logger = init_logger(str(repo_path), verbose, output_json)
     logger.start()
 
-    # Questioner initialisieren (für interaktive Fragen)
-    if args.interactive and args.portal_url and args.execution_id and args.reporter_token:
+    # Questioner initialisieren (für interaktive Fragen und plan_first)
+    needs_questioner = args.interactive or args.execution_mode in ["interactive", "plan_first"]
+    has_credentials = args.portal_url and args.execution_id and args.reporter_token
+
+    if needs_questioner and has_credentials:
         questioner = create_questioner(
             portal_url=args.portal_url,
             reporter_token=args.reporter_token,
@@ -339,11 +387,11 @@ Beispiele:
         )
         questioner.set_logger(logger)
         set_questioner(questioner)
-        logger.info(f"Interactive Mode aktiviert (Timeout: {args.question_timeout}min)")
+        logger.info(f"Portal-Integration aktiviert (Timeout: {args.question_timeout}min)")
     else:
         set_questioner(create_dummy_questioner())
-        if args.interactive:
-            logger.warn("Interactive Mode angefordert aber Portal-Credentials fehlen")
+        if needs_questioner:
+            logger.warn(f"Execution Mode '{args.execution_mode}' benötigt Portal-Credentials (fehlen)")
 
     try:
         # Resume-Modus
@@ -378,7 +426,9 @@ Beispiele:
                 logger.info(f"Schritte: {[s.name for s in route.steps]}")
                 logger.info(f"Geschätzte Tasks: {route.estimated_tasks}")
             else:
-                success = run_execution(repo_path, spec_path, route, args.dry_run, args.use_proteus)
+                success = run_execution(
+                    repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode
+                )
                 if not success:
                     sys.exit(1)
 

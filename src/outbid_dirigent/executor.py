@@ -14,10 +14,41 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 
+import unicodedata
+
 from outbid_dirigent.logger import get_logger
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.router import load_state, save_state, mark_step_complete
 from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
+
+
+def slugify(text: str, max_length: int = 50) -> str:
+    """
+    Konvertiert Text in einen URL-sicheren Slug für Branch-Namen.
+
+    Beispiel: "Add Dark Mode Toggle" -> "add-dark-mode-toggle"
+    """
+    # Unicode normalisieren und zu ASCII konvertieren
+    text = unicodedata.normalize('NFKD', text)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+
+    # Kleinbuchstaben
+    text = text.lower()
+
+    # Nur alphanumerische Zeichen und Leerzeichen behalten
+    text = re.sub(r'[^a-z0-9\s-]', '', text)
+
+    # Leerzeichen und mehrfache Bindestriche durch einzelnen Bindestrich ersetzen
+    text = re.sub(r'[\s_-]+', '-', text)
+
+    # Führende und nachfolgende Bindestriche entfernen
+    text = text.strip('-')
+
+    # Auf max_length kürzen (am Wortende)
+    if len(text) > max_length:
+        text = text[:max_length].rsplit('-', 1)[0]
+
+    return text or "feature"
 
 
 @dataclass
@@ -673,10 +704,23 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
     def ship(self) -> bool:
         """Erstellt Branch, pusht und erstellt PR."""
         plan = self._load_plan()
-        spec_title = plan.get("title", "Dirigent Feature") if plan else "Dirigent Feature"
+        spec_title = plan.get("title", "Feature") if plan else "Feature"
 
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        branch_name = f"feature/dirigent-{timestamp}"
+        # Branch-Name aus Titel generieren: dirigent/<slug>
+        slug = slugify(spec_title)
+        branch_name = f"dirigent/{slug}"
+
+        # Prüfen ob Branch bereits existiert, dann Suffix anhängen
+        check_result = subprocess.run(
+            ["git", "rev-parse", "--verify", branch_name],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True,
+        )
+        if check_result.returncode == 0:
+            # Branch existiert, Timestamp anhängen
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            branch_name = f"dirigent/{slug}-{timestamp}"
 
         self.logger.ship_start(branch_name)
 

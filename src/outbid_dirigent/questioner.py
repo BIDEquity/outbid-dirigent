@@ -286,6 +286,116 @@ class Questioner:
 
         return result.answer if result.answered and result.answer else default_on_timeout
 
+    def submit_plan_for_approval(
+        self,
+        plan_content: Dict[str, Any],
+        timeout_minutes: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Sendet Plan zur Genehmigung und wartet auf Antwort.
+
+        Args:
+            plan_content: Der Plan als Dict (aus PLAN.json)
+            timeout_minutes: Timeout für Genehmigung (default: self.timeout_minutes)
+
+        Returns:
+            Dict mit:
+                - status: 'approved' | 'rejected' | 'edited' | 'timeout' | 'error'
+                - plan: Der (ggf. editierte) Plan
+                - message: Optional Nachricht vom User
+        """
+        if not self._enabled:
+            self.logger.debug("Questioner deaktiviert, überspringe Plan-Approval")
+            return {"status": "approved", "plan": plan_content, "message": None}
+
+        timeout = timeout_minutes or self.timeout_minutes
+        self.logger.info(f"Plan zur Genehmigung gesendet (Timeout: {timeout}min)")
+
+        # Plan-Event an Portal senden
+        try:
+            response = requests.post(
+                f"{self.portal_url}/api/execution-event",
+                headers={"X-Reporter-Token": self.reporter_token},
+                json={
+                    "execution_id": self.execution_id,
+                    "event": {
+                        "type": "plan",
+                        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "data": {
+                            "planContent": plan_content,
+                            "timeoutMinutes": timeout,
+                        }
+                    }
+                },
+                timeout=30,
+            )
+
+            if response.status_code != 200:
+                self.logger.error(f"Plan konnte nicht gesendet werden: {response.text}")
+                return {"status": "error", "plan": plan_content, "message": response.text}
+
+        except requests.RequestException as e:
+            self.logger.error(f"Netzwerkfehler beim Plan-Senden: {e}")
+            return {"status": "error", "plan": plan_content, "message": str(e)}
+
+        # Auf Genehmigung pollen
+        start_time = time.time()
+        timeout_seconds = timeout * 60
+
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed >= timeout_seconds:
+                self.logger.warn(f"Plan-Approval Timeout nach {timeout}min")
+                return {"status": "timeout", "plan": plan_content, "message": None}
+
+            try:
+                poll_response = requests.get(
+                    f"{self.portal_url}/api/poll-plan-approval",
+                    params={
+                        "execution_id": self.execution_id,
+                        "reporter_token": self.reporter_token,
+                    },
+                    timeout=30,
+                )
+
+                if poll_response.status_code == 200:
+                    data = poll_response.json()
+                    status = data.get("status")
+
+                    if status == "pending":
+                        # Noch keine Entscheidung, weiter pollen
+                        remaining = int((timeout_seconds - elapsed) / 60)
+                        self.logger.debug(f"Warte auf Plan-Approval... ({remaining}min verbleibend)")
+                        time.sleep(self.POLL_INTERVAL)
+                        continue
+
+                    elif status == "approved":
+                        self.logger.info("Plan genehmigt")
+                        return {"status": "approved", "plan": plan_content, "message": None}
+
+                    elif status == "rejected":
+                        message = data.get("message", "Keine Begründung angegeben")
+                        self.logger.warn(f"Plan abgelehnt: {message}")
+                        return {"status": "rejected", "plan": plan_content, "message": message}
+
+                    elif status == "edited":
+                        edited_plan = data.get("plan", plan_content)
+                        self.logger.info("Plan wurde editiert und genehmigt")
+                        return {"status": "edited", "plan": edited_plan, "message": None}
+
+                    else:
+                        self.logger.warn(f"Unbekannter Plan-Status: {status}")
+                        time.sleep(self.POLL_INTERVAL)
+                        continue
+
+                else:
+                    self.logger.debug(f"Poll-Fehler: {poll_response.status_code}")
+                    time.sleep(self.POLL_INTERVAL)
+
+            except requests.RequestException as e:
+                self.logger.debug(f"Poll-Netzwerkfehler: {e}")
+                time.sleep(self.POLL_INTERVAL)
+
 
 def create_questioner(
     portal_url: str,
@@ -326,6 +436,14 @@ class DummyQuestioner:
     def ask_text(self, question: str, default_on_timeout: str = "", **kwargs) -> str:
         self.logger.debug(f"[NON-INTERACTIVE] Text-Frage übersprungen: {question[:50]}...")
         return default_on_timeout
+
+    def submit_plan_for_approval(
+        self,
+        plan_content: Dict[str, Any],
+        timeout_minutes: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        self.logger.debug("[NON-INTERACTIVE] Plan-Approval übersprungen")
+        return {"status": "approved", "plan": plan_content, "message": None}
 
 
 def create_dummy_questioner() -> DummyQuestioner:
