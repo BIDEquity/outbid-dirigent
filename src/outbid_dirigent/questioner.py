@@ -307,6 +307,10 @@ class DummyQuestioner:
     def is_enabled(self) -> bool:
         return False
 
+    def is_active(self) -> bool:
+        """Alias für is_enabled() - für Kompatibilität."""
+        return False
+
     def ask(self, question: str, **kwargs) -> QuestionResult:
         self.logger.debug(f"[NON-INTERACTIVE] Frage übersprungen: {question[:50]}...")
         return QuestionResult(answered=False, answer=None, timeout=False, skipped=True)
