@@ -14,6 +14,7 @@ from loguru import logger
 
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.task_runner import TaskRunner
+from outbid_dirigent.test_manifest import TestManifest
 
 
 class Planner:
@@ -41,6 +42,31 @@ class Planner:
         if context_file.exists():
             repo_context = f"\n## Repo-Kontext\n{context_file.read_text(encoding='utf-8')}\n"
 
+        # Test manifest context
+        manifest = TestManifest.load(self.repo_path)
+        manifest_context = ""
+        if manifest:
+            l1_cmds = ", ".join(f"`{c.run}`" for c in manifest.commands_for_level("l1"))
+            l2_cmds = ", ".join(f"`{c.run}`" for c in manifest.commands_for_level("l2"))
+            real_comps = [c for c in manifest.components if not c.is_mocked]
+            comp_names = ", ".join(c.name for c in real_comps)
+            mocked = manifest.mocked_components()
+            mocked_names = ", ".join(c.name for c in mocked) if mocked else "keine"
+            gaps = ", ".join(manifest.gap_strings()) if manifest.gaps else "keine"
+
+            manifest_context = f"""
+## Test-Manifest vorhanden
+Nutze es fuer Task-Planung:
+- L1 verfuegbar: {l1_cmds or 'keine'}
+- L2 verfuegbar: {l2_cmds or 'keine'} (braucht: {comp_names or 'nichts'})
+- Auto-mocked (kein Setup): {mocked_names}
+- Bekannte Gaps: {gaps}
+- Tasks die testen sollen: test_level auf "L1" oder "L2" setzen
+- Tasks die NICHT testen koennen (Gap): test_level leer lassen
+- Keine eigenen Test-Befehle erfinden — nur Manifest-Commands verwenden
+- Am Ende laeuft ein zentraler TEST-Schritt ueber alle Aenderungen
+"""
+
         prompt = f"""Erstelle einen Ausführungsplan für dieses Feature.
 
 # Spec
@@ -48,6 +74,7 @@ class Planner:
 
 {br_context}
 {repo_context}
+{manifest_context}
 
 Erstelle die Datei .dirigent/PLAN.json mit diesem Format:
 {Plan.json_template()}
@@ -61,6 +88,7 @@ Regeln:
 - Bei Legacy-Migration: Alle Business Rules müssen erhalten bleiben
 - Für "model": Verwende "haiku" für einfache Tasks (delete files, add imports, kleine Änderungen), "sonnet" für Standard-Tasks (neue Methoden, Tests, Refactoring), "opus" nur für sehr komplexe Architektur-Tasks
 - Für "effort": "low" für mechanische Tasks, "medium" für Standard, "high" für komplexe Logik
+- Für "test_level": "L1" wenn der Task mit Unit Tests/Lint verifiziert werden soll, "L2" wenn Integration Tests nötig sind, leer wenn kein Testing nötig
 - Für "assumptions": Liste alle Annahmen über die Codebase auf (z.B. "Tests laufen mit pytest")
 - Für "out_of_scope": Liste explizit auf was NICHT gemacht werden soll
 
