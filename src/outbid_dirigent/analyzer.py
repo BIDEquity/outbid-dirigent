@@ -52,10 +52,36 @@ class SpecAnalysis:
 
 
 @dataclass
+class RuntimeRequirement:
+    """Eine benötigte Runtime-Abhängigkeit (Service, Tool, etc.)."""
+    name: str
+    type: str  # database, cache, queue, storage, api
+    docker_image: Optional[str] = None
+    port: Optional[int] = None
+    env_vars: Optional[List[str]] = None
+
+
+@dataclass
+class RuntimeAnalysis:
+    """Analyse wie das Projekt lokal gestartet wird."""
+    start_command: str  # z.B. "npm run dev"
+    port: int  # z.B. 3000
+    package_manager: str  # npm, yarn, pnpm, pip, go, etc.
+    framework: Optional[str]  # Next.js, FastAPI, etc.
+    services: List[RuntimeRequirement]  # Benötigte Services (DB, Redis, etc.)
+    setup_steps: List[str]  # z.B. ["npm install", "npm run db:migrate"]
+    uses_doppler: bool  # Ob Doppler für Secrets verwendet wird
+    uses_docker_compose: bool  # Ob docker-compose.yml vorhanden ist
+    env_file: Optional[str]  # .env.example oder .env.local
+    health_check_path: Optional[str]  # z.B. "/api/health"
+
+
+@dataclass
 class AnalysisResult:
     """Kombiniertes Analyse-Ergebnis."""
     repo: RepoAnalysis
     spec: SpecAnalysis
+    runtime: Optional[RuntimeAnalysis]  # NEU: Runtime-Analyse
     route: str  # greenfield, legacy, hybrid
     route_reason: str
     confidence: str  # low, medium, high
@@ -211,6 +237,7 @@ class Analyzer:
 
         repo_analysis = self._analyze_repo()
         spec_analysis = self._analyze_spec()
+        runtime_analysis = self._analyze_runtime(repo_analysis)
 
         # Log Statistiken
         age_info = f"{repo_analysis.last_commit_days_ago} Tage seit letztem Commit"
@@ -224,6 +251,13 @@ class Analyzer:
             age_info
         )
 
+        # Log Runtime-Info
+        if runtime_analysis:
+            self.logger.debug(
+                f"Runtime: {runtime_analysis.start_command} (Port {runtime_analysis.port}), "
+                f"{len(runtime_analysis.services)} Services, Doppler: {runtime_analysis.uses_doppler}"
+            )
+
         # Route bestimmen
         route, reason, confidence, legacy_signals, greenfield_signals = self._determine_route(
             repo_analysis, spec_analysis
@@ -235,6 +269,7 @@ class Analyzer:
         result = AnalysisResult(
             repo=repo_analysis,
             spec=spec_analysis,
+            runtime=runtime_analysis,
             route=route,
             route_reason=reason,
             confidence=confidence,
@@ -470,6 +505,249 @@ class Analyzer:
 
         return False
 
+    def _analyze_runtime(self, repo: RepoAnalysis) -> Optional[RuntimeAnalysis]:
+        """Analysiert wie das Projekt lokal gestartet werden kann."""
+        try:
+            start_command = "npm run dev"
+            port = 3000
+            package_manager = "npm"
+            framework = repo.framework_detected
+            services: List[RuntimeRequirement] = []
+            setup_steps: List[str] = []
+            uses_doppler = False
+            uses_docker_compose = False
+            env_file = None
+            health_check_path = None
+
+            # 1. Package Manager und Start-Command aus package.json
+            package_json_path = self.repo_path / "package.json"
+            if package_json_path.exists():
+                try:
+                    package_data = json.loads(package_json_path.read_text(encoding="utf-8"))
+                    scripts = package_data.get("scripts", {})
+                    deps = {**package_data.get("dependencies", {}), **package_data.get("devDependencies", {})}
+
+                    # Package Manager erkennen
+                    pkg_manager = package_data.get("packageManager", "")
+                    if pkg_manager.startswith("yarn"):
+                        package_manager = "yarn"
+                    elif pkg_manager.startswith("pnpm"):
+                        package_manager = "pnpm"
+                    elif (self.repo_path / "yarn.lock").exists():
+                        package_manager = "yarn"
+                    elif (self.repo_path / "pnpm-lock.yaml").exists():
+                        package_manager = "pnpm"
+
+                    # Start-Command erkennen
+                    if "dev" in scripts:
+                        start_command = f"{package_manager} run dev" if package_manager != "npm" else "npm run dev"
+                        # Port aus dev script extrahieren
+                        port_match = re.search(r"--port[=\s]+(\d+)|-p[=\s]+(\d+)", scripts["dev"])
+                        if port_match:
+                            port = int(port_match.group(1) or port_match.group(2))
+                    elif "start:dev" in scripts:
+                        start_command = f"{package_manager} run start:dev" if package_manager != "npm" else "npm run start:dev"
+                    elif "serve" in scripts:
+                        start_command = f"{package_manager} run serve" if package_manager != "npm" else "npm run serve"
+
+                    # Framework-spezifische Ports
+                    if "next" in deps:
+                        framework = "Next.js"
+                        port = 3000
+                    elif "nuxt" in deps:
+                        framework = "Nuxt"
+                        port = 3000
+                    elif "@angular/core" in deps:
+                        framework = "Angular"
+                        port = 4200
+                    elif "vue" in deps and "nuxt" not in deps:
+                        framework = "Vue"
+                        port = 5173
+                    elif "svelte" in deps or "@sveltejs/kit" in deps:
+                        framework = "Svelte/SvelteKit"
+                        port = 5173
+                    elif "astro" in deps:
+                        framework = "Astro"
+                        port = 4321
+
+                    # Setup-Steps
+                    setup_steps.append(f"{package_manager} install")
+                    if "db:migrate" in scripts:
+                        setup_steps.append(f"{package_manager} run db:migrate")
+                    elif "migrate" in scripts:
+                        setup_steps.append(f"{package_manager} run migrate")
+                    if "db:seed" in scripts:
+                        setup_steps.append(f"{package_manager} run db:seed")
+
+                    # Services aus Dependencies erkennen
+                    if "pg" in deps or "postgres" in deps or "@prisma/client" in deps:
+                        services.append(RuntimeRequirement(
+                            name="PostgreSQL",
+                            type="database",
+                            docker_image="postgres:15",
+                            port=5432,
+                            env_vars=["POSTGRES_PASSWORD=dev", "POSTGRES_DB=app_dev"]
+                        ))
+                    if "mysql" in deps or "mysql2" in deps:
+                        services.append(RuntimeRequirement(
+                            name="MySQL",
+                            type="database",
+                            docker_image="mysql:8",
+                            port=3306,
+                            env_vars=["MYSQL_ROOT_PASSWORD=dev", "MYSQL_DATABASE=app_dev"]
+                        ))
+                    if "mongodb" in deps or "mongoose" in deps:
+                        services.append(RuntimeRequirement(
+                            name="MongoDB",
+                            type="database",
+                            docker_image="mongo:7",
+                            port=27017
+                        ))
+                    if "redis" in deps or "ioredis" in deps:
+                        services.append(RuntimeRequirement(
+                            name="Redis",
+                            type="cache",
+                            docker_image="redis:7-alpine",
+                            port=6379
+                        ))
+
+                except Exception as e:
+                    self.logger.debug(f"Error parsing package.json: {e}")
+
+            # 2. Python-Projekte
+            elif (self.repo_path / "pyproject.toml").exists() or (self.repo_path / "requirements.txt").exists():
+                package_manager = "pip"
+                setup_steps.append("pip install -r requirements.txt" if (self.repo_path / "requirements.txt").exists() else "pip install -e .")
+
+                # Framework erkennen
+                for req_file in ["requirements.txt", "pyproject.toml"]:
+                    req_path = self.repo_path / req_file
+                    if req_path.exists():
+                        content = req_path.read_text(encoding="utf-8").lower()
+                        if "fastapi" in content:
+                            framework = "FastAPI"
+                            start_command = "uvicorn main:app --reload"
+                            port = 8000
+                        elif "django" in content:
+                            framework = "Django"
+                            start_command = "python manage.py runserver"
+                            port = 8000
+                            setup_steps.append("python manage.py migrate")
+                        elif "flask" in content:
+                            framework = "Flask"
+                            start_command = "flask run"
+                            port = 5000
+                        break
+
+            # 3. Go-Projekte
+            elif (self.repo_path / "go.mod").exists():
+                package_manager = "go"
+                start_command = "go run ."
+                port = 8080
+                framework = "Go"
+
+            # 4. docker-compose.yml analysieren
+            compose_path = self.repo_path / "docker-compose.yml"
+            if not compose_path.exists():
+                compose_path = self.repo_path / "docker-compose.yaml"
+
+            if compose_path.exists():
+                uses_docker_compose = True
+                try:
+                    compose_content = compose_path.read_text(encoding="utf-8").lower()
+
+                    # Services aus docker-compose extrahieren (vereinfacht)
+                    if "postgres" in compose_content and not any(s.name == "PostgreSQL" for s in services):
+                        services.append(RuntimeRequirement(
+                            name="PostgreSQL",
+                            type="database",
+                            docker_image="postgres:15",
+                            port=5432,
+                            env_vars=["POSTGRES_PASSWORD=dev"]
+                        ))
+                    if "redis" in compose_content and not any(s.name == "Redis" for s in services):
+                        services.append(RuntimeRequirement(
+                            name="Redis",
+                            type="cache",
+                            docker_image="redis:7-alpine",
+                            port=6379
+                        ))
+                    if "mongo" in compose_content and not any(s.name == "MongoDB" for s in services):
+                        services.append(RuntimeRequirement(
+                            name="MongoDB",
+                            type="database",
+                            docker_image="mongo:7",
+                            port=27017
+                        ))
+                    if "elasticsearch" in compose_content:
+                        services.append(RuntimeRequirement(
+                            name="Elasticsearch",
+                            type="search",
+                            docker_image="elasticsearch:8.11.0",
+                            port=9200
+                        ))
+                    if "rabbitmq" in compose_content:
+                        services.append(RuntimeRequirement(
+                            name="RabbitMQ",
+                            type="queue",
+                            docker_image="rabbitmq:3-management",
+                            port=5672
+                        ))
+                except Exception as e:
+                    self.logger.debug(f"Error parsing docker-compose: {e}")
+
+            # 5. Doppler-Nutzung erkennen
+            doppler_indicators = [".doppler.yaml", "doppler.yaml"]
+            for indicator in doppler_indicators:
+                if (self.repo_path / indicator).exists():
+                    uses_doppler = True
+                    break
+
+            # Auch in README oder env.example nach Doppler suchen
+            for check_file in ["README.md", ".env.example", "CONTRIBUTING.md"]:
+                check_path = self.repo_path / check_file
+                if check_path.exists():
+                    try:
+                        content = check_path.read_text(encoding="utf-8").lower()
+                        if "doppler" in content:
+                            uses_doppler = True
+                            break
+                    except Exception:
+                        pass
+
+            # 6. Env-File finden
+            for env_name in [".env.example", ".env.local.example", ".env.sample", ".env.development"]:
+                if (self.repo_path / env_name).exists():
+                    env_file = env_name
+                    break
+
+            # 7. Health-Check-Path erkennen (häufige Patterns)
+            health_patterns = ["/api/health", "/health", "/healthz", "/_health"]
+            for src_dir in ["src", "app", "api", "."]:
+                for pattern in ["health", "healthcheck"]:
+                    for ext in [".ts", ".js", ".py", ".go"]:
+                        health_file = self.repo_path / src_dir / f"{pattern}{ext}"
+                        if health_file.exists():
+                            health_check_path = "/api/health"
+                            break
+
+            return RuntimeAnalysis(
+                start_command=start_command,
+                port=port,
+                package_manager=package_manager,
+                framework=framework,
+                services=services,
+                setup_steps=setup_steps,
+                uses_doppler=uses_doppler,
+                uses_docker_compose=uses_docker_compose,
+                env_file=env_file,
+                health_check_path=health_check_path,
+            )
+
+        except Exception as e:
+            self.logger.debug(f"Runtime analysis failed: {e}")
+            return None
+
     def _analyze_spec(self) -> SpecAnalysis:
         """Analysiert die Spec-Datei."""
         content = self.spec_path.read_text(encoding="utf-8")
@@ -623,6 +901,30 @@ class Analyzer:
             "greenfield_signals": result.greenfield_signals,
             "analyzed_at": datetime.now().isoformat(),
         }
+
+        # Runtime-Analyse hinzufügen
+        if result.runtime:
+            data["runtime"] = {
+                "start_command": result.runtime.start_command,
+                "port": result.runtime.port,
+                "package_manager": result.runtime.package_manager,
+                "framework": result.runtime.framework,
+                "services": [
+                    {
+                        "name": s.name,
+                        "type": s.type,
+                        "docker_image": s.docker_image,
+                        "port": s.port,
+                        "env_vars": s.env_vars,
+                    }
+                    for s in result.runtime.services
+                ],
+                "setup_steps": result.runtime.setup_steps,
+                "uses_doppler": result.runtime.uses_doppler,
+                "uses_docker_compose": result.runtime.uses_docker_compose,
+                "env_file": result.runtime.env_file,
+                "health_check_path": result.runtime.health_check_path,
+            }
 
         with open(analysis_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

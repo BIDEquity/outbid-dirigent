@@ -490,6 +490,9 @@ Beispiele:
                 executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model)
                 executor.generate_summary()
 
+                # Preview-Script generieren für Workspace-Vorschau
+                executor.generate_preview_script()
+
         # Ship only
         if args.phase == "ship":
             executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model)
