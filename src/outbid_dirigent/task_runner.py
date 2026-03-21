@@ -7,6 +7,7 @@ Extracted from the Executor god class. Handles:
 - Parsing results, deviations, summaries
 """
 
+import os
 import re
 import subprocess
 from datetime import datetime
@@ -17,6 +18,7 @@ from loguru import logger
 
 from outbid_dirigent.plan_schema import Plan, Task
 from outbid_dirigent.router import load_state, save_state
+from outbid_dirigent.test_manifest import TestManifest
 
 
 class TaskResult:
@@ -96,7 +98,26 @@ class TaskRunner:
             cmd.extend(["--effort", effort])
         if system_prompt:
             cmd.extend(["--append-system-prompt", system_prompt])
+
+        # Inject bundled plugin for session recall skills
+        plugin_dir = Path(__file__).parent / "plugin"
+        if plugin_dir.exists():
+            cmd.extend(["--plugin-dir", str(plugin_dir)])
+
         cmd.extend(["-p", prompt])
+
+        # Clean env: strip venv vars so subprocess uses target repo's venv
+        clean_env = {
+            k: v for k, v in os.environ.items()
+            if k not in ("VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV")
+        }
+        # Remove any venv bin/ dirs from PATH
+        if "VIRTUAL_ENV" in os.environ:
+            venv_bin = str(Path(os.environ["VIRTUAL_ENV"]) / "bin")
+            clean_env["PATH"] = os.pathsep.join(
+                p for p in clean_env.get("PATH", "").split(os.pathsep)
+                if p != venv_bin
+            )
 
         try:
             result = subprocess.run(
@@ -105,6 +126,7 @@ class TaskRunner:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=clean_env,
             )
             return result.returncode == 0, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -178,6 +200,73 @@ class TaskRunner:
             for m in re.finditer(pattern, summary, re.IGNORECASE)
         ]
 
+    # ── Session recall ──
+
+    def _recall_from_sessions(self, max_chars: int = 2000) -> str:
+        """Query past Claude session logs via DuckDB for lessons learned."""
+        try:
+            duckdb_check = subprocess.run(
+                ["which", "duckdb"], capture_output=True, text=True, timeout=5,
+            )
+            if duckdb_check.returncode != 0:
+                return ""
+
+            # Build the project path pattern for session logs
+            project_key = str(self.repo_path).replace("/", "-").replace("_", "-")
+            search_path = Path.home() / ".claude" / "projects" / project_key / "*.jsonl"
+            if not any(search_path.parent.glob("*.jsonl")):
+                # Try with leading dash (Claude's format)
+                project_key = "-" + project_key.lstrip("-")
+                search_path = Path.home() / ".claude" / "projects" / project_key / "*.jsonl"
+                if not any(search_path.parent.glob("*.jsonl")):
+                    return ""
+
+            query = f"""
+SELECT DISTINCT
+  regexp_replace(
+    regexp_extract(message.content::VARCHAR, 'DEVIATION:\\s*(\\S+[-\\w]*)\\s*[-—]?\\s*([^\\n\"]+)', 0),
+    '^DEVIATION:\\s*', ''
+  ) AS deviation
+FROM read_ndjson('{search_path}', auto_detect=true, ignore_errors=true, filename=true)
+WHERE message.role = 'assistant'
+  AND message.content::VARCHAR LIKE '%DEVIATION:%'
+  AND length(regexp_extract(message.content::VARCHAR, 'DEVIATION:\\s*\\S+[-\\w]*\\s*[-—]?\\s*([^\\n\"]+)', 1)) > 5
+ORDER BY 1
+LIMIT 30;
+"""
+            result = subprocess.run(
+                ["duckdb", ":memory:", "-csv", "-c", query],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return ""
+
+            lines = []
+            for l in result.stdout.strip().splitlines()[1:]:
+                l = l.strip().strip('"')
+                # Clean up escape sequences and truncate at first newline
+                l = l.replace("\\n", " ").replace('\\"', '"')
+                l = l.split("DEVIATION:")[0].strip() if "DEVIATION:" in l[20:] else l
+                l = l[:150].strip()
+                if len(l) > 10:
+                    lines.append(l)
+            if not lines:
+                return ""
+
+            # Deduplicate similar entries
+            seen = set()
+            unique = []
+            for line in lines:
+                key = line[:50].lower()
+                if key not in seen:
+                    seen.add(key)
+                    unique.append(line)
+
+            recall = "\n".join(f"- {l}" for l in unique[:15])
+            return recall[:max_chars]
+        except Exception:
+            return ""
+
     # ── Prompt assembly ──
 
     def _build_prompt(self, task: Task, plan: Plan) -> str:
@@ -232,6 +321,20 @@ Position: Task {pos['index']}/{pos['total']}, Phase {pos['phase_id']}/{pos['tota
         if business_rules:
             sections.append(f"\n## Business Rules (MÜSSEN erhalten bleiben!)\n{business_rules[:2000]}")
 
+        # Test manifest context
+        manifest = TestManifest.load(self.repo_path)
+        if manifest:
+            sections.append(f"\n{manifest.summary_for_task(task.test_level)}")
+
+        # Session recall — lessons from past runs
+        recall = self._recall_from_sessions()
+        if recall:
+            sections.append(f"""
+# Bekannte Probleme aus frueheren Runs (Session Recall)
+Diese Bugs/Blocker wurden in frueheren Runs auf diesem Repo gefunden.
+Pruefe ob sie fuer deinen Task relevant sind und vermeide sie proaktiv:
+{recall}""")
+
         # Summary format hint (deviation rules are in system prompt)
         sections.append(f"""
 ## Summary Format
@@ -253,6 +356,13 @@ Deviation Rules:
 3. Blocker entdeckt → Beheben, als "DEVIATION: Resolved Blocker" dokumentieren
 4. Architektur-Frage → STOPP – Frage für Oracle dokumentieren
 
+Session Recall Skills (bei Fehlern oder Blockern):
+- /dirigent:search-memories <keyword> — Suche in frueheren Sessions
+- /dirigent:find-edits <datei> — Finde alle Aenderungen an einer Datei
+- /dirigent:find-errors — Finde bekannte Fehler aus frueheren Runs
+- /dirigent:query-data <sql> — Ad-hoc DuckDB Query auf beliebige Dateien
+Nutze diese nur bei echten Blockern, nicht fuer jeden Schritt.
+
 Nach Abschluss:
 1. git add -A && git commit -m "feat(TASK_ID): TASK_NAME"
 2. Summary in .dirigent/summaries/TASK_ID-SUMMARY.md erstellen
@@ -269,7 +379,13 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen."""
         task_effort = task.effort or self.default_effort
 
         # Inject static rules via system prompt (keeps user prompt focused)
-        sys_prompt = self.SYSTEM_PROMPT_SUFFIX.replace("TASK_ID", task.id).replace("TASK_NAME", task.name)
+        project_key = "-" + str(self.repo_path).replace("/", "-").lstrip("-")
+        sys_prompt = (
+            self.SYSTEM_PROMPT_SUFFIX
+            .replace("TASK_ID", task.id)
+            .replace("TASK_NAME", task.name)
+            .replace("PROJ", project_key)
+        )
 
         for attempt in range(1, self.MAX_RETRIES + 1):
             if attempt > 1:
