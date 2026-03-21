@@ -83,6 +83,24 @@ class Executor:
             self._legacy_logger = None
 
     # ══════════════════════════════════════════
+    # TEST MANIFEST GENERATION
+    # ══════════════════════════════════════════
+
+    def generate_test_manifest(self) -> bool:
+        """Generate outbid-test-manifest.yaml via 3x sonnet + haiku consolidation."""
+        from outbid_dirigent.test_manifest import TestManifest, ManifestGenerator
+
+        # Skip if manifest already exists
+        manifest_path = self.repo_path / "outbid-test-manifest.yaml"
+        if manifest_path.exists():
+            logger.info(f"Test manifest already exists: {manifest_path}")
+            return True
+
+        generator = ManifestGenerator(self.repo_path, self.runner)
+        manifest = generator.generate()
+        return manifest is not None
+
+    # ══════════════════════════════════════════
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 
@@ -341,6 +359,9 @@ Keine vollständige Codebase-Analyse nötig.
                         self._legacy_logger.run_complete(success=False)
                     return False
 
+            # Phase review — code review + fix cycle
+            self._review_phase(phase, plan)
+
             # Phase complete
             state.setdefault("completed_phases", []).append(phase.id)
             save_state(str(self.repo_path), state)
@@ -367,6 +388,112 @@ Keine vollständige Codebase-Analyse nötig.
             state.setdefault("completed_tasks", [])
         save_state(str(self.repo_path), state)
         return state
+
+    # ══════════════════════════════════════════
+    # PHASE REVIEW (code review + fix)
+    # ══════════════════════════════════════════
+
+    def _review_phase(self, phase, plan: Plan):
+        """Launch a Claude process that runs code-review then fix on the phase's changes."""
+        # Collect what this phase changed
+        commit_count = len(phase.tasks)
+        if commit_count == 0:
+            return
+
+        logger.info(f"Phase {phase.id} review: reviewing {commit_count} task commits")
+
+        # Build the diff of this phase's work
+        diff_cmd = f"git diff HEAD~{commit_count} --stat"
+
+        # File list for context
+        files_modified = []
+        files_created = []
+        for task in phase.tasks:
+            files_modified.extend(task.files_to_modify)
+            files_created.extend(task.files_to_create)
+        all_files = sorted(set(files_modified + files_created))
+
+        prompt = f"""Du bist ein Post-Phase Reviewer. Phase {phase.id} ("{phase.name}") wurde gerade abgeschlossen.
+
+# Deine Aufgabe
+Fuehre zwei Schritte sequentiell aus:
+
+## Schritt 1: Code Review (Agent)
+Starte einen Agent mit folgendem Auftrag:
+- Pruefe den Diff der letzten {commit_count} Commits: `{diff_cmd}`
+- Lies die geaenderten Dateien und pruefe auf:
+  1. **Bugs**: None-Checks, fehlende Parameter-Validierung, falsche Typen
+  2. **API-Kompatibilitaet**: Werden bestehende Funktionssignaturen gebrochen? Werden Parameter die None sein koennen ohne Guard verwendet?
+  3. **Unvollstaendige Arbeit**: TODOs, auskommentierter Code, fehlende Imports
+  4. **Logik-Fehler**: Off-by-one, falsche Vergleiche, fehlende Edge Cases
+- Schreibe die Findings in .dirigent/reviews/phase-{phase.id}-REVIEW.md
+- Format: Severity (CRITICAL/WARN/INFO), Datei:Zeile, Beschreibung, Fix-Vorschlag
+
+Dateien die in dieser Phase geaendert wurden:
+{chr(10).join(f'- {f}' for f in all_files) if all_files else '(siehe git diff)'}
+
+## Schritt 2: Fix (Agent)
+Starte einen zweiten Agent der:
+- .dirigent/reviews/phase-{phase.id}-REVIEW.md liest
+- Alle CRITICAL und WARN Findings fixt
+- git add -A && git commit -m "fix(phase-{phase.id}): post-review fixes"
+- Wenn keine Findings: nichts tun
+
+Wichtig:
+- Schritt 2 erst starten NACHDEM Schritt 1 fertig ist
+- Keine neuen Features einfuehren, nur Bugs fixen
+- Wenn der Review keine CRITICAL/WARN Findings hat, ueberspringe Schritt 2
+"""
+
+        sys_prompt = f"""Du orchestrierst zwei Agents sequentiell: erst Review, dann Fix.
+Nutze den Agent-Tool fuer beide Schritte. Warte auf das Ergebnis von Schritt 1 bevor du Schritt 2 startest.
+Keine eigenen Code-Aenderungen — nur ueber die Agents arbeiten."""
+
+        success, stdout, stderr = self.runner._run_claude(
+            prompt, timeout=600, system_prompt=sys_prompt,
+        )
+
+        if success:
+            review_file = self.dirigent_dir / "reviews" / f"phase-{phase.id}-REVIEW.md"
+            if review_file.exists():
+                content = review_file.read_text(encoding="utf-8")
+                critical_count = content.lower().count("critical")
+                warn_count = content.lower().count("warn")
+                logger.info(f"Phase {phase.id} review: {critical_count} critical, {warn_count} warnings")
+            else:
+                logger.info(f"Phase {phase.id} review: no review file created")
+        else:
+            logger.warning(f"Phase {phase.id} review failed (non-blocking): {stderr[:200]}")
+
+    # ══════════════════════════════════════════
+    # TEST STEP
+    # ══════════════════════════════════════════
+
+    def run_tests(self) -> bool:
+        """Run full test suite from test manifest. Returns True if passed or no manifest."""
+        from outbid_dirigent.test_manifest import TestManifest, TestStepRunner
+
+        manifest = TestManifest.load(self.repo_path)
+        if not manifest:
+            logger.info("No test manifest found, skipping test step")
+            return True
+
+        logger.info("Running test suite from manifest...")
+        runner = TestStepRunner(self.repo_path, manifest)
+        result = runner.run()
+
+        if result.summary:
+            logger.info(f"Test results:\n{result.summary}")
+
+        if result.skipped_levels:
+            logger.warning(f"Skipped test levels: {', '.join(result.skipped_levels)}")
+
+        if result.passed:
+            logger.info("All tests passed")
+        else:
+            logger.error("Tests failed — blocking ship")
+
+        return result.passed
 
     # ══════════════════════════════════════════
     # SHIPPING
