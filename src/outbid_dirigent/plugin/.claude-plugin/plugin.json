@@ -1,0 +1,5 @@
+{
+  "name": "dirigent",
+  "description": "Session recall and data exploration skills for Dirigent subprocesses. Search past sessions, find file edits, discover known errors, and run ad-hoc DuckDB queries.",
+  "version": "0.1.0"
+}
