@@ -107,11 +107,13 @@ def run_execution(
     dry_run: bool = False,
     use_proteus: bool = False,
     execution_mode: str = "autonomous",
+    model: str = "",
+    effort: str = "",
 ) -> bool:
     """Führt alle Schritte basierend auf der Route aus."""
     import json
     logger = get_logger()
-    executor = create_executor(str(repo_path), str(spec_path), dry_run, use_proteus)
+    executor = create_executor(str(repo_path), str(spec_path), dry_run, use_proteus, model, effort)
     questioner = get_questioner()
 
     state = load_state(str(repo_path)) or {"completed_steps": []}
@@ -134,7 +136,13 @@ def run_execution(
             success = executor.quick_scan()
 
         elif step.step_type == StepType.PLANNING:
-            success = executor.create_plan()
+            # Skip planning if PLAN.json already exists (e.g. from --plan-only)
+            plan_file = repo_path / ".dirigent" / "PLAN.json"
+            if plan_file.exists():
+                logger.info("Existierender Plan gefunden, überspringe Planung")
+                success = True
+            else:
+                success = executor.create_plan()
 
             # plan_first: Nach Plan-Erstellung auf Genehmigung warten
             if success and execution_mode == "plan_first" and questioner and questioner.is_enabled():
@@ -187,7 +195,7 @@ def run_execution(
     return True
 
 
-def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, use_proteus: bool = False) -> bool:
+def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, use_proteus: bool = False, model: str = "", effort: str = "") -> bool:
     """Setzt eine unterbrochene Ausführung fort."""
     logger = get_logger()
 
@@ -243,7 +251,7 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
         last_task = state["completed_tasks"][-1]
         logger.resume(last_task)
 
-    return run_execution(repo_path, spec_path, route, dry_run, use_proteus)
+    return run_execution(repo_path, spec_path, route, dry_run, use_proteus, model=model, effort=effort)
 
 
 def main():
@@ -337,6 +345,12 @@ Beispiele:
     )
 
     parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Analyse + Routing + Plan erstellen, dann stoppen. Plan liegt in .dirigent/PLAN.json",
+    )
+
+    parser.add_argument(
         "--interactive",
         action="store_true",
         help="[DEPRECATED] Nutze --execution-mode interactive",
@@ -347,6 +361,20 @@ Beispiele:
         type=int,
         default=30,
         help="Timeout in Minuten für interaktive Fragen (default: 30)",
+    )
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="",
+        help="Claude Model für Task-Ausführung (z.B. haiku, sonnet, opus). Leer = Claude Code Default.",
+    )
+
+    parser.add_argument(
+        "--effort",
+        choices=["low", "medium", "high", "max"],
+        default="",
+        help="Thinking Effort Level (low, medium, high, max). Leer = Default.",
     )
 
     parser.add_argument(
@@ -408,7 +436,7 @@ Beispiele:
     try:
         # Resume-Modus
         if args.resume:
-            success = resume_execution(repo_path, spec_path, args.dry_run, args.use_proteus)
+            success = resume_execution(repo_path, spec_path, args.dry_run, args.use_proteus, args.model, args.effort)
             sys.exit(0 if success else 1)
 
         # Normale Ausführung
@@ -432,6 +460,18 @@ Beispiele:
         set_execution_mode(execution_mode)
         logger.info(f"Execution Mode: {execution_mode}")
 
+        # Plan-Only: Nur bis Plan erstellen, dann stoppen
+        if args.plan_only:
+            executor = create_executor(str(repo_path), str(spec_path), dry_run=False, use_proteus=args.use_proteus, model=args.model, effort=args.effort)
+            success = executor.create_plan()
+            if success:
+                plan_file = repo_path / ".dirigent" / "PLAN.json"
+                logger.info(f"Plan erstellt: {plan_file}")
+                logger.info("Prüfe den Plan und starte dann mit: --phase execute")
+            else:
+                logger.error("Plan-Erstellung fehlgeschlagen")
+            sys.exit(0 if success else 1)
+
         # Execution
         if args.phase in ["execute", "all"]:
             if args.dry_run:
@@ -441,18 +481,18 @@ Beispiele:
                 logger.info(f"Geschätzte Tasks: {route.estimated_tasks}")
             else:
                 success = run_execution(
-                    repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode
+                    repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort
                 )
                 if not success:
                     sys.exit(1)
 
                 # Summary generieren nach erfolgreicher Execution
-                executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus)
+                executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model)
                 executor.generate_summary()
 
         # Ship only
         if args.phase == "ship":
-            executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus)
+            executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model)
             success = executor.ship()
             sys.exit(0 if success else 1)
 

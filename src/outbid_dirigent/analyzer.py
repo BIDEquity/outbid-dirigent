@@ -545,10 +545,14 @@ class Analyzer:
                 reasons.append(f"Sprach-Migration von {repo.primary_language} zu {spec.target_language}")
 
         if spec.has_legacy_keywords:
-            legacy_signals += 2
+            # Scale by keyword density: 1-2 keywords = partial refactor (+1), 3+ = real migration (+2)
+            if len(spec.legacy_keywords_found) >= 3:
+                legacy_signals += 2
+            else:
+                legacy_signals += 1
             reasons.append(f"Legacy-Keywords in Spec: {', '.join(spec.legacy_keywords_found[:3])}")
 
-        if repo.commit_count > 500:
+        if repo.commit_count > 2000:
             legacy_signals += 1
             reasons.append(f"Großes Projekt mit {repo.commit_count} Commits")
 

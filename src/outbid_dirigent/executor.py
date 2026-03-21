@@ -1,190 +1,104 @@
-#!/usr/bin/env python3
 """
-Outbid Dirigent – Executor
-Führt Claude Code Prozesse aus für Business Rule Extraktion, Planning und Task-Ausführung.
+Outbid Dirigent – Executor (orchestrator)
+
+Composes TaskRunner, Planner, and Shipper to execute the full pipeline.
+Previously a 1300-line god class — now delegates to focused modules.
 """
 
-import os
-import re
 import json
-import subprocess
-import shutil
-import time
+import re
 import requests
-from pathlib import Path
+import subprocess
+import time
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
 
-import unicodedata
+from loguru import logger
 
-from outbid_dirigent.logger import get_logger
 from outbid_dirigent.oracle import Oracle, create_oracle
-from outbid_dirigent.router import load_state, save_state, mark_step_complete
+from outbid_dirigent.plan_schema import Plan
+from outbid_dirigent.planner import Planner
 from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
-
-
-def slugify(text: str, max_length: int = 50) -> str:
-    """
-    Konvertiert Text in einen URL-sicheren Slug für Branch-Namen.
-
-    Beispiel: "Add Dark Mode Toggle" -> "add-dark-mode-toggle"
-    """
-    # Unicode normalisieren und zu ASCII konvertieren
-    text = unicodedata.normalize('NFKD', text)
-    text = text.encode('ascii', 'ignore').decode('ascii')
-
-    # Kleinbuchstaben
-    text = text.lower()
-
-    # Nur alphanumerische Zeichen und Leerzeichen behalten
-    text = re.sub(r'[^a-z0-9\s-]', '', text)
-
-    # Leerzeichen und mehrfache Bindestriche durch einzelnen Bindestrich ersetzen
-    text = re.sub(r'[\s_-]+', '-', text)
-
-    # Führende und nachfolgende Bindestriche entfernen
-    text = text.strip('-')
-
-    # Auf max_length kürzen (am Wortende)
-    if len(text) > max_length:
-        text = text[:max_length].rsplit('-', 1)[0]
-
-    return text or "feature"
-
-
-@dataclass
-class TaskResult:
-    """Ergebnis einer Task-Ausführung."""
-    task_id: str
-    success: bool
-    commit_hash: Optional[str]
-    summary: str
-    deviations: List[Dict]
-    duration_seconds: float
-    attempts: int
-
-
-@dataclass
-class Phase:
-    """Eine Ausführungsphase."""
-    id: str
-    name: str
-    tasks: List[Dict]
+from outbid_dirigent.router import load_state, save_state, mark_step_complete
+from outbid_dirigent.shipper import Shipper
+from outbid_dirigent.task_runner import TaskRunner, TaskResult
 
 
 class Executor:
-    """Führt alle Claude Code Operationen aus."""
+    """Orchestrates the full dirigent execution pipeline.
 
-    MAX_TASK_RETRIES = 3
-    CLAUDE_TIMEOUT = 1800  # 30 Minuten pro Task
+    Delegates actual work to:
+    - TaskRunner: runs individual Claude Code tasks
+    - Planner: creates PLAN.json
+    - Shipper: branch/push/PR
+    """
 
-    def __init__(self, repo_path: str, spec_path: str, dry_run: bool = False, use_proteus: bool = False):
+    def __init__(
+        self,
+        repo_path: str,
+        spec_path: str,
+        dry_run: bool = False,
+        use_proteus: bool = False,
+        model: str = "",
+        effort: str = "",
+    ):
         self.repo_path = Path(repo_path).resolve()
         self.spec_path = Path(spec_path).resolve()
         self.use_proteus = use_proteus
         self.dry_run = dry_run
-        self.logger = get_logger()
         self.oracle = create_oracle(str(self.repo_path))
 
-        # Verzeichnisse sicherstellen
+        # Directories
         self.dirigent_dir = self.repo_path / ".dirigent"
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
 
-        # Spec-Inhalt laden
+        # Spec content
         self.spec_content = self.spec_path.read_text(encoding="utf-8")
 
-        # Ship-Ergebnisse (werden von ship() gesetzt und von generate_summary() gelesen)
+        # Compose modules
+        self.runner = TaskRunner(
+            repo_path=self.repo_path,
+            spec_content=self.spec_content,
+            default_model=model,
+            default_effort=effort,
+        )
+        self.planner = Planner(
+            repo_path=self.repo_path,
+            spec_content=self.spec_content,
+            runner=self.runner,
+        )
+
+        # Ship results (set by ship(), read by generate_summary())
         self.shipped_branch_name: Optional[str] = None
         self.shipped_pr_url: Optional[str] = None
 
-    def _run_claude(self, prompt: str, timeout: int = None) -> Tuple[bool, str, str]:
-        """
-        Führt Claude Code mit einem Prompt aus.
-
-        Returns:
-            Tuple von (success, stdout, stderr)
-        """
-        if self.dry_run:
-            self.logger.info("[DRY-RUN] Würde Claude Code ausführen")
-            return True, "[DRY-RUN] Simulierte Ausgabe", ""
-
-        timeout = timeout or self.CLAUDE_TIMEOUT
-
+        # Legacy logger bridge — keep the old logger working until fully migrated
         try:
-            result = subprocess.run(
-                ["claude", "--dangerously-skip-permissions", "-p", prompt],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-
-            success = result.returncode == 0
-            return success, result.stdout, result.stderr
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Claude Code Timeout nach {timeout}s")
-            return False, "", f"Timeout nach {timeout} Sekunden"
-        except FileNotFoundError:
-            self.logger.error("Claude CLI nicht gefunden. Ist 'claude' installiert?")
-            return False, "", "Claude CLI nicht gefunden"
-        except Exception as e:
-            self.logger.error(f"Claude Code Fehler: {e}")
-            return False, "", str(e)
-
-    def _get_latest_commit_hash(self) -> Optional[str]:
-        """Holt den letzten Commit-Hash."""
-        try:
-            result = subprocess.run(
-                ["git", "log", "-1", "--format=%H"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
+            from outbid_dirigent.logger import get_logger
+            self._legacy_logger = get_logger()
         except Exception:
-            pass
-        return None
+            self._legacy_logger = None
 
-    def _load_business_rules(self) -> Optional[str]:
-        """Lädt Business Rules falls vorhanden."""
-        rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
-        if rules_file.exists():
-            return rules_file.read_text(encoding="utf-8")
-        return None
-
-    def _load_previous_summaries(self) -> str:
-        """Lädt alle bisherigen Task-Summaries."""
-        summaries = []
-        for summary_file in sorted(self.summaries_dir.glob("*-SUMMARY.md")):
-            task_id = summary_file.stem.replace("-SUMMARY", "")
-            content = summary_file.read_text(encoding="utf-8")
-            summaries.append(f"### Task {task_id}\n{content}")
-
-        return "\n\n".join(summaries) if summaries else "Keine vorherigen Tasks."
-
-    # ========================================
+    # ══════════════════════════════════════════
     # BUSINESS RULE EXTRACTION (Legacy Route)
-    # ========================================
+    # ══════════════════════════════════════════
 
     def extract_business_rules(self) -> bool:
-        """Extrahiert Business Rules aus der Codebase (für Legacy-Route)."""
-        self.logger.extract_start()
+        """Extract business rules from the codebase (Legacy route)."""
+        if self._legacy_logger:
+            self._legacy_logger.extract_start()
 
-        # Wenn Proteus aktiviert ist, nutze Proteus für tiefere Extraktion
         if self.use_proteus:
             return self._extract_with_proteus()
 
-        # Primäre Sprache aus Analyse laden
+        # Primary language from analysis
         analysis_file = self.dirigent_dir / "ANALYSIS.json"
         language = "unbekannt"
         if analysis_file.exists():
             with open(analysis_file, encoding="utf-8") as f:
-                analysis = json.load(f)
-                language = analysis.get("primary_language", "unbekannt")
+                language = json.load(f).get("primary_language", "unbekannt")
 
         prompt = f"""Analysiere diese {language} Codebase und extrahiere alle Business Rules.
 
@@ -222,103 +136,75 @@ Regeln:
 Erstelle die Datei jetzt.
 """
 
-        success, stdout, stderr = self._run_claude(prompt, timeout=900)  # 15 Minuten
-
+        success, _, stderr = self.runner._run_claude(prompt, timeout=900)
         if not success:
-            self.logger.error(f"Business Rule Extraktion fehlgeschlagen: {stderr}")
+            logger.error(f"Business Rule extraction failed: {stderr}")
             return False
 
-        # Prüfe ob Datei erstellt wurde
         rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
         if rules_file.exists():
-            # Zähle Regeln (approximativ)
             content = rules_file.read_text(encoding="utf-8")
             rule_count = content.count("- ") + content.count("* ")
-            self.logger.extract_done(rule_count)
+            if self._legacy_logger:
+                self._legacy_logger.extract_done(rule_count)
+            logger.info(f"Business Rules extracted ({rule_count} rules)")
             return True
-        else:
-            self.logger.error("BUSINESS_RULES.md wurde nicht erstellt")
-            return False
+
+        logger.error("BUSINESS_RULES.md was not created")
+        return False
 
     def _extract_with_proteus(self) -> bool:
-        """Nutzt Proteus für tiefgehende Domain-Extraktion."""
-        self.logger.info("Nutze Proteus für Domain-Extraktion...")
-
+        """Use Proteus for deep domain extraction."""
+        logger.info("Using Proteus for domain extraction...")
         proteus = create_proteus_integration(str(self.repo_path), self.dry_run)
 
-        # Führe Proteus Extraktion durch
         if not proteus.run_full_extraction():
-            self.logger.error("Proteus Extraktion fehlgeschlagen")
+            logger.error("Proteus extraction failed")
             return False
 
-        # Zusammenfassung loggen
         summary = proteus.get_extraction_summary()
-        self.logger.info(
+        logger.info(
             f"Proteus: {summary['fields_count']} Fields, "
             f"{summary['rules_count']} Rules, "
             f"{summary['events_count']} Events, "
             f"{summary['dependencies_count']} Dependencies"
         )
-
-        # Erstelle auch BUSINESS_RULES.md für Kompatibilität
         self._create_business_rules_from_proteus(proteus)
-
         return True
 
     def _create_business_rules_from_proteus(self, proteus: ProteusIntegration):
-        """Erstellt BUSINESS_RULES.md aus Proteus-Daten für Abwärtskompatibilität."""
+        """Create BUSINESS_RULES.md from Proteus data."""
         proteus_dir = self.repo_path / ".proteus"
-        rules_content = [f"# Business Rules – {self.repo_path.name}\n"]
-        rules_content.append("*Extrahiert mit Proteus*\n")
+        parts = [f"# Business Rules – {self.repo_path.name}\n", "*Extracted via Proteus*\n"]
 
-        # Arch einbinden
         arch_file = proteus_dir / "arch.md"
         if arch_file.exists():
-            rules_content.append("## Architektur\n")
-            rules_content.append(arch_file.read_text(encoding="utf-8")[:3000])
-            rules_content.append("\n")
+            parts.extend(["## Architektur\n", arch_file.read_text(encoding="utf-8")[:3000], "\n"])
 
-        # Rules einbinden
-        rules_file = proteus_dir / "rules.json"
-        if rules_file.exists():
-            try:
-                with open(rules_file) as f:
-                    data = json.load(f)
-                rules_content.append("## Business Rules\n")
-                for rule in data.get("rules", []):
-                    rules_content.append(f"- **{rule.get('name', 'Unknown')}**: {rule.get('description', '')}\n")
-                    if rule.get('logic'):
-                        rules_content.append(f"  - Logic: {rule.get('logic')}\n")
-            except Exception:
-                pass
+        for name, section in [("rules.json", "Business Rules"), ("events.json", "Domain Events")]:
+            fpath = proteus_dir / name
+            if fpath.exists():
+                try:
+                    with open(fpath) as f:
+                        data = json.load(f)
+                    key = "rules" if "rules" in name else "events"
+                    parts.append(f"\n## {section}\n")
+                    for item in data.get(key, []):
+                        parts.append(f"- **{item.get('name', 'Unknown')}**: {item.get('description', item.get('trigger', ''))}\n")
+                except Exception:
+                    pass
 
-        # Events einbinden
-        events_file = proteus_dir / "events.json"
-        if events_file.exists():
-            try:
-                with open(events_file) as f:
-                    data = json.load(f)
-                rules_content.append("\n## Domain Events\n")
-                for event in data.get("events", []):
-                    rules_content.append(f"- **{event.get('name', 'Unknown')}**: {event.get('trigger', '')}\n")
-            except Exception:
-                pass
+        rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
+        rules_file.write_text("".join(parts), encoding="utf-8")
+        logger.info("BUSINESS_RULES.md created from Proteus data")
 
-        # Speichern
-        business_rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
-        with open(business_rules_file, "w", encoding="utf-8") as f:
-            f.write("".join(rules_content))
-
-        self.logger.info("BUSINESS_RULES.md aus Proteus-Daten erstellt")
-
-    # ========================================
+    # ══════════════════════════════════════════
     # QUICK SCAN (Hybrid Route)
-    # ========================================
+    # ══════════════════════════════════════════
 
     def quick_scan(self) -> bool:
-        """Schneller Scan der relevanten Dateien (für Hybrid-Route)."""
-        self.logger.info("Starte Quick Scan...")
-
+        """Quick scan of relevant files (Hybrid route)."""
+        logger.info("Starting Quick Scan...")
         prompt = f"""Analysiere diese Codebase um das folgende Feature zu implementieren:
 
 {self.spec_content}
@@ -342,475 +228,132 @@ Identifiziere die relevanten Dateien und erstelle .dirigent/CONTEXT.md mit:
 Fokussiere dich NUR auf die für dieses Feature relevanten Teile.
 Keine vollständige Codebase-Analyse nötig.
 """
-
-        success, stdout, stderr = self._run_claude(prompt, timeout=300)  # 5 Minuten
-
+        success, _, stderr = self.runner._run_claude(prompt, timeout=300)
         if not success:
-            self.logger.error(f"Quick Scan fehlgeschlagen: {stderr}")
+            logger.error(f"Quick Scan failed: {stderr}")
             return False
-
-        self.logger.info("Quick Scan abgeschlossen")
+        logger.info("Quick Scan complete")
         return True
 
-    # ========================================
+    # ══════════════════════════════════════════
     # PLANNING
-    # ========================================
+    # ══════════════════════════════════════════
 
     def create_plan(self) -> bool:
-        """Erstellt den Ausführungsplan."""
-        self.logger.plan_start()
+        """Create the execution plan via Claude Code."""
+        if self._legacy_logger:
+            self._legacy_logger.plan_start()
 
-        # Zusätzlichen Kontext sammeln
-        business_rules = self._load_business_rules()
-        business_rules_context = ""
-        if business_rules:
-            business_rules_context = f"""
-## Business Rules (müssen erhalten bleiben!)
-{business_rules[:3000]}
-{"... (truncated)" if len(business_rules) > 3000 else ""}
-"""
-
-        context_file = self.dirigent_dir / "CONTEXT.md"
-        context_content = ""
-        if context_file.exists():
-            context_content = f"""
-## Repo-Kontext
-{context_file.read_text(encoding="utf-8")}
-"""
-
-        prompt = f"""Erstelle einen Ausführungsplan für dieses Feature.
-
-# Spec
-{self.spec_content}
-
-{business_rules_context}
-{context_content}
-
-Erstelle die Datei .dirigent/PLAN.json mit diesem Format:
-{{
-  "title": "Feature-Titel",
-  "summary": "Kurze Beschreibung was implementiert wird",
-  "phases": [
-    {{
-      "id": "01",
-      "name": "Phase-Name",
-      "description": "Was in dieser Phase passiert",
-      "tasks": [
-        {{
-          "id": "01-01",
-          "name": "Task-Name",
-          "description": "Detaillierte Beschreibung was zu tun ist",
-          "files_to_create": ["liste/von/neuen/dateien.ext"],
-          "files_to_modify": ["liste/von/existierenden/dateien.ext"],
-          "depends_on": []
-        }}
-      ]
-    }}
-  ],
-  "estimated_complexity": "low|medium|high",
-  "risks": ["Liste von potentiellen Risiken"]
-}}
-
-Regeln:
-- Maximal 4 Phasen
-- Maximal 4 Tasks pro Phase
-- Jeder Task ist atomar (macht genau eine Sache)
-- Keine Abhängigkeiten zwischen Tasks innerhalb einer Phase
-- Tasks müssen konkret und ausführbar sein
-- Bei Legacy-Migration: Alle Business Rules müssen erhalten bleiben
-
-Erstelle den Plan jetzt.
-"""
-
-        success, stdout, stderr = self._run_claude(prompt, timeout=1800)  # 30 Minuten
-
-        if not success:
-            self.logger.error(f"Plan-Erstellung fehlgeschlagen: {stderr}")
+        plan = self.planner.create_plan()
+        if plan is None:
             return False
 
-        # Plan laden und validieren
-        plan_file = self.dirigent_dir / "PLAN.json"
-        if not plan_file.exists():
-            self.logger.error("PLAN.json wurde nicht erstellt")
-            return False
-
-        try:
-            with open(plan_file, encoding="utf-8") as f:
-                plan = json.load(f)
-
-            phases = plan.get("phases", [])
-            total_tasks = sum(len(phase.get("tasks", [])) for phase in phases)
+        if self._legacy_logger:
             phase_details = [
-                {
-                    "phase": int(p["id"]) if p["id"].isdigit() else p["id"],
-                    "name": p["name"],
-                    "taskCount": len(p.get("tasks", [])),
-                }
-                for p in phases
+                {"phase": p.id, "name": p.name, "taskCount": len(p.tasks)}
+                for p in plan.phases
             ]
-            self.logger.plan_done(len(phases), total_tasks, phase_details)
-            return True
+            self._legacy_logger.plan_done(len(plan.phases), plan.total_tasks, phase_details)
+        return True
 
-        except json.JSONDecodeError as e:
-            self.logger.error(f"PLAN.json ist kein valides JSON: {e}")
-            return False
-
-    # ========================================
-    # TASK EXECUTION
-    # ========================================
+    # ══════════════════════════════════════════
+    # PLAN EXECUTION
+    # ══════════════════════════════════════════
 
     def execute_plan(self) -> bool:
-        """Führt den kompletten Plan aus."""
-        plan = self._load_plan()
+        """Execute all tasks in the plan sequentially."""
+        plan = Plan.load(self.dirigent_dir / "PLAN.json")
         if not plan:
-            self.logger.error("Kein Plan gefunden")
+            logger.error("No plan found")
             return False
 
         state = self._load_or_init_state()
 
-        total_phases = len(plan.get("phases", []))
-        total_tasks = sum(len(p.get("tasks", [])) for p in plan.get("phases", []))
+        total_phases = len(plan.phases)
+        total_tasks = plan.total_tasks
 
-        # Nur im Interactive Mode User fragen - im Autonomous und Plan-First Mode einfach starten
+        # Interactive mode check
         from outbid_dirigent.dirigent import get_questioner, get_execution_mode
         questioner = get_questioner()
         execution_mode = get_execution_mode()
 
-        # In plan_first mode: User hat bereits beim Plan-Approval zugestimmt
-        # In interactive mode: Frage vor Start stellen
-        # In autonomous mode: Einfach starten
         if execution_mode == "interactive" and questioner and questioner.is_active():
-            # Interactive Mode: User fragen
             result = questioner.ask(
                 question=f"Der Plan enthält {total_phases} Phasen mit {total_tasks} Tasks. Soll die Ausführung gestartet werden?",
                 options=["Ja, starten", "Nein, abbrechen"],
                 context=f"Geschätzte Zeit: {total_tasks * 5} Minuten.",
                 phase=0,
             )
-
-            if result.answered and result.answer:
-                if "abbrechen" in result.answer.lower() or "nein" in result.answer.lower():
-                    self.logger.info("Ausführung vom User abgebrochen")
-                    return False
-            elif result.timeout:
-                self.logger.info("Frage-Timeout, starte Ausführung...")
-            # Bei skipped oder no answer: weitermachen
+            if result.answered and result.answer and ("abbrechen" in result.answer.lower() or "nein" in result.answer.lower()):
+                logger.info("Execution cancelled by user")
+                return False
         else:
-            # Autonomous/Plan-First Mode: Einfach starten ohne zu fragen
-            self.logger.info(f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
+            if self._legacy_logger:
+                self._legacy_logger.info(f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
 
-        for phase in plan.get("phases", []):
-            # Support both "id" and "phase" field names for compatibility
-            phase_id = str(phase.get("id") or phase.get("phase", "1"))
-            phase_name = phase.get("name", f"Phase {phase_id}")
-            phase_tasks = phase.get("tasks", [])
-            phase_num = int(phase_id) if phase_id.isdigit() else phase_id
-
-            # Prüfe ob Phase bereits abgeschlossen
-            if phase_id in state.get("completed_phases", []):
-                self.logger.skip(phase_id, "bereits abgeschlossen")
+        for phase in plan.phases:
+            if phase.id in state.get("completed_phases", []):
+                logger.info(f"Phase {phase.id} already completed, skipping")
                 continue
 
-            self.logger.phase_start(phase_id, phase_name, len(phase_tasks))
+            if self._legacy_logger:
+                self._legacy_logger.phase_start(phase.id, phase.name, len(phase.tasks))
 
             phase_deviation_count = 0
             phase_commit_count = 0
             phase_tasks_completed = 0
 
-            for task in phase_tasks:
-                task_id = task["id"]
-
-                # Prüfe ob Task bereits abgeschlossen
-                if task_id in state.get("completed_tasks", []):
-                    self.logger.skip(task_id, "bereits abgeschlossen")
+            for task in phase.tasks:
+                if task.id in state.get("completed_tasks", []):
+                    logger.info(f"Task {task.id} already completed, skipping")
                     phase_tasks_completed += 1
                     continue
 
-                result = self._execute_task(task, phase_num=phase_num)
+                if self._legacy_logger:
+                    self._legacy_logger.task_start(task.id, task.name, phase=phase.id)
+
+                result = self.runner.run_task(task, plan, phase_num=phase.id)
 
                 if result.success:
-                    state["completed_tasks"].append(task_id)
+                    state["completed_tasks"].append(task.id)
                     save_state(str(self.repo_path), state)
                     phase_tasks_completed += 1
                     phase_deviation_count += len(result.deviations)
                     if result.commit_hash:
                         phase_commit_count += 1
+
+                    if self._legacy_logger:
+                        for dev in result.deviations:
+                            self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=phase.id)
+                        self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=phase.id)
                 else:
-                    # Task fehlgeschlagen nach allen Retries
-                    state["failed_tasks"] = state.get("failed_tasks", [])
-                    state["failed_tasks"].append({
-                        "task_id": task_id,
+                    state.setdefault("failed_tasks", []).append({
+                        "task_id": task.id,
                         "error": result.summary,
                         "attempts": result.attempts,
                     })
                     save_state(str(self.repo_path), state)
 
-                    self.logger.stop(f"Task {task_id} fehlgeschlagen nach {result.attempts} Versuchen")
-                    self.logger.error_json(
-                        f"Task {task_id} fehlgeschlagen nach {result.attempts} Versuchen",
-                        phase=phase_num, task_id=task_id, fatal=True,
-                    )
-                    self.logger.run_complete(success=False)
+                    logger.error(f"Task {task.id} failed after {result.attempts} attempts")
+                    if self._legacy_logger:
+                        self._legacy_logger.stop(f"Task {task.id} fehlgeschlagen nach {result.attempts} Versuchen")
+                        self._legacy_logger.run_complete(success=False)
                     return False
 
-            # Phase abgeschlossen
-            state["completed_phases"] = state.get("completed_phases", [])
-            state["completed_phases"].append(phase_id)
+            # Phase complete
+            state.setdefault("completed_phases", []).append(phase.id)
             save_state(str(self.repo_path), state)
-            self.logger.phase_complete(
-                phase_id, phase_name, phase_tasks_completed,
-                phase_deviation_count, phase_commit_count,
-            )
+            if self._legacy_logger:
+                self._legacy_logger.phase_complete(
+                    phase.id, phase.name, phase_tasks_completed,
+                    phase_deviation_count, phase_commit_count,
+                )
 
-        self.logger.run_complete(success=True)
+        if self._legacy_logger:
+            self._legacy_logger.run_complete(success=True)
         return True
 
-    def _execute_task(self, task: Dict, phase_num=None) -> TaskResult:
-        """Führt einen einzelnen Task aus."""
-        task_id = task["id"]
-        task_name = task["name"]
-        task_description = task.get("description", "")
-        start_time = datetime.now()
-
-        # Interactive Mode: Frage VOR dem Task ob er so ausgeführt werden soll
-        from outbid_dirigent.dirigent import get_questioner, get_execution_mode
-        questioner = get_questioner()
-        execution_mode = get_execution_mode()
-
-        if execution_mode == "interactive" and questioner and questioner.is_active():
-            # Frage vor Task-Ausführung
-            result = questioner.ask(
-                question=f"Task '{task_name}' soll jetzt ausgeführt werden. Wie soll ich vorgehen?",
-                options=[
-                    "Ausführen wie geplant",
-                    "Mit anderem Ansatz ausführen",
-                    "Task überspringen",
-                    "Ausführung abbrechen"
-                ],
-                context=f"Beschreibung: {task_description[:500]}" if task_description else None,
-                task_id=task_id,
-                phase=phase_num,
-                question_type="choice",
-                default_on_timeout="Ausführen wie geplant",
-            )
-
-            if result.answered and result.answer:
-                answer = result.answer.lower()
-                if "abbrechen" in answer:
-                    self.logger.info(f"Task {task_id} vom User abgebrochen")
-                    return TaskResult(
-                        task_id=task_id,
-                        success=False,
-                        commit_hash=None,
-                        summary="Vom User abgebrochen",
-                        deviations=[],
-                        duration_seconds=0,
-                        attempts=0,
-                    )
-                elif "überspringen" in answer or "skip" in answer:
-                    self.logger.skip(task_id, "vom User übersprungen")
-                    return TaskResult(
-                        task_id=task_id,
-                        success=True,  # Task gilt als "erledigt" durch Überspringen
-                        commit_hash=None,
-                        summary="Vom User übersprungen",
-                        deviations=[],
-                        duration_seconds=0,
-                        attempts=0,
-                    )
-                elif "anderem ansatz" in answer or "anders" in answer:
-                    # Frage nach dem alternativen Ansatz
-                    alt_result = questioner.ask_text(
-                        question=f"Wie soll Task '{task_name}' stattdessen ausgeführt werden?",
-                        context=f"Ursprüngliche Beschreibung: {task_description[:300]}",
-                        task_id=task_id,
-                        phase=phase_num,
-                        default_on_timeout="",
-                    )
-                    if alt_result:
-                        # Überschreibe die Task-Beschreibung
-                        task = dict(task)
-                        task["description"] = alt_result
-                        task_description = alt_result
-                        self.logger.info(f"Task {task_id} mit alternativer Beschreibung: {alt_result[:100]}...")
-
-        self.logger.task_start(task_id, task_name, phase=phase_num)
-
-        # Vorherige Summaries laden
-        previous_summaries = self._load_previous_summaries()
-
-        # Business Rules laden falls vorhanden
-        business_rules = self._load_business_rules()
-        rules_context = ""
-        if business_rules:
-            rules_context = f"""
-## Business Rules (MÜSSEN erhalten bleiben!)
-{business_rules[:2000]}
-"""
-
-        prompt = f"""Du führst Task {task_id} aus: {task_name}
-
-# Gesamt-Spec
-{self.spec_content}
-
-# Bisheriger Fortschritt
-{previous_summaries}
-
-# Dein Task
-{task['description']}
-
-Dateien zu erstellen: {', '.join(task.get('files_to_create', [])) or 'keine'}
-Dateien zu modifizieren: {', '.join(task.get('files_to_modify', [])) or 'keine'}
-
-{rules_context}
-
-## Deviation Rules
-Du MUSST diese Regeln befolgen:
-
-1. **Bug gefunden**: Automatisch fixen, in Summary als "DEVIATION: Bug-Fix" dokumentieren
-2. **Kritisches fehlt**: Hinzufügen, in Summary als "DEVIATION: Added Missing" dokumentieren
-3. **Blocker entdeckt**: Beheben, in Summary als "DEVIATION: Resolved Blocker" dokumentieren
-4. **Architektur-Frage**: STOPP – Frage für Oracle dokumentieren
-
-## Nach Abschluss
-1. Alle Änderungen committen:
-   git add -A && git commit -m "feat({task_id}): {task_name}"
-
-2. Summary erstellen in .dirigent/summaries/{task_id}-SUMMARY.md:
-   # Task {task_id}: {task_name}
-
-   ## Was wurde gemacht
-   (Kurze Beschreibung)
-
-   ## Geänderte Dateien
-   - file1.ext: Beschreibung
-
-   ## Deviations
-   (Falls vorhanden)
-
-   ## Nächste Schritte
-   (Falls relevant für folgende Tasks)
-
-Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
-"""
-
-        for attempt in range(1, self.MAX_TASK_RETRIES + 1):
-            if attempt > 1:
-                self.logger.task_retry(task_id, attempt)
-
-            success, stdout, stderr = self._run_claude(prompt)
-
-            if success:
-                # Commit-Hash holen
-                commit_hash = self._get_latest_commit_hash()
-
-                # Summary laden
-                summary_file = self.summaries_dir / f"{task_id}-SUMMARY.md"
-                summary = ""
-                if summary_file.exists():
-                    summary = summary_file.read_text(encoding="utf-8")
-
-                # Deviations extrahieren
-                deviations = self._extract_deviations(summary)
-                for dev in deviations:
-                    self.logger.deviation(dev["type"], dev["description"],
-                                          task_id=task_id, phase=phase_num)
-
-                # Interactive Mode: Bei Deviations den User fragen ob das ok ist
-                if deviations and execution_mode == "interactive" and questioner and questioner.is_active():
-                    deviation_summary = "\n".join([
-                        f"- {d['type']}: {d['description'][:100]}"
-                        for d in deviations[:5]  # Max 5 zeigen
-                    ])
-
-                    dev_result = questioner.ask(
-                        question=f"Task '{task_name}' hatte {len(deviations)} Abweichung(en). Ist das ok?",
-                        options=[
-                            "Ja, weiter",
-                            "Nein, Task wiederholen",
-                            "Nein, Ausführung abbrechen"
-                        ],
-                        context=f"Abweichungen:\n{deviation_summary}",
-                        task_id=task_id,
-                        phase=phase_num,
-                        question_type="choice",
-                        default_on_timeout="Ja, weiter",
-                    )
-
-                    if dev_result.answered and dev_result.answer:
-                        answer = dev_result.answer.lower()
-                        if "wiederholen" in answer or "retry" in answer:
-                            self.logger.info(f"Task {task_id} wird auf User-Wunsch wiederholt")
-                            # Git reset zum vorherigen Stand
-                            subprocess.run(
-                                ["git", "reset", "--hard", "HEAD~1"],
-                                cwd=self.repo_path,
-                                capture_output=True,
-                            )
-                            continue  # Nächster Versuch
-                        elif "abbrechen" in answer:
-                            self.logger.info(f"Ausführung auf User-Wunsch abgebrochen")
-                            return TaskResult(
-                                task_id=task_id,
-                                success=False,
-                                commit_hash=None,
-                                summary="Vom User abgebrochen wegen Deviations",
-                                deviations=deviations,
-                                duration_seconds=(datetime.now() - start_time).total_seconds(),
-                                attempts=attempt,
-                            )
-
-                duration = (datetime.now() - start_time).total_seconds()
-                self.logger.task_done(task_id, commit_hash,
-                                      task_name=task_name, phase=phase_num)
-
-                return TaskResult(
-                    task_id=task_id,
-                    success=True,
-                    commit_hash=commit_hash,
-                    summary=summary,
-                    deviations=deviations,
-                    duration_seconds=duration,
-                    attempts=attempt,
-                )
-            else:
-                self.logger.task_failed(task_id, stderr[:200], attempt)
-
-        # Alle Retries aufgebraucht
-        duration = (datetime.now() - start_time).total_seconds()
-        return TaskResult(
-            task_id=task_id,
-            success=False,
-            commit_hash=None,
-            summary=f"Fehlgeschlagen nach {self.MAX_TASK_RETRIES} Versuchen",
-            deviations=[],
-            duration_seconds=duration,
-            attempts=self.MAX_TASK_RETRIES,
-        )
-
-    def _extract_deviations(self, summary: str) -> List[Dict]:
-        """Extrahiert Deviations aus dem Summary."""
-        deviations = []
-        pattern = r"DEVIATION:\s*(\w+[-\w]*)\s*[:\-]?\s*(.+)"
-
-        for match in re.finditer(pattern, summary, re.IGNORECASE):
-            deviations.append({
-                "type": match.group(1).strip(),
-                "description": match.group(2).strip(),
-            })
-
-        return deviations
-
-    def _load_plan(self) -> Optional[Dict]:
-        """Lädt den Ausführungsplan."""
-        plan_file = self.dirigent_dir / "PLAN.json"
-        if plan_file.exists():
-            with open(plan_file, encoding="utf-8") as f:
-                return json.load(f)
-        return None
-
-    def _load_or_init_state(self) -> Dict:
-        """Lädt oder initialisiert den State."""
+    def _load_or_init_state(self) -> dict:
         state = load_state(str(self.repo_path))
         if not state:
             state = {
@@ -819,228 +362,180 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
                 "completed_tasks": [],
             }
         else:
-            # Ensure required keys exist (for backwards compatibility)
-            if "completed_phases" not in state:
-                state["completed_phases"] = []
-            if "completed_tasks" not in state:
-                state["completed_tasks"] = []
+            state.setdefault("completed_phases", [])
+            state.setdefault("completed_tasks", [])
         save_state(str(self.repo_path), state)
         return state
 
-    # ========================================
+    # ══════════════════════════════════════════
     # SHIPPING
-    # ========================================
+    # ══════════════════════════════════════════
 
     def ship(self) -> bool:
-        """Erstellt Branch, pusht und erstellt PR."""
-        plan = self._load_plan()
-        spec_title = plan.get("title", "Feature") if plan else "Feature"
+        """Create branch, push, and open PR."""
+        plan = Plan.load(self.dirigent_dir / "PLAN.json")
+        if self._legacy_logger:
+            self._legacy_logger.ship_start("dirigent/...")
 
-        # Branch-Name aus Titel generieren: dirigent/<slug>
-        slug = slugify(spec_title)
-        branch_name = f"dirigent/{slug}"
+        shipper = Shipper(self.repo_path, plan, self.dry_run)
+        success = shipper.ship()
 
-        # Prüfen ob Branch bereits existiert, dann Suffix anhängen
-        check_result = subprocess.run(
-            ["git", "rev-parse", "--verify", branch_name],
-            cwd=self.repo_path,
-            capture_output=True,
-            text=True,
-        )
-        if check_result.returncode == 0:
-            # Branch existiert, Timestamp anhängen
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            branch_name = f"dirigent/{slug}-{timestamp}"
+        self.shipped_branch_name = shipper.branch_name
+        self.shipped_pr_url = shipper.pr_url
 
-        self.logger.ship_start(branch_name)
+        if self._legacy_logger:
+            if shipper.pr_url:
+                self._legacy_logger.ship_done(shipper.pr_url)
+            elif shipper.branch_name:
+                self._legacy_logger.ship_pushed(shipper.branch_name)
+        return success
 
-        # Branch-Name speichern für Summary
-        self.shipped_branch_name = branch_name
+    # ══════════════════════════════════════════
+    # SUMMARY GENERATION
+    # ══════════════════════════════════════════
 
-        if self.dry_run:
-            self.logger.info("[DRY-RUN] Würde Branch erstellen und pushen")
-            return True
+    def generate_summary(self, branch_name: str = None, pr_url: str = None) -> dict:
+        """Generate the final execution report."""
+        logger.info("Generating summary...")
 
-        try:
-            # Branch erstellen
-            result = subprocess.run(
-                ["git", "checkout", "-b", branch_name],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                self.logger.error(f"Branch-Erstellung fehlgeschlagen: {result.stderr}")
-                return False
+        plan = Plan.load(self.dirigent_dir / "PLAN.json")
+        plan_title = plan.title if plan else "Feature"
 
-            # Push
-            result = subprocess.run(
-                ["git", "push", "-u", "origin", branch_name],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                self.logger.error(f"Push fehlgeschlagen: {result.stderr}")
-                # Nicht kritisch - vielleicht kein Remote
-                self.logger.ship_pushed(branch_name)
-                return True
-
-            # PR erstellen (falls gh verfügbar)
-            if shutil.which("gh"):
-                pr_body = self._generate_pr_body()
-
-                result = subprocess.run(
-                    [
-                        "gh", "pr", "create",
-                        "--title", f"feat: {spec_title}",
-                        "--body", pr_body,
-                        "--head", branch_name,
-                    ],
-                    cwd=self.repo_path,
-                    capture_output=True,
-                    text=True,
-                )
-
-                if result.returncode == 0:
-                    # PR URL extrahieren
-                    pr_url = result.stdout.strip()
-                    self.shipped_pr_url = pr_url
-                    self.logger.ship_done(pr_url)
-                else:
-                    self.logger.info(f"PR-Erstellung fehlgeschlagen: {result.stderr}")
-                    self.logger.ship_pushed(branch_name)
-            else:
-                self.logger.info("gh CLI nicht gefunden, PR manuell erstellen")
-                self.logger.ship_pushed(branch_name)
-
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Shipping fehlgeschlagen: {e}")
-            return False
-
-    def generate_summary(self, branch_name: str = None, pr_url: str = None) -> Dict[str, Any]:
-        """
-        Generiert das Abschlussprotokoll mit allen gesammelten Daten.
-        Wird nach execute_plan() aufgerufen.
-        """
-        self.logger.info("Generiere Abschlussprotokoll...")
-
-        plan = self._load_plan()
-        plan_title = plan.get("title", "Feature") if plan else "Feature"
-
-        # Sammle Task-Summaries
-        summaries = []
-        for summary_file in sorted(self.summaries_dir.glob("*-SUMMARY.md")):
-            summaries.append(summary_file.read_text(encoding="utf-8"))
-
-        # Oracle-Entscheidungen laden
+        summaries = [f.read_text(encoding="utf-8") for f in sorted(self.summaries_dir.glob("*-SUMMARY.md"))]
         decisions = self.oracle.get_all_decisions()
-
-        # Git diff für geänderte Dateien
         files_changed = self._get_files_changed()
-
-        # Deviations sammeln
         deviations = self._collect_all_deviations(summaries)
 
-        # Kosten-Totals vom Logger holen
-        cost_totals = self.logger.get_cost_totals()
+        cost_totals = self._legacy_logger.get_cost_totals() if self._legacy_logger else {
+            "total_cost_cents": 0, "total_input_tokens": 0, "total_output_tokens": 0,
+        }
 
-        # Branch-Name ermitteln falls nicht übergeben
         if not branch_name:
             branch_name = self.shipped_branch_name or self._get_current_branch()
-
-        # PR-URL aus ship() übernehmen falls nicht übergeben
         if not pr_url:
             pr_url = self.shipped_pr_url
 
-        # Commit-Count ermitteln
-        total_commits = self.logger._total_commits
-
-        # Duration berechnen
-        elapsed = datetime.now() - self.logger._start_time
-        duration_ms = int(elapsed.total_seconds() * 1000)
-
-        # Markdown generieren
         markdown = self._generate_summary_markdown(
-            plan_title, summaries, decisions, files_changed, deviations, cost_totals
+            plan_title, plan, summaries, decisions, files_changed, deviations, cost_totals
         )
 
-        # Event emittieren (stdout)
-        self.logger.summary(
-            markdown=markdown,
-            files_changed=files_changed,
-            decisions=[{
-                "question": d["question"][:200],
-                "decision": d["decision"],
-                "reason": d["reason"]
-            } for d in decisions],
-            deviations=deviations,
-            total_cost_cents=cost_totals["total_cost_cents"],
-            total_input_tokens=cost_totals["total_input_tokens"],
-            total_output_tokens=cost_totals["total_output_tokens"],
-        )
+        if self._legacy_logger:
+            self._legacy_logger.summary(
+                markdown=markdown,
+                files_changed=files_changed,
+                decisions=[{"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]} for d in decisions],
+                deviations=deviations,
+                total_cost_cents=cost_totals["total_cost_cents"],
+                total_input_tokens=cost_totals["total_input_tokens"],
+                total_output_tokens=cost_totals["total_output_tokens"],
+            )
 
-        # Summary auch via HTTP ans Portal senden
-        self._send_summary_to_portal(
-            markdown=markdown,
-            files_changed=files_changed,
-            decisions=decisions,
-            deviations=deviations,
-            branch_name=branch_name,
-            pr_url=pr_url,
-            total_commits=total_commits,
-            duration_ms=duration_ms,
-        )
+        self._send_summary_to_portal(markdown, files_changed, decisions, deviations, branch_name, pr_url)
 
-        return {
-            "markdown": markdown,
-            "files_changed": files_changed,
-            "decisions": decisions,
-            "deviations": deviations,
-            "cost_totals": cost_totals,
-            "branch_name": branch_name,
-            "pr_url": pr_url,
-        }
+        return {"markdown": markdown, "files_changed": files_changed, "decisions": decisions,
+                "deviations": deviations, "cost_totals": cost_totals, "branch_name": branch_name, "pr_url": pr_url}
+
+    # ── Summary helpers ──
 
     def _get_current_branch(self) -> Optional[str]:
-        """Holt den aktuellen Branch-Namen."""
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
+                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
             )
-            if result.returncode == 0:
-                return result.stdout.strip()
+            return result.stdout.strip() if result.returncode == 0 else None
         except Exception:
-            pass
-        return None
+            return None
+
+    def _get_files_changed(self) -> list[dict]:
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--numstat", "HEAD~20..HEAD"],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+            )
+            files = []
+            for line in result.stdout.strip().split("\n"):
+                parts = line.split("\t") if line else []
+                if len(parts) == 3:
+                    files.append({
+                        "path": parts[2],
+                        "lines_added": int(parts[0]) if parts[0] != '-' else 0,
+                        "lines_removed": int(parts[1]) if parts[1] != '-' else 0,
+                    })
+            return files
+        except Exception:
+            return []
+
+    def _collect_all_deviations(self, summaries: list[str]) -> list[dict]:
+        all_devs = []
+        for s in summaries:
+            all_devs.extend(TaskRunner._extract_deviations(s))
+        return all_devs
+
+    def _generate_summary_markdown(
+        self, title: str, plan: Optional[Plan], summaries: list[str],
+        decisions: list[dict], files: list[dict], deviations: list[dict], cost_totals: dict,
+    ) -> str:
+        phases_count = len(plan.phases) if plan else 0
+        tasks_count = plan.total_tasks if plan else 0
+        cost_usd = cost_totals["total_cost_cents"] / 100
+
+        md = [f"# Abschlussprotokoll: {title}\n"]
+        md.append(f"**Datum:** {datetime.now().strftime('%d.%m.%Y %H:%M')}\n")
+        md.append("## Übersicht\n")
+        md.append(f"- **Phasen:** {phases_count}")
+        md.append(f"- **Tasks:** {tasks_count}")
+        md.append(f"- **Dateien geändert:** {len(files)}")
+        md.append(f"- **Deviations:** {len(deviations)}")
+        md.append(f"- **Oracle-Entscheidungen:** {len(decisions)}")
+        md.append(f"- **API-Kosten:** ${cost_usd:.2f}")
+        md.append(f"- **Tokens:** {cost_totals['total_input_tokens']:,} in / {cost_totals['total_output_tokens']:,} out\n")
+
+        if files:
+            md.append("## Geänderte Dateien\n")
+            for f in files[:30]:
+                md.append(f"- `{f['path']}` (+{f['lines_added']}/-{f['lines_removed']})")
+            if len(files) > 30:
+                md.append(f"- ... und {len(files) - 30} weitere")
+            md.append("")
+
+        if decisions:
+            md.append("## Oracle-Entscheidungen\n")
+            for d in decisions[:15]:
+                q = d['question'][:100] + "..." if len(d['question']) > 100 else d['question']
+                md.append(f"**Q:** {q}\n**A:** {d['decision']}\n*{d['reason']}*\n")
+
+        if deviations:
+            md.append("## Deviations\n")
+            for dev in deviations:
+                md.append(f"- **{dev['type']}:** {dev['description']}")
+            md.append("")
+
+        if summaries:
+            md.append("## Task-Details\n")
+            for i, s in enumerate(summaries[:10], 1):
+                lines = s.strip().split("\n")
+                md.append(f"### {lines[0] if lines else f'Task {i}'}")
+                match = re.search(r"## Was wurde gemacht\n(.+?)(?=\n##|\Z)", s, re.DOTALL)
+                if match:
+                    md.append(match.group(1).strip()[:300])
+                md.append("")
+
+        return "\n".join(md)
 
     def _send_summary_to_portal(
-        self,
-        markdown: str,
-        files_changed: List[Dict],
-        decisions: List[Dict],
-        deviations: List[Dict],
-        branch_name: Optional[str],
-        pr_url: Optional[str],
-        total_commits: int,
-        duration_ms: int,
+        self, markdown: str, files_changed: list[dict],
+        decisions: list[dict], deviations: list[dict],
+        branch_name: Optional[str], pr_url: Optional[str],
     ):
-        """Sendet Summary via HTTP an das Portal."""
         from outbid_dirigent.dirigent import get_questioner
-
         questioner = get_questioner()
         if not questioner or not hasattr(questioner, 'portal_url'):
-            self.logger.debug("Kein Questioner mit Portal-Credentials verfügbar")
             return
 
         try:
-            response = requests.post(
+            elapsed = datetime.now() - (self._legacy_logger._start_time if self._legacy_logger else datetime.now())
+            requests.post(
                 f"{questioner.portal_url}/api/execution-event",
                 headers={"X-Reporter-Token": questioner.reporter_token},
                 json={
@@ -1051,167 +546,25 @@ Keine Rückfragen. Kein Warten. Durcharbeiten und committen.
                         "data": {
                             "markdown": markdown,
                             "filesChanged": files_changed,
-                            "decisions": [{
-                                "question": d["question"][:200],
-                                "decision": d["decision"],
-                                "reason": d["reason"]
-                            } for d in decisions],
+                            "decisions": [{"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]} for d in decisions],
                             "deviations": deviations,
                             "branchName": branch_name,
                             "prUrl": pr_url,
-                            "totalCommits": total_commits,
-                            "durationMs": duration_ms,
+                            "totalCommits": self._legacy_logger._total_commits if self._legacy_logger else 0,
+                            "durationMs": int(elapsed.total_seconds() * 1000),
                         }
                     }
                 },
                 timeout=30,
             )
-
-            if response.status_code == 200:
-                self.logger.info("Summary ans Portal gesendet")
-            else:
-                self.logger.debug(f"Summary-Übertragung fehlgeschlagen: {response.status_code}")
-
         except requests.RequestException as e:
-            self.logger.debug(f"Summary-Übertragung fehlgeschlagen: {e}")
-
-    def _get_files_changed(self) -> List[Dict]:
-        """Holt geänderte Dateien via git diff."""
-        try:
-            # Anzahl Commits aus dem Plan ermitteln
-            result = subprocess.run(
-                ["git", "diff", "--numstat", "HEAD~20..HEAD"],
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            files = []
-            for line in result.stdout.strip().split("\n"):
-                if line:
-                    parts = line.split("\t")
-                    if len(parts) == 3:
-                        added = int(parts[0]) if parts[0] != '-' else 0
-                        removed = int(parts[1]) if parts[1] != '-' else 0
-                        files.append({
-                            "path": parts[2],
-                            "lines_added": added,
-                            "lines_removed": removed,
-                        })
-            return files
-        except Exception as e:
-            self.logger.debug(f"Git diff Fehler: {e}")
-            return []
-
-    def _collect_all_deviations(self, summaries: List[str]) -> List[Dict]:
-        """Sammelt alle Deviations aus den Task-Summaries."""
-        all_deviations = []
-        for summary in summaries:
-            deviations = self._extract_deviations(summary)
-            all_deviations.extend(deviations)
-        return all_deviations
-
-    def _generate_summary_markdown(
-        self,
-        title: str,
-        summaries: List[str],
-        decisions: List[Dict],
-        files: List[Dict],
-        deviations: List[Dict],
-        cost_totals: Dict,
-    ) -> str:
-        """Erstellt lesbares Abschlussprotokoll."""
-        plan = self._load_plan()
-        phases_count = len(plan.get("phases", [])) if plan else 0
-        tasks_count = sum(len(p.get("tasks", [])) for p in plan.get("phases", [])) if plan else 0
-
-        md = [f"# Abschlussprotokoll: {title}\n"]
-        md.append(f"**Datum:** {datetime.now().strftime('%d.%m.%Y %H:%M')}\n")
-
-        # Übersicht
-        md.append("## Übersicht\n")
-        cost_usd = cost_totals["total_cost_cents"] / 100
-        md.append(f"- **Phasen:** {phases_count}")
-        md.append(f"- **Tasks:** {tasks_count}")
-        md.append(f"- **Dateien geändert:** {len(files)}")
-        md.append(f"- **Deviations:** {len(deviations)}")
-        md.append(f"- **Oracle-Entscheidungen:** {len(decisions)}")
-        md.append(f"- **API-Kosten:** ${cost_usd:.2f}")
-        md.append(f"- **Tokens:** {cost_totals['total_input_tokens']:,} in / {cost_totals['total_output_tokens']:,} out\n")
-
-        # Geänderte Dateien
-        if files:
-            md.append("## Geänderte Dateien\n")
-            for f in files[:30]:  # Max 30
-                md.append(f"- `{f['path']}` (+{f['lines_added']}/-{f['lines_removed']})")
-            if len(files) > 30:
-                md.append(f"- ... und {len(files) - 30} weitere Dateien")
-            md.append("")
-
-        # Oracle-Entscheidungen
-        if decisions:
-            md.append("## Oracle-Entscheidungen\n")
-            for d in decisions[:15]:  # Max 15
-                question_short = d['question'][:100] + "..." if len(d['question']) > 100 else d['question']
-                md.append(f"**Q:** {question_short}")
-                md.append(f"**A:** {d['decision']}")
-                md.append(f"*{d['reason']}*\n")
-            if len(decisions) > 15:
-                md.append(f"... und {len(decisions) - 15} weitere Entscheidungen\n")
-
-        # Deviations
-        if deviations:
-            md.append("## Deviations\n")
-            for dev in deviations:
-                md.append(f"- **{dev['type']}:** {dev['description']}")
-            md.append("")
-
-        # Task-Summaries (komprimiert)
-        if summaries:
-            md.append("## Task-Details\n")
-            for i, summary in enumerate(summaries[:10], 1):
-                # Nur erste Zeilen pro Summary
-                lines = summary.strip().split("\n")
-                title_line = lines[0] if lines else f"Task {i}"
-                md.append(f"### {title_line}")
-                # Nur "Was wurde gemacht" Sektion
-                match = re.search(r"## Was wurde gemacht\n(.+?)(?=\n##|\Z)", summary, re.DOTALL)
-                if match:
-                    md.append(match.group(1).strip()[:300])
-                md.append("")
-            if len(summaries) > 10:
-                md.append(f"... und {len(summaries) - 10} weitere Tasks\n")
-
-        return "\n".join(md)
-
-    def _generate_pr_body(self) -> str:
-        """Generiert den PR Body."""
-        plan = self._load_plan()
-
-        body_parts = [
-            "## Summary",
-            plan.get("summary", "Automatisch erstellt vom Outbid Dirigenten.") if plan else "Automatisch erstellt vom Outbid Dirigenten.",
-            "",
-            "## Changes",
-        ]
-
-        # Summaries einbinden
-        for summary_file in sorted(self.summaries_dir.glob("*-SUMMARY.md")):
-            content = summary_file.read_text(encoding="utf-8")
-            # Nur "Was wurde gemacht" Sektion extrahieren
-            match = re.search(r"## Was wurde gemacht\n(.+?)(?=\n##|\Z)", content, re.DOTALL)
-            if match:
-                body_parts.append(f"- {match.group(1).strip()}")
-
-        body_parts.extend([
-            "",
-            "---",
-            "*Automatisch erstellt vom Outbid Dirigenten*",
-        ])
-
-        return "\n".join(body_parts)
+            logger.debug(f"Summary upload failed: {e}")
 
 
-def create_executor(repo_path: str, spec_path: str, dry_run: bool = False, use_proteus: bool = False) -> Executor:
-    """Factory-Funktion für Executor-Instanz."""
-    return Executor(repo_path, spec_path, dry_run, use_proteus)
+def create_executor(
+    repo_path: str, spec_path: str,
+    dry_run: bool = False, use_proteus: bool = False,
+    model: str = "", effort: str = "",
+) -> Executor:
+    """Factory function for Executor."""
+    return Executor(repo_path, spec_path, dry_run, use_proteus, model, effort)
