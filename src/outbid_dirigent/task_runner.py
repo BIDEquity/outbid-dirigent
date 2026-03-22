@@ -60,6 +60,19 @@ class TaskRunner:
         self.dirigent_dir = repo_path / ".dirigent"
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
+        # Discover spec images in .planning/assets/
+        self.spec_images = self._discover_spec_images()
+
+    def _discover_spec_images(self) -> list[Path]:
+        """Find all images in .planning/assets/ directory."""
+        assets_dir = self.repo_path / ".planning" / "assets"
+        if not assets_dir.exists():
+            return []
+        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+        return [
+            f for f in assets_dir.iterdir()
+            if f.is_file() and f.suffix.lower() in image_extensions
+        ]
 
     # ── Claude Code invocation ──
 
@@ -195,6 +208,11 @@ Position: Task {pos['index']}/{pos['total']}, Phase {pos['phase_id']}/{pos['tota
 
         # Spec
         sections.append(f"\n# Gesamt-Spec\n{self.spec_content}")
+
+        # Reference spec images if available
+        if self.spec_images:
+            img_list = "\n".join(f"- .planning/assets/{img.name}" for img in self.spec_images)
+            sections.append(f"\n# Visuelle Referenzen\nFolgende Bilder sind verfügbar (nutze Read tool um sie zu betrachten):\n{img_list}")
 
         # Progress
         sections.append(f"\n# Bisheriger Fortschritt\n{previous_summaries}")
