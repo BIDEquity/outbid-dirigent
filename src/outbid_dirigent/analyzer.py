@@ -580,36 +580,39 @@ class Analyzer:
                         setup_steps.append(f"{package_manager} run db:seed")
 
                     # Services aus Dependencies erkennen
-                    if "pg" in deps or "postgres" in deps or "@prisma/client" in deps:
-                        services.append(RuntimeRequirement(
-                            name="PostgreSQL",
-                            type="database",
-                            docker_image="postgres:15",
-                            port=5432,
-                            env_vars=["POSTGRES_PASSWORD=dev", "POSTGRES_DB=app_dev"]
-                        ))
-                    if "mysql" in deps or "mysql2" in deps:
-                        services.append(RuntimeRequirement(
-                            name="MySQL",
-                            type="database",
-                            docker_image="mysql:8",
-                            port=3306,
-                            env_vars=["MYSQL_ROOT_PASSWORD=dev", "MYSQL_DATABASE=app_dev"]
-                        ))
-                    if "mongodb" in deps or "mongoose" in deps:
-                        services.append(RuntimeRequirement(
-                            name="MongoDB",
-                            type="database",
-                            docker_image="mongo:7",
-                            port=27017
-                        ))
-                    if "redis" in deps or "ioredis" in deps:
-                        services.append(RuntimeRequirement(
-                            name="Redis",
-                            type="cache",
-                            docker_image="redis:7-alpine",
-                            port=6379
-                        ))
+                    # WICHTIG: Bei Doppler werden externe Services (Supabase, etc.) genutzt
+                    # -> Keine lokalen DB-Container starten!
+                    if not uses_doppler:
+                        if "pg" in deps or "postgres" in deps or "@prisma/client" in deps:
+                            services.append(RuntimeRequirement(
+                                name="PostgreSQL",
+                                type="database",
+                                docker_image="postgres:15",
+                                port=5432,
+                                env_vars=["POSTGRES_PASSWORD=dev", "POSTGRES_DB=app_dev"]
+                            ))
+                        if "mysql" in deps or "mysql2" in deps:
+                            services.append(RuntimeRequirement(
+                                name="MySQL",
+                                type="database",
+                                docker_image="mysql:8",
+                                port=3306,
+                                env_vars=["MYSQL_ROOT_PASSWORD=dev", "MYSQL_DATABASE=app_dev"]
+                            ))
+                        if "mongodb" in deps or "mongoose" in deps:
+                            services.append(RuntimeRequirement(
+                                name="MongoDB",
+                                type="database",
+                                docker_image="mongo:7",
+                                port=27017
+                            ))
+                        if "redis" in deps or "ioredis" in deps:
+                            services.append(RuntimeRequirement(
+                                name="Redis",
+                                type="cache",
+                                docker_image="redis:7-alpine",
+                                port=6379
+                            ))
 
                 except Exception as e:
                     self.logger.debug(f"Error parsing package.json: {e}")
