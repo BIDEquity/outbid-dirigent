@@ -297,7 +297,7 @@ Beispiele:
 
     parser.add_argument(
         "--phase",
-        choices=["analyze", "execute", "ship", "all"],
+        choices=["analyze", "manifest", "execute", "ship", "all"],
         default="all",
         help="Welche Phase ausführen (default: all)",
     )
@@ -455,6 +455,16 @@ Beispiele:
             if args.phase == "analyze":
                 logger.info("Analyse abgeschlossen. Beende.")
                 sys.exit(0)
+
+        # Manifest-only
+        if args.phase == "manifest":
+            executor = create_executor(str(repo_path), str(spec_path), model=args.model, effort=args.effort)
+            success = executor.generate_test_manifest()
+            if success:
+                logger.info(f"Test manifest generated: {repo_path / 'outbid-test-manifest.yaml'}")
+            else:
+                logger.error("Manifest generation failed")
+            sys.exit(0 if success else 1)
 
         # Route bestimmen
         analysis = run_analysis(repo_path, spec_path, force=False)

@@ -683,6 +683,37 @@ Wenn Doppler erkannt: start_command MIT "doppler run" prefix, uses_doppler: true
   ACHTUNG: READMEs sind haeufig outdated! Verifiziere jeden Command/Pfad gegen den tatsaechlichen Code.
   Wenn README und Code sich widersprechen, vertraue dem Code.
 
+## Session Recall — Verifiziere Commands gegen echte Historie
+WICHTIG: Bevor du Test-Commands ins Manifest schreibst, pruefe in frueheren Claude Sessions
+ob diese Commands tatsaechlich funktioniert haben.
+
+Fuehre diesen DuckDB-Query aus um zu sehen welche Commands in diesem Repo gelaufen sind:
+```bash
+duckdb :memory: -c "
+SELECT
+  regexp_extract(message.content::VARCHAR, '\"command\":\"([^\"]+)\"', 1) AS command,
+  CASE
+    WHEN message.content::VARCHAR LIKE '%\"is_error\":true%' THEN 'FAILED'
+    WHEN message.content::VARCHAR LIKE '%exit code 1%' THEN 'FAILED'
+    WHEN message.content::VARCHAR LIKE '%exit code 0%' THEN 'OK'
+    ELSE 'UNKNOWN'
+  END AS result,
+  timestamp
+FROM read_ndjson('{session_path}', auto_detect=true, ignore_errors=true)
+WHERE message.content::VARCHAR LIKE '%command%'
+  AND message.content::VARCHAR LIKE '%pytest%'
+  OR message.content::VARCHAR LIKE '%npm%test%'
+  OR message.content::VARCHAR LIKE '%ruff%'
+  OR message.content::VARCHAR LIKE '%vitest%'
+  OR message.content::VARCHAR LIKE '%just %'
+ORDER BY timestamp DESC
+LIMIT 30;
+"
+```
+- Bevorzuge Commands die in NEUEREN Sessions erfolgreich waren (neuere Sessions = naeher am aktuellen Code)
+- Wenn ein Command in der Historie FAILED hat, pruefe ob er inzwischen gefixt wurde
+- Wenn ein Command NIE in der Historie auftaucht, sei besonders vorsichtig (konservativ als Gap)
+
 Gib NUR das YAML aus, keine Erklaerung, kein Markdown-Fence. Reines YAML.
 """
 
@@ -725,11 +756,25 @@ class ManifestGenerator:
         self.repo_path = repo_path
         self.runner = runner
 
+    def _resolve_session_path(self) -> str:
+        """Find the Claude session log path for this repo."""
+        project_key = str(self.repo_path).replace("/", "-")
+        if not project_key.startswith("-"):
+            project_key = "-" + project_key
+        session_dir = Path.home() / ".claude" / "projects" / project_key
+        if session_dir.exists() and any(session_dir.glob("*.jsonl")):
+            return str(session_dir / "*.jsonl")
+        return ""
+
     def generate(self) -> Optional[TestManifest]:
         """Run 3 sonnet generations in parallel, consolidate with haiku."""
         logger.info("Generating test manifest (3x sonnet + haiku consolidation)...")
 
-        prompt = GENERATE_PROMPT.format(schema=MANIFEST_SCHEMA_EXAMPLE)
+        session_path = self._resolve_session_path()
+        prompt = GENERATE_PROMPT.format(
+            schema=MANIFEST_SCHEMA_EXAMPLE,
+            session_path=session_path or "$HOME/.claude/projects/PROJ/*.jsonl",
+        )
 
         # Run 3 generations in parallel
         versions: list[str] = []
