@@ -24,8 +24,10 @@ class RouteType(Enum):
 class StepType(Enum):
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
+    MANIFEST_GENERATION = "manifest_generation"
     PLANNING = "planning"
     EXECUTION = "execution"
+    TEST = "test"
     SHIP = "ship"
 
 
@@ -55,6 +57,12 @@ class Router:
     # Definitionen der Pfade
     GREENFIELD_STEPS = [
         RouteStep(
+            step_type=StepType.MANIFEST_GENERATION,
+            name="Test-Manifest Generierung",
+            description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
+            required=False,
+        ),
+        RouteStep(
             step_type=StepType.PLANNING,
             name="Planung",
             description="Claude Code analysiert Repo-Struktur und erstellt Ausführungsplan",
@@ -63,6 +71,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Ausführung",
             description="Tasks werden sequentiell ausgeführt mit frischem Kontext pro Task",
+        ),
+        RouteStep(
+            step_type=StepType.TEST,
+            name="Test Suite",
+            description="Volle Test-Suite aus Test-Manifest ausführen",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.SHIP,
@@ -78,6 +92,12 @@ class Router:
             description="Claude Code liest komplette Codebase und extrahiert alle Business Rules",
         ),
         RouteStep(
+            step_type=StepType.MANIFEST_GENERATION,
+            name="Test-Manifest Generierung",
+            description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
+            required=False,
+        ),
+        RouteStep(
             step_type=StepType.PLANNING,
             name="Planung mit Guardrails",
             description="Plan erstellen der BUSINESS_RULES.md als Kontext nutzt",
@@ -86,6 +106,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Ausführung mit Rule-Check",
             description="Tasks ausführen mit Business Rule Verification nach jedem Task",
+        ),
+        RouteStep(
+            step_type=StepType.TEST,
+            name="Test Suite",
+            description="Volle Test-Suite aus Test-Manifest ausführen",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.SHIP,
@@ -101,6 +127,12 @@ class Router:
             description="Claude Code analysiert nur die zum Feature relevanten Dateien",
         ),
         RouteStep(
+            step_type=StepType.MANIFEST_GENERATION,
+            name="Test-Manifest Generierung",
+            description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
+            required=False,
+        ),
+        RouteStep(
             step_type=StepType.PLANNING,
             name="Planung mit Kontext",
             description="Plan erstellen mit Repo-Kontext",
@@ -109,6 +141,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Ausführung",
             description="Tasks ausführen mit Repo-Kontext",
+        ),
+        RouteStep(
+            step_type=StepType.TEST,
+            name="Test Suite",
+            description="Volle Test-Suite aus Test-Manifest ausführen",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.SHIP,

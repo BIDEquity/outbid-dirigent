@@ -21,6 +21,7 @@ class Task(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
     model: str = ""
     effort: str = ""
+    test_level: str = ""  # "", "L1", "L2"
 
 
 class Phase(BaseModel):
@@ -132,7 +133,8 @@ class Plan(BaseModel):
           "files_to_modify": ["liste/von/existierenden/dateien.ext"],
           "depends_on": [],
           "model": "sonnet|haiku|opus (welches Modell für diesen Task am besten ist)",
-          "effort": "low|medium|high (wie viel Denkaufwand nötig ist)"
+          "effort": "low|medium|high (wie viel Denkaufwand nötig ist)",
+          "test_level": "L1|L2| (welches Test-Level nach diesem Task laufen soll, leer wenn kein Test nötig)"
         }
       ]
     }

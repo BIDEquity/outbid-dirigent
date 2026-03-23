@@ -83,6 +83,24 @@ class Executor:
             self._legacy_logger = None
 
     # ══════════════════════════════════════════
+    # TEST MANIFEST GENERATION
+    # ══════════════════════════════════════════
+
+    def generate_test_manifest(self) -> bool:
+        """Generate outbid-test-manifest.yaml via 3x sonnet + haiku consolidation."""
+        from outbid_dirigent.test_manifest import TestManifest, ManifestGenerator
+
+        # Skip if manifest already exists
+        manifest_path = self.repo_path / "outbid-test-manifest.yaml"
+        if manifest_path.exists():
+            logger.info(f"Test manifest already exists: {manifest_path}")
+            return True
+
+        generator = ManifestGenerator(self.repo_path, self.runner)
+        manifest = generator.generate()
+        return manifest is not None
+
+    # ══════════════════════════════════════════
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 
@@ -341,6 +359,9 @@ Keine vollständige Codebase-Analyse nötig.
                         self._legacy_logger.run_complete(success=False)
                     return False
 
+            # Phase review — code review + fix cycle
+            self._review_phase(phase, plan)
+
             # Phase complete
             state.setdefault("completed_phases", []).append(phase.id)
             save_state(str(self.repo_path), state)
@@ -367,6 +388,112 @@ Keine vollständige Codebase-Analyse nötig.
             state.setdefault("completed_tasks", [])
         save_state(str(self.repo_path), state)
         return state
+
+    # ══════════════════════════════════════════
+    # PHASE REVIEW (code review + fix)
+    # ══════════════════════════════════════════
+
+    def _review_phase(self, phase, plan: Plan):
+        """Launch a Claude process that runs code-review then fix on the phase's changes."""
+        # Collect what this phase changed
+        commit_count = len(phase.tasks)
+        if commit_count == 0:
+            return
+
+        logger.info(f"Phase {phase.id} review: reviewing {commit_count} task commits")
+
+        # Build the diff of this phase's work
+        diff_cmd = f"git diff HEAD~{commit_count} --stat"
+
+        # File list for context
+        files_modified = []
+        files_created = []
+        for task in phase.tasks:
+            files_modified.extend(task.files_to_modify)
+            files_created.extend(task.files_to_create)
+        all_files = sorted(set(files_modified + files_created))
+
+        prompt = f"""Du bist ein Post-Phase Reviewer. Phase {phase.id} ("{phase.name}") wurde gerade abgeschlossen.
+
+# Deine Aufgabe
+Fuehre zwei Schritte sequentiell aus:
+
+## Schritt 1: Code Review (Agent)
+Starte einen Agent mit folgendem Auftrag:
+- Pruefe den Diff der letzten {commit_count} Commits: `{diff_cmd}`
+- Lies die geaenderten Dateien und pruefe auf:
+  1. **Bugs**: None-Checks, fehlende Parameter-Validierung, falsche Typen
+  2. **API-Kompatibilitaet**: Werden bestehende Funktionssignaturen gebrochen? Werden Parameter die None sein koennen ohne Guard verwendet?
+  3. **Unvollstaendige Arbeit**: TODOs, auskommentierter Code, fehlende Imports
+  4. **Logik-Fehler**: Off-by-one, falsche Vergleiche, fehlende Edge Cases
+- Schreibe die Findings in .dirigent/reviews/phase-{phase.id}-REVIEW.md
+- Format: Severity (CRITICAL/WARN/INFO), Datei:Zeile, Beschreibung, Fix-Vorschlag
+
+Dateien die in dieser Phase geaendert wurden:
+{chr(10).join(f'- {f}' for f in all_files) if all_files else '(siehe git diff)'}
+
+## Schritt 2: Fix (Agent)
+Starte einen zweiten Agent der:
+- .dirigent/reviews/phase-{phase.id}-REVIEW.md liest
+- Alle CRITICAL und WARN Findings fixt
+- git add -A && git commit -m "fix(phase-{phase.id}): post-review fixes"
+- Wenn keine Findings: nichts tun
+
+Wichtig:
+- Schritt 2 erst starten NACHDEM Schritt 1 fertig ist
+- Keine neuen Features einfuehren, nur Bugs fixen
+- Wenn der Review keine CRITICAL/WARN Findings hat, ueberspringe Schritt 2
+"""
+
+        sys_prompt = f"""Du orchestrierst zwei Agents sequentiell: erst Review, dann Fix.
+Nutze den Agent-Tool fuer beide Schritte. Warte auf das Ergebnis von Schritt 1 bevor du Schritt 2 startest.
+Keine eigenen Code-Aenderungen — nur ueber die Agents arbeiten."""
+
+        success, stdout, stderr = self.runner._run_claude(
+            prompt, timeout=600, system_prompt=sys_prompt,
+        )
+
+        if success:
+            review_file = self.dirigent_dir / "reviews" / f"phase-{phase.id}-REVIEW.md"
+            if review_file.exists():
+                content = review_file.read_text(encoding="utf-8")
+                critical_count = content.lower().count("critical")
+                warn_count = content.lower().count("warn")
+                logger.info(f"Phase {phase.id} review: {critical_count} critical, {warn_count} warnings")
+            else:
+                logger.info(f"Phase {phase.id} review: no review file created")
+        else:
+            logger.warning(f"Phase {phase.id} review failed (non-blocking): {stderr[:200]}")
+
+    # ══════════════════════════════════════════
+    # TEST STEP
+    # ══════════════════════════════════════════
+
+    def run_tests(self) -> bool:
+        """Run full test suite from test manifest. Returns True if passed or no manifest."""
+        from outbid_dirigent.test_manifest import TestManifest, TestStepRunner
+
+        manifest = TestManifest.load(self.repo_path)
+        if not manifest:
+            logger.info("No test manifest found, skipping test step")
+            return True
+
+        logger.info("Running test suite from manifest...")
+        runner = TestStepRunner(self.repo_path, manifest)
+        result = runner.run()
+
+        if result.summary:
+            logger.info(f"Test results:\n{result.summary}")
+
+        if result.skipped_levels:
+            logger.warning(f"Skipped test levels: {', '.join(result.skipped_levels)}")
+
+        if result.passed:
+            logger.info("All tests passed")
+        else:
+            logger.error("Tests failed — blocking ship")
+
+        return result.passed
 
     # ══════════════════════════════════════════
     # SHIPPING
@@ -568,24 +695,30 @@ Keine vollständige Codebase-Analyse nötig.
     def generate_preview_script(self) -> bool:
         """Generate ~/preview-start.sh for workspace preview.
 
-        This script is used by the Portal to start a preview of the built app.
-        It's based on the runtime analysis performed before building.
+        Uses the test manifest as source of truth. Falls back to RuntimeAnalysis
+        for repos that don't have a manifest yet.
         """
+        from outbid_dirigent.test_manifest import TestManifest
+
         logger.info("Generating preview script...")
 
-        # Load runtime analysis
-        analysis = load_analysis(str(self.repo_path))
-        if not analysis or "runtime" not in analysis:
-            logger.warning("No runtime analysis found, skipping preview script generation")
-            return False
+        manifest = TestManifest.load(self.repo_path)
+        if manifest and manifest.preview.start_command:
+            return self._generate_preview_from_manifest(manifest)
 
-        runtime = analysis["runtime"]
-        project_name = analysis.get("repo_name", "project")
+        return self._generate_preview_from_runtime()
 
-        # Build the script
+    def _generate_preview_from_manifest(self, manifest) -> bool:
+        """Generate preview script from the test manifest (preferred path)."""
+        preview = manifest.preview
+        project_name = self.repo_path.name
+
+        # Collect real (non-mocked) components with start commands
+        startable = [c for c in manifest.components if not c.is_mocked and c.effective_start_cmd]
+
         script_lines = [
             "#!/bin/bash",
-            "# Preview Start Script - Generated by Outbid Dirigent",
+            "# Preview Start Script - Generated by Outbid Dirigent (from manifest)",
             "# This script starts all necessary services and the dev server",
             "",
             "set -e",
@@ -595,53 +728,28 @@ Keine vollständige Codebase-Analyse nötig.
             "",
         ]
 
-        # Add service startup commands
-        services = runtime.get("services", [])
-        if services:
+        # Start components in dependency order
+        if startable:
             script_lines.append("# ─── Start Required Services ───")
             script_lines.append("")
 
-            for service in services:
-                name = service.get("name", "service")
-                docker_image = service.get("docker_image")
-                port = service.get("port")
-                env_vars = service.get("env_vars", [])
+            for comp in startable:
+                start_cmd = comp.effective_start_cmd
+                ready_cmd = comp.effective_ready_check
+                timeout = comp.ready_timeout
+                if comp.start and comp.start.ready_check.timeout:
+                    timeout = comp.start.ready_check.timeout
 
-                if docker_image:
-                    container_name = name.lower().replace(" ", "_")
+                script_lines.append(f"# {comp.name} ({comp.type})")
+                script_lines.append(f'echo "Starting {comp.name}..."')
+                script_lines.append(f"{start_cmd}")
 
-                    # Check if container already running
-                    script_lines.append(f"# {name}")
-                    script_lines.append(f'if ! docker ps --format "{{{{.Names}}}}" | grep -q "^{container_name}$"; then')
-                    script_lines.append(f'  echo "Starting {name}..."')
+                if ready_cmd:
+                    script_lines.append(f'echo "Waiting for {comp.name}..."')
+                    script_lines.append(f"timeout={timeout}")
+                    script_lines.append(f'until {ready_cmd} 2>/dev/null; do sleep 1; timeout=$((timeout-1)); [ $timeout -le 0 ] && echo "{comp.name} not ready" && break; done')
 
-                    # Build docker run command
-                    docker_cmd = f"  docker run -d --name {container_name}"
-                    for env_var in env_vars:
-                        docker_cmd += f' -e "{env_var}"'
-                    if port:
-                        docker_cmd += f" -p {port}:{port}"
-                    docker_cmd += f" {docker_image}"
-
-                    script_lines.append(docker_cmd)
-                    script_lines.append("else")
-                    script_lines.append(f'  echo "{name} already running"')
-                    script_lines.append("fi")
-                    script_lines.append("")
-
-            # Wait for services to be ready
-            script_lines.append("# Wait for services to be ready")
-
-            for service in services:
-                if service.get("type") == "database" and service.get("name") == "PostgreSQL":
-                    script_lines.append('echo "Waiting for PostgreSQL..."')
-                    script_lines.append("until docker exec postgres pg_isready -q 2>/dev/null; do sleep 1; done")
-                elif service.get("type") == "database" and service.get("name") == "MySQL":
-                    script_lines.append('echo "Waiting for MySQL..."')
-                    script_lines.append('until docker exec mysql mysqladmin ping -h localhost --silent 2>/dev/null; do sleep 1; done')
-                elif service.get("type") == "cache" and service.get("name") == "Redis":
-                    script_lines.append('echo "Waiting for Redis..."')
-                    script_lines.append("until docker exec redis redis-cli ping 2>/dev/null | grep -q PONG; do sleep 1; done")
+                script_lines.append("")
 
             script_lines.append('echo "All services ready!"')
             script_lines.append("")
@@ -652,12 +760,11 @@ Keine vollständige Codebase-Analyse nötig.
         script_lines.append(f"cd ~/{project_name}")
         script_lines.append("")
 
-        # Setup steps (if not already done)
-        setup_steps = runtime.get("setup_steps", [])
-        if setup_steps:
+        # Setup steps
+        if preview.setup_steps:
             script_lines.append("# Run setup if needed")
             script_lines.append('if [ ! -f ".setup_done" ]; then')
-            for step in setup_steps:
+            for step in preview.setup_steps:
                 script_lines.append(f'  echo "Running: {step}"')
                 script_lines.append(f"  {step}")
             script_lines.append('  touch ".setup_done"')
@@ -668,10 +775,8 @@ Keine vollständige Codebase-Analyse nötig.
         script_lines.append("# ─── Start Dev Server ───")
         script_lines.append("")
 
-        start_command = runtime.get("start_command", "npm run dev")
-        uses_doppler = runtime.get("uses_doppler", False)
-
-        if uses_doppler:
+        start_command = preview.start_command
+        if preview.uses_doppler:
             script_lines.append('if [ -n "$DOPPLER_TOKEN" ]; then')
             script_lines.append('  echo "Starting with Doppler secrets..."')
             script_lines.append(f'  exec doppler run --token "$DOPPLER_TOKEN" -- {start_command}')
@@ -680,7 +785,6 @@ Keine vollständige Codebase-Analyse nötig.
             script_lines.append(f"  exec {start_command}")
             script_lines.append("fi")
         else:
-            # Even without Doppler config, support token if provided
             script_lines.append('if [ -n "$DOPPLER_TOKEN" ]; then')
             script_lines.append('  echo "Starting with Doppler secrets..."')
             script_lines.append(f'  exec doppler run --token "$DOPPLER_TOKEN" -- {start_command}')
@@ -688,26 +792,117 @@ Keine vollständige Codebase-Analyse nötig.
             script_lines.append(f"  exec {start_command}")
             script_lines.append("fi")
 
-        # Write the script
+        return self._write_preview_script(
+            script_lines, preview.port, preview.framework,
+            start_command, [c.name for c in startable],
+            preview.uses_doppler, preview.health_check,
+        )
+
+    def _generate_preview_from_runtime(self) -> bool:
+        """Fallback: generate preview script from RuntimeAnalysis."""
+        analysis = load_analysis(str(self.repo_path))
+        if not analysis or "runtime" not in analysis:
+            logger.warning("No manifest or runtime analysis found, skipping preview script")
+            return False
+
+        runtime = analysis["runtime"]
+        project_name = analysis.get("repo_name", "project")
+        services = runtime.get("services", [])
+        start_command = runtime.get("start_command", "npm run dev")
+        uses_doppler = runtime.get("uses_doppler", False)
+
+        script_lines = [
+            "#!/bin/bash",
+            "# Preview Start Script - Generated by Outbid Dirigent (from runtime analysis)",
+            "",
+            "set -e",
+            "",
+            'DOPPLER_TOKEN="${1:-$DOPPLER_TOKEN}"',
+            "",
+        ]
+
+        if services:
+            script_lines.append("# ─── Start Required Services ───")
+            script_lines.append("")
+            for service in services:
+                name = service.get("name", "service")
+                docker_image = service.get("docker_image")
+                port = service.get("port")
+                env_vars = service.get("env_vars", [])
+                if docker_image:
+                    container_name = name.lower().replace(" ", "_")
+                    script_lines.append(f"# {name}")
+                    script_lines.append(f'if ! docker ps --format "{{{{.Names}}}}" | grep -q "^{container_name}$"; then')
+                    docker_cmd = f"  docker run -d --name {container_name}"
+                    for env_var in env_vars:
+                        docker_cmd += f' -e "{env_var}"'
+                    if port:
+                        docker_cmd += f" -p {port}:{port}"
+                    docker_cmd += f" {docker_image}"
+                    script_lines.append(docker_cmd)
+                    script_lines.append("else")
+                    script_lines.append(f'  echo "{name} already running"')
+                    script_lines.append("fi")
+                    script_lines.append("")
+            script_lines.append("sleep 3")
+            script_lines.append("")
+
+        script_lines.append(f"cd ~/{project_name}")
+        script_lines.append("")
+
+        setup_steps = runtime.get("setup_steps", [])
+        if setup_steps:
+            script_lines.append('if [ ! -f ".setup_done" ]; then')
+            for step in setup_steps:
+                script_lines.append(f"  {step}")
+            script_lines.append('  touch ".setup_done"')
+            script_lines.append("fi")
+            script_lines.append("")
+
+        if uses_doppler:
+            script_lines.append('if [ -n "$DOPPLER_TOKEN" ]; then')
+            script_lines.append(f'  exec doppler run --token "$DOPPLER_TOKEN" -- {start_command}')
+            script_lines.append("else")
+            script_lines.append(f"  exec {start_command}")
+            script_lines.append("fi")
+        else:
+            script_lines.append('if [ -n "$DOPPLER_TOKEN" ]; then')
+            script_lines.append(f'  exec doppler run --token "$DOPPLER_TOKEN" -- {start_command}')
+            script_lines.append("else")
+            script_lines.append(f"  exec {start_command}")
+            script_lines.append("fi")
+
+        return self._write_preview_script(
+            script_lines, runtime.get("port", 3000), runtime.get("framework"),
+            start_command, [s.get("name") for s in services],
+            uses_doppler, runtime.get("health_check_path"),
+        )
+
+    def _write_preview_script(
+        self, script_lines: list[str], port: int, framework: str | None,
+        start_command: str, service_names: list[str],
+        uses_doppler: bool, health_check: str | None,
+    ) -> bool:
+        """Write the preview script and metadata."""
         script_content = "\n".join(script_lines) + "\n"
         home_dir = Path.home()
         script_path = home_dir / "preview-start.sh"
 
         try:
             script_path.write_text(script_content, encoding="utf-8")
-            script_path.chmod(0o755)  # Make executable
+            script_path.chmod(0o755)
             logger.info(f"Preview script written to {script_path}")
         except Exception as e:
             logger.error(f"Failed to write preview script: {e}")
             return False
 
-        # Write metadata for the Portal
         metadata = {
-            "port": runtime.get("port", 3000),
-            "framework": runtime.get("framework"),
+            "port": port,
+            "framework": framework,
             "start_command": start_command,
-            "services": [s.get("name") for s in services],
+            "services": service_names,
             "uses_doppler": uses_doppler,
+            "health_check": health_check,
             "generated_at": datetime.now().isoformat(),
         }
 

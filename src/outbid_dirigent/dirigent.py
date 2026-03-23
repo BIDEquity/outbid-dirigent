@@ -135,6 +135,9 @@ def run_execution(
         elif step.step_type == StepType.QUICK_SCAN:
             success = executor.quick_scan()
 
+        elif step.step_type == StepType.MANIFEST_GENERATION:
+            success = executor.generate_test_manifest()
+
         elif step.step_type == StepType.PLANNING:
             # Skip planning if PLAN.json already exists (e.g. from --plan-only)
             plan_file = repo_path / ".dirigent" / "PLAN.json"
@@ -183,10 +186,16 @@ def run_execution(
         elif step.step_type == StepType.EXECUTION:
             success = executor.execute_plan()
 
+        elif step.step_type == StepType.TEST:
+            success = executor.run_tests()
+
         elif step.step_type == StepType.SHIP:
             success = executor.ship()
 
         if success:
+            mark_step_complete(str(repo_path), step_name)
+        elif not step.required:
+            logger.warn(f"Optionaler Schritt '{step.name}' fehlgeschlagen, fahre fort")
             mark_step_complete(str(repo_path), step_name)
         else:
             logger.stop(f"Schritt '{step.name}' fehlgeschlagen")
@@ -288,7 +297,7 @@ Beispiele:
 
     parser.add_argument(
         "--phase",
-        choices=["analyze", "execute", "ship", "all"],
+        choices=["analyze", "manifest", "execute", "ship", "all"],
         default="all",
         help="Welche Phase ausführen (default: all)",
     )
@@ -446,6 +455,16 @@ Beispiele:
             if args.phase == "analyze":
                 logger.info("Analyse abgeschlossen. Beende.")
                 sys.exit(0)
+
+        # Manifest-only
+        if args.phase == "manifest":
+            executor = create_executor(str(repo_path), str(spec_path), model=args.model, effort=args.effort)
+            success = executor.generate_test_manifest()
+            if success:
+                logger.info(f"Test manifest generated: {repo_path / 'outbid-test-manifest.yaml'}")
+            else:
+                logger.error("Manifest generation failed")
+            sys.exit(0 if success else 1)
 
         # Route bestimmen
         analysis = run_analysis(repo_path, spec_path, force=False)
