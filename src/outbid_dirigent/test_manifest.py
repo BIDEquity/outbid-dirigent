@@ -141,12 +141,24 @@ class Prerequisites(BaseModel):
     env_vars: list[EnvVar] = Field(default_factory=list)
 
 
+class PreviewConfig(BaseModel):
+    start_command: str = ""
+    port: int = 3000
+    framework: str = ""
+    health_check: str = ""
+    setup_steps: list[str] = Field(default_factory=list)
+    uses_doppler: bool = False
+    doppler_project: str = ""
+    doppler_config: str = ""
+
+
 class TestManifest(BaseModel):
     test_level: int = 1
     prerequisites: list[Prerequisite] | Prerequisites = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
     levels: dict[str, TestLevelConfig] = Field(default_factory=dict)
     gaps: list[str | Gap] = Field(default_factory=list)
+    preview: PreviewConfig = Field(default_factory=PreviewConfig)
 
     @model_validator(mode='before')
     @classmethod
@@ -607,13 +619,25 @@ gaps:
     description: "No performance/load testing setup"
     mitigation: "Monitor production metrics"
     risk: low
+
+# Preview: how to start the app locally
+preview:
+  start_command: "doppler run -- uvicorn main:app --reload --port 8000"
+  port: 8000
+  framework: "FastAPI"
+  health_check: "/health"
+  setup_steps:
+    - "uv pip install -e '.[dev]'"
+    - "doppler run -- alembic upgrade head"
+  uses_doppler: true
+  doppler_project: "my-project"
+  doppler_config: "dev_personal"
 """
 
 GENERATE_PROMPT = """\
 Analysiere dieses Repository und erstelle ein outbid-test-manifest.yaml.
 
-Das Manifest beschreibt die Test-Infrastruktur: welche Tests existieren,
-wie man sie ausfuehrt, welche Services gebraucht werden, und was fehlt (gaps).
+Das Manifest beschreibt die Test-Infrastruktur UND wie das Projekt lokal gestartet wird.
 
 ## Schema und Beispiel
 ```yaml
@@ -624,18 +648,40 @@ wie man sie ausfuehrt, welche Services gebraucht werden, und was fehlt (gaps).
 - Nur Commands auflisten die TATSAECHLICH funktionieren (Dateien/Config existiert)
 - prerequisites: Was installiert sein muss (check-Command muss funktionieren)
 - components: Externe Services (DB, Cache, etc.) — nur wenn docker-compose.yml o.ae. existiert
+- components mit mock: Externe APIs die in Tests automatisch gemockt werden (conftest.py, fixtures)
 - levels.l1: Schnelle Tests (unit tests, lint, type check) — kein externer Service noetig
 - levels.l2: Integration tests — brauchen components
 - gaps: Was NICHT vorhanden ist aber sinnvoll waere
 - test_level: 1 wenn nur L1 verfuegbar, 2 wenn L1+L2 verfuegbar
 - Sei konservativ: lieber eine Luecke als Gap dokumentieren als einen Command der nicht funktioniert
 
-Analysiere die Codebase gruendlich:
+## Preview-Sektion
+- preview.start_command: Der Dev-Server Start-Befehl
+- preview.port: Port des Dev-Servers
+- preview.framework: Erkanntes Framework (Next.js, FastAPI, Django, etc.)
+- preview.health_check: Health-Check Endpoint falls vorhanden (/health, /api/health, etc.)
+- preview.setup_steps: Was vor dem Start laufen muss (install, migrate, seed)
+- preview.uses_doppler: true wenn Doppler fuer Secrets verwendet wird
+- preview.doppler_project: Doppler Projektname (aus .doppler.yaml oder doppler.yaml)
+- preview.doppler_config: Doppler Config (z.B. "dev", "dev_personal")
+
+## Doppler-Erkennung
+Pruefe ob Doppler verwendet wird:
+- .doppler.yaml oder doppler.yaml im Root
+- "doppler run" in justfile, Makefile, package.json scripts, oder CI config
+- "doppler" in README.md, CONTRIBUTING.md, oder .env.example
+Wenn Doppler erkannt: start_command MIT "doppler run" prefix, uses_doppler: true
+
+## Codebase-Analyse
 - Schau dir pyproject.toml, package.json, Makefile, justfile, tox.ini, setup.cfg an
 - Pruefe ob test-Verzeichnisse existieren
 - Pruefe ob Linter/Formatter konfiguriert sind (ruff, eslint, prettier, etc.)
 - Pruefe ob Docker/docker-compose vorhanden ist
 - Pruefe ob CI-Config existiert (.github/workflows, .gitlab-ci.yml, etc.)
+- Pruefe conftest.py / test fixtures fuer auto-mocked Services
+- Lies die README.md — dort stehen oft Setup-Anweisungen, Start-Commands, und benoetigte Services.
+  ACHTUNG: READMEs sind haeufig outdated! Verifiziere jeden Command/Pfad gegen den tatsaechlichen Code.
+  Wenn README und Code sich widersprechen, vertraue dem Code.
 
 Gib NUR das YAML aus, keine Erklaerung, kein Markdown-Fence. Reines YAML.
 """
