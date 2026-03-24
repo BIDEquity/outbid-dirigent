@@ -152,6 +152,11 @@ class PreviewConfig(BaseModel):
     doppler_config: str = ""
 
 
+class ReadinessScore(BaseModel):
+    score: int = 0
+    rationale: str = ""
+
+
 class TestManifest(BaseModel):
     test_level: int = 1
     prerequisites: list[Prerequisite] | Prerequisites = Field(default_factory=list)
@@ -159,6 +164,7 @@ class TestManifest(BaseModel):
     levels: dict[str, TestLevelConfig] = Field(default_factory=dict)
     gaps: list[str | Gap] = Field(default_factory=list)
     preview: PreviewConfig = Field(default_factory=PreviewConfig)
+    readiness: ReadinessScore = Field(default_factory=ReadinessScore)
 
     @model_validator(mode='before')
     @classmethod

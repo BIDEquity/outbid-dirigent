@@ -1,0 +1,16 @@
+{
+  "name": "outbid-dirigent",
+  "owner": {
+    "name": "BIDEquity"
+  },
+  "metadata": {
+    "description": "Dirigent skills — session recall, data exploration, and manifest generation"
+  },
+  "plugins": [
+    {
+      "name": "dirigent",
+      "source": "./src/outbid_dirigent/plugin",
+      "description": "Session recall, data exploration, and manifest generation skills for Dirigent subprocesses"
+    }
+  ]
+}

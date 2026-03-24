@@ -1,0 +1,117 @@
+# outbid-test-manifest.yaml — full example with all fields.
+# The Dirigent reads this to know what tests exist, how to run them,
+# and how to start the app for workspace preview.
+
+test_level: 2  # 1 = L1 only, 2 = L1+L2
+
+prerequisites:
+  tools:
+    - name: python
+      check: "python3 --version"
+      install_hint: "brew install python@3.12"
+      required_version: ">=3.10"
+    - name: docker
+      check: "docker --version"
+      install_hint: "brew install --cask docker"
+    - name: doppler
+      check: "doppler --version"
+      install_hint: "brew install dopplerhq/cli/doppler && doppler login"
+  env_vars:
+    - name: DATABASE_URL
+      source: "Doppler — auto-injected via doppler run"
+      secret: true
+    - name: OPENAI_API_KEY
+      source: "Doppler"
+      secret: true
+
+# Components as dict keyed by name
+components:
+  postgres:
+    type: database
+    runtime: docker-compose
+    start:
+      command: "docker compose up -d postgres"
+      ready_check:
+        type: tcp
+        target: "localhost:5432"
+        timeout: 30
+    endpoint:
+      host: localhost
+      port: 5432
+      protocol: tcp
+
+  redis:
+    type: cache
+    runtime: docker-compose
+    start:
+      command: "docker compose up -d redis"
+      ready_check:
+        type: tcp
+        target: "localhost:6379"
+        timeout: 15
+
+  # External APIs that are auto-mocked in tests
+  openai_api:
+    type: external
+    mock:
+      strategy: stub
+      config:
+        note: "Auto-mocked in pytest via conftest.py"
+
+levels:
+  l1:
+    pre_commands:
+      - "uv pip install -e '.[dev]'"
+    commands:
+      - name: unit-tests
+        run: "pytest tests/unit -x -q"
+        expect: exit_0
+      - name: lint
+        run: "ruff check ."
+        expect: exit_0
+      - name: type-check
+        run: "pyright src/"
+        expect: exit_0
+  l2:
+    pre_commands:
+      - "doppler run -- docker compose up -d postgres redis"
+      - "sleep 5"
+    commands:
+      - name: integration-tests
+        run: "doppler run -- pytest tests/integration -x -q"
+        expect: exit_0
+        needs: [postgres, redis]
+      - name: health-check
+        run: "curl -sf http://localhost:8000/health"
+        expect: exit_0
+        needs: [postgres]
+
+gaps:
+  - area: "E2E/Playwright"
+    reason: "not_configured"
+    description: "No browser-based end-to-end tests"
+    mitigation: "Manual QA via staging"
+    risk: medium
+  - area: "Load testing"
+    reason: "requires_hardware"
+    description: "No performance/load testing setup"
+    mitigation: "Monitor production metrics"
+    risk: low
+
+# Preview: how to start the app locally
+preview:
+  start_command: "doppler run -- uvicorn main:app --reload --port 8000"
+  port: 8000
+  framework: "FastAPI"
+  health_check: "/health"
+  setup_steps:
+    - "uv pip install -e '.[dev]'"
+    - "doppler run -- alembic upgrade head"
+  uses_doppler: true
+  doppler_project: "my-project"
+  doppler_config: "dev_personal"
+
+# Agentic development readiness (0-10)
+readiness:
+  score: 7
+  rationale: "L1+L2 tests verified, Doppler handles secrets, single-command preview. Missing E2E tests and no task runner — setup requires knowing the right docker-compose incantations."
