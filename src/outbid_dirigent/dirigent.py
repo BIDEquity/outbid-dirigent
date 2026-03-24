@@ -286,7 +286,7 @@ Beispiele:
     parser.add_argument(
         "--spec",
         required=True,
-        help="Pfad zur SPEC.md Datei",
+        help="Pfad zur SPEC.md Datei (oder '-' / '.' fuer stdin)",
     )
 
     parser.add_argument(
@@ -410,8 +410,25 @@ Beispiele:
     args = parser.parse_args()
 
     # Pfade auflösen
-    spec_path = Path(args.spec).resolve()
     repo_path = Path(args.repo).resolve()
+
+    # Spec von stdin lesen wenn "-" oder "." als Argument
+    if args.spec in ("-", "."):
+        import tempfile
+        stdin_content = sys.stdin.read()
+        if not stdin_content.strip():
+            print("❌ Keine Spec-Daten auf stdin empfangen", file=sys.stderr)
+            sys.exit(1)
+        (repo_path / ".dirigent").mkdir(parents=True, exist_ok=True)
+        spec_tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", prefix="spec-", dir=repo_path / ".dirigent",
+            delete=False, encoding="utf-8",
+        )
+        spec_tmp.write(stdin_content)
+        spec_tmp.close()
+        spec_path = Path(spec_tmp.name)
+    else:
+        spec_path = Path(args.spec).resolve()
 
     # Validierung
     if not validate_inputs(spec_path, repo_path):
