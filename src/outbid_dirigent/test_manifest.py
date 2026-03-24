@@ -229,25 +229,26 @@ class TestManifest(BaseModel):
 
     def summary_for_prompt(self) -> str:
         """Compact summary for injection into planner/task prompts."""
-        lines = ["# Test-Infrastruktur (aus outbid-test-manifest.yaml)"]
+        lines = ["<test-infrastructure source=\"outbid-test-manifest.yaml\">"]
 
         for level_name, level_cfg in self.levels.items():
             cmds = ", ".join(f"`{c.run}`" for c in level_cfg.commands)
-            lines.append(f"- **{level_name.upper()}**: {cmds}")
+            lines.append(f"<level name=\"{level_name.upper()}\">{cmds}</level>")
 
         real_comps = [c for c in self.components if not c.is_mocked]
         if real_comps:
             comp_names = ", ".join(c.name for c in real_comps)
-            lines.append(f"- **Benoetigte Services**: {comp_names}")
+            lines.append(f"<services>{comp_names}</services>")
 
         mocked = self.mocked_components()
         if mocked:
             mock_names = ", ".join(c.name for c in mocked)
-            lines.append(f"- **Auto-mocked (kein Setup noetig)**: {mock_names}")
+            lines.append(f"<auto-mocked>{mock_names}</auto-mocked>")
 
         if self.gaps:
-            lines.append(f"- **Bekannte Gaps**: {', '.join(self.gap_strings())}")
+            lines.append(f"<gaps>{', '.join(self.gap_strings())}</gaps>")
 
+        lines.append("</test-infrastructure>")
         return "\n".join(lines)
 
     def commands_for_level(self, level: str) -> list[TestCommand]:
@@ -257,45 +258,49 @@ class TestManifest(BaseModel):
 
     def summary_for_task(self, test_level: str) -> str:
         """Context block for an individual task prompt."""
-        lines = ["# Test-Infrastruktur (aus Test-Manifest)"]
+        lines = ["<test-infrastructure>"]
 
-        lines.append("\nVerfuegbare Test-Commands:")
+        lines.append("<available-commands>")
         for level_name, level_cfg in self.levels.items():
             for cmd in level_cfg.commands:
-                needs = f" (braucht: {', '.join(cmd.needs)})" if cmd.needs else ""
-                lines.append(f"- `{cmd.run}` ({cmd.name}){needs}")
+                needs = f" needs=\"{', '.join(cmd.needs)}\"" if cmd.needs else ""
+                lines.append(f"<command name=\"{cmd.name}\" level=\"{level_name}\"{needs}>{cmd.run}</command>")
+        lines.append("</available-commands>")
 
         real_comps = [c for c in self.components if not c.is_mocked]
         if real_comps:
-            lines.append("\nBenoetigte Services fuer L2:")
+            lines.append("<services required-for=\"L2\">")
             for comp in real_comps:
                 start = comp.effective_start_cmd
-                lines.append(f"- {comp.name} — `{start}`" if start else f"- {comp.name}")
+                lines.append(f"<service name=\"{comp.name}\">{start or 'no start command'}</service>")
+            lines.append("</services>")
 
         mocked = self.mocked_components()
         if mocked:
-            lines.append("\nAuto-mocked Services (kein Setup noetig, in Tests automatisch gemockt):")
+            lines.append("<auto-mocked hint=\"kein Setup noetig, in Tests automatisch gemockt\">")
             for comp in mocked:
                 note = comp.mock.config.get("note", "") if comp.mock and comp.mock.config else ""
-                lines.append(f"- {comp.name}" + (f" — {note}" if note else ""))
+                lines.append(f"<mock name=\"{comp.name}\">{note}</mock>")
+            lines.append("</auto-mocked>")
 
         if self.gaps:
-            lines.append("\nBekannte Gaps (NICHT versuchen zu loesen):")
+            lines.append("<gaps hint=\"NICHT versuchen zu loesen\">")
             for gap in self.gaps:
-                lines.append(f"- {gap}")
+                lines.append(f"<gap>{gap}</gap>")
+            lines.append("</gaps>")
 
         if test_level:
             level_key = test_level.lower()
             cmds = self.commands_for_level(level_key)
             if cmds:
                 cmd_strs = " und ".join(f"`{c.run}`" for c in cmds)
-                lines.append(f"\nDein Task test_level: {test_level}")
-                lines.append(f"-> Fuehre nach deinen Aenderungen {cmd_strs} aus um zu verifizieren.")
+                lines.append(f"<your-task test-level=\"{test_level}\">Fuehre nach deinen Aenderungen {cmd_strs} aus um zu verifizieren.</your-task>")
             else:
-                lines.append(f"\nDein Task test_level: {test_level}")
+                lines.append(f"<your-task test-level=\"{test_level}\"/>")
         else:
-            lines.append("\nKein Testing fuer diesen Task noetig.")
+            lines.append("<your-task>Kein Testing fuer diesen Task noetig.</your-task>")
 
+        lines.append("</test-infrastructure>")
         return "\n".join(lines)
 
 
@@ -641,60 +646,61 @@ preview:
 """
 
 GENERATE_PROMPT = """\
-Analysiere dieses Repository und erstelle ein outbid-test-manifest.yaml.
+<task>Analysiere dieses Repository und erstelle ein outbid-test-manifest.yaml.</task>
 
-Das Manifest beschreibt die Test-Infrastruktur UND wie das Projekt lokal gestartet wird.
+<context>Das Manifest beschreibt die Test-Infrastruktur UND wie das Projekt lokal gestartet wird.</context>
 
-## Schema und Beispiel
-```yaml
+<schema>
 {schema}
-```
+</schema>
 
-## Regeln
-- Nur Commands auflisten die TATSAECHLICH funktionieren (Dateien/Config existiert)
-- prerequisites: Was installiert sein muss (check-Command muss funktionieren)
-- components: Externe Services (DB, Cache, etc.) — nur wenn docker-compose.yml o.ae. existiert
-- components mit mock: Externe APIs die in Tests automatisch gemockt werden (conftest.py, fixtures)
-- levels.l1: Schnelle Tests (unit tests, lint, type check) — kein externer Service noetig
-- levels.l2: Integration tests — brauchen components
-- gaps: Was NICHT vorhanden ist aber sinnvoll waere
-- test_level: 1 wenn nur L1 verfuegbar, 2 wenn L1+L2 verfuegbar
-- Sei konservativ: lieber eine Luecke als Gap dokumentieren als einen Command der nicht funktioniert
+<rules>
+<rule>Nur Commands auflisten die TATSAECHLICH funktionieren (Dateien/Config existiert)</rule>
+<rule>prerequisites: Was installiert sein muss (check-Command muss funktionieren)</rule>
+<rule>components: Externe Services (DB, Cache, etc.) — nur wenn docker-compose.yml o.ae. existiert</rule>
+<rule>components mit mock: Externe APIs die in Tests automatisch gemockt werden (conftest.py, fixtures)</rule>
+<rule>levels.l1: Schnelle Tests (unit tests, lint, type check) — kein externer Service noetig</rule>
+<rule>levels.l2: Integration tests — brauchen components</rule>
+<rule>gaps: Was NICHT vorhanden ist aber sinnvoll waere</rule>
+<rule>test_level: 1 wenn nur L1 verfuegbar, 2 wenn L1+L2 verfuegbar</rule>
+<rule>Sei konservativ: lieber eine Luecke als Gap dokumentieren als einen Command der nicht funktioniert</rule>
+</rules>
 
-## Preview-Sektion
-- preview.start_command: Der Dev-Server Start-Befehl
-- preview.port: Port des Dev-Servers
-- preview.framework: Erkanntes Framework (Next.js, FastAPI, Django, etc.)
-- preview.health_check: Health-Check Endpoint falls vorhanden (/health, /api/health, etc.)
-- preview.setup_steps: Was vor dem Start laufen muss (install, migrate, seed)
-- preview.uses_doppler: true wenn Doppler fuer Secrets verwendet wird
-- preview.doppler_project: Doppler Projektname (aus .doppler.yaml oder doppler.yaml)
-- preview.doppler_config: Doppler Config (z.B. "dev", "dev_personal")
+<preview-rules>
+<field name="start_command">Der Dev-Server Start-Befehl</field>
+<field name="port">Port des Dev-Servers</field>
+<field name="framework">Erkanntes Framework (Next.js, FastAPI, Django, etc.)</field>
+<field name="health_check">Health-Check Endpoint falls vorhanden (/health, /api/health, etc.)</field>
+<field name="setup_steps">Was vor dem Start laufen muss (install, migrate, seed)</field>
+<field name="uses_doppler">true wenn Doppler fuer Secrets verwendet wird</field>
+<field name="doppler_project">Doppler Projektname (aus .doppler.yaml oder doppler.yaml)</field>
+<field name="doppler_config">Doppler Config (z.B. "dev", "dev_personal")</field>
+</preview-rules>
 
-## Doppler-Erkennung
+<doppler-detection>
 Pruefe ob Doppler verwendet wird:
 - .doppler.yaml oder doppler.yaml im Root
 - "doppler run" in justfile, Makefile, package.json scripts, oder CI config
 - "doppler" in README.md, CONTRIBUTING.md, oder .env.example
 Wenn Doppler erkannt: start_command MIT "doppler run" prefix, uses_doppler: true
+</doppler-detection>
 
-## Codebase-Analyse
-- Schau dir pyproject.toml, package.json, Makefile, justfile, tox.ini, setup.cfg an
-- Pruefe ob test-Verzeichnisse existieren
-- Pruefe ob Linter/Formatter konfiguriert sind (ruff, eslint, prettier, etc.)
-- Pruefe ob Docker/docker-compose vorhanden ist
-- Pruefe ob CI-Config existiert (.github/workflows, .gitlab-ci.yml, etc.)
-- Pruefe conftest.py / test fixtures fuer auto-mocked Services
-- Lies die README.md — dort stehen oft Setup-Anweisungen, Start-Commands, und benoetigte Services.
-  ACHTUNG: READMEs sind haeufig outdated! Verifiziere jeden Command/Pfad gegen den tatsaechlichen Code.
-  Wenn README und Code sich widersprechen, vertraue dem Code.
+<analysis-checklist>
+<check>pyproject.toml, package.json, Makefile, justfile, tox.ini, setup.cfg</check>
+<check>test-Verzeichnisse existieren?</check>
+<check>Linter/Formatter konfiguriert? (ruff, eslint, prettier, etc.)</check>
+<check>Docker/docker-compose vorhanden?</check>
+<check>CI-Config existiert? (.github/workflows, .gitlab-ci.yml, etc.)</check>
+<check>conftest.py / test fixtures fuer auto-mocked Services</check>
+<check>README.md — Setup-Anweisungen, Start-Commands, benoetigte Services</check>
+<warning>READMEs sind haeufig outdated! Verifiziere jeden Command/Pfad gegen den tatsaechlichen Code. Wenn README und Code sich widersprechen, vertraue dem Code.</warning>
+</analysis-checklist>
 
-## Session Recall — Verifiziere Commands gegen echte Historie
+<session-recall>
 WICHTIG: Bevor du Test-Commands ins Manifest schreibst, pruefe in frueheren Claude Sessions
 ob diese Commands tatsaechlich funktioniert haben.
 
-Fuehre diesen DuckDB-Query aus um zu sehen welche Commands in diesem Repo gelaufen sind:
-```bash
+<query>
 duckdb :memory: -c "
 SELECT
   regexp_extract(message.content::VARCHAR, '\"command\":\"([^\"]+)\"', 1) AS command,
@@ -715,41 +721,41 @@ WHERE message.content::VARCHAR LIKE '%command%'
 ORDER BY timestamp DESC
 LIMIT 30;
 "
-```
+</query>
+<guidance>
 - Bevorzuge Commands die in NEUEREN Sessions erfolgreich waren (neuere Sessions = naeher am aktuellen Code)
 - Wenn ein Command in der Historie FAILED hat, pruefe ob er inzwischen gefixt wurde
 - Wenn ein Command NIE in der Historie auftaucht, sei besonders vorsichtig (konservativ als Gap)
+</guidance>
+</session-recall>
 
-Gib NUR das YAML aus, keine Erklaerung, kein Markdown-Fence. Reines YAML.
+<output-format>Gib NUR das YAML aus, keine Erklaerung, kein Markdown-Fence. Reines YAML.</output-format>
 """
 
 CONSOLIDATE_PROMPT = """\
-Du bekommst 3 Versionen eines outbid-test-manifest.yaml fuer dasselbe Repository.
-Konsolidiere sie zu einer einzigen, optimalen Version.
+<task>Konsolidiere 3 Versionen eines outbid-test-manifest.yaml zu einer einzigen, optimalen Version.</task>
 
-## Regeln
-- Nimm die UNION aller korrekt erkannten Test-Commands
-- Wenn sich Versionen widersprechen: waehle die konservativere Variante
-- Wenn ein Command in 2+ Versionen vorkommt, ist er wahrscheinlich korrekt
-- Wenn ein Command nur in 1 Version vorkommt, pruefe ob er plausibel ist
-- gaps: Vereinige alle erkannten Gaps (dedupliziert)
-- Bevorzuge spezifischere Commands (z.B. "pytest tests/unit" > "pytest")
-- test_level: Setze auf das Maximum das plausibel funktioniert
+<rules>
+<rule>Nimm die UNION aller korrekt erkannten Test-Commands</rule>
+<rule>Wenn sich Versionen widersprechen: waehle die konservativere Variante</rule>
+<rule>Wenn ein Command in 2+ Versionen vorkommt, ist er wahrscheinlich korrekt</rule>
+<rule>Wenn ein Command nur in 1 Version vorkommt, pruefe ob er plausibel ist</rule>
+<rule>gaps: Vereinige alle erkannten Gaps (dedupliziert)</rule>
+<rule>Bevorzuge spezifischere Commands (z.B. "pytest tests/unit" > "pytest")</rule>
+<rule>test_level: Setze auf das Maximum das plausibel funktioniert</rule>
+</rules>
 
-## Version A
-```yaml
+<version id="A">
 {version_a}
-```
+</version>
 
-## Version B
-```yaml
+<version id="B">
 {version_b}
-```
+</version>
 
-## Version C
-```yaml
+<version id="C">
 {version_c}
-```
+</version>
 
 Gib NUR das konsolidierte YAML aus, keine Erklaerung, kein Markdown-Fence. Reines YAML.
 """

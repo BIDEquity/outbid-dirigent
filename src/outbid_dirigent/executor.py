@@ -119,20 +119,19 @@ class Executor:
             with open(analysis_file, encoding="utf-8") as f:
                 language = json.load(f).get("primary_language", "unbekannt")
 
-        prompt = f"""Analysiere diese {language} Codebase und extrahiere alle Business Rules.
+        prompt = f"""<task>Analysiere diese {language} Codebase und extrahiere alle Business Rules.</task>
 
-Erstelle die Datei .dirigent/BUSINESS_RULES.md mit folgendem Format:
-
+<output file=".dirigent/BUSINESS_RULES.md">
 # Business Rules – {self.repo_path.name}
 
-## Kern-Entitäten
+## Kern-Entitaeten
 (Alle Domain-Objekte und ihre Felder)
 
-## Geschäftsregeln
+## Geschaeftsregeln
 (Validierungen, Berechnungen, Constraints)
 
 ## Domain Events
-(Was passiert wann? User erstellt X → Y wird ausgelöst)
+(Was passiert wann? User erstellt X → Y wird ausgeloest)
 
 ## API Endpoints
 (Alle Routes mit Parametern und Response-Format)
@@ -140,17 +139,19 @@ Erstelle die Datei .dirigent/BUSINESS_RULES.md mit folgendem Format:
 ## Datenbank
 (Schema, Relationen, Constraints)
 
-## Externe Abhängigkeiten
+## Externe Abhaengigkeiten
 (APIs, Services, Integrations)
 
 ## Edge Cases
-(Bekannte Sonderfälle und wie sie behandelt werden)
+(Bekannte Sonderfaelle und wie sie behandelt werden)
+</output>
 
-Regeln:
-- Sei präzise. Keine Annahmen. Nur was du im Code siehst.
-- Dokumentiere numerische Werte exakt (Limits, Timeouts, etc.)
-- Bei Unsicherheit, markiere es mit [UNKLAR]
-- Analysiere alle relevanten Dateien systematisch
+<rules>
+<rule>Sei praezise. Keine Annahmen. Nur was du im Code siehst.</rule>
+<rule>Dokumentiere numerische Werte exakt (Limits, Timeouts, etc.)</rule>
+<rule>Bei Unsicherheit, markiere es mit [UNKLAR]</rule>
+<rule>Analysiere alle relevanten Dateien systematisch</rule>
+</rules>
 
 Erstelle die Datei jetzt.
 """
@@ -224,28 +225,32 @@ Erstelle die Datei jetzt.
     def quick_scan(self) -> bool:
         """Quick scan of relevant files (Hybrid route)."""
         logger.info("Starting Quick Scan...")
-        prompt = f"""Analysiere diese Codebase um das folgende Feature zu implementieren:
+        prompt = f"""<task>Analysiere diese Codebase um das folgende Feature zu implementieren.</task>
 
+<spec>
 {self.spec_content}
+</spec>
 
-Identifiziere die relevanten Dateien und erstelle .dirigent/CONTEXT.md mit:
-
-# Relevante Dateien für Feature
+<output file=".dirigent/CONTEXT.md">
+# Relevante Dateien fuer Feature
 
 ## Hauptdateien
-(Die Dateien die direkt modifiziert werden müssen)
+(Die Dateien die direkt modifiziert werden muessen)
 
-## Abhängigkeiten
-(Dateien die verstanden werden müssen aber nicht geändert werden)
+## Abhaengigkeiten
+(Dateien die verstanden werden muessen aber nicht geaendert werden)
 
 ## Patterns
 (Coding-Patterns die im Projekt verwendet werden)
 
 ## Integration Points
-(Wo das neue Feature sich einfügen muss)
+(Wo das neue Feature sich einfuegen muss)
+</output>
 
-Fokussiere dich NUR auf die für dieses Feature relevanten Teile.
-Keine vollständige Codebase-Analyse nötig.
+<constraints>
+Fokussiere dich NUR auf die fuer dieses Feature relevanten Teile.
+Keine vollstaendige Codebase-Analyse noetig.
+</constraints>
 """
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
         if not success:
@@ -413,41 +418,51 @@ Keine vollständige Codebase-Analyse nötig.
             files_created.extend(task.files_to_create)
         all_files = sorted(set(files_modified + files_created))
 
-        prompt = f"""Du bist ein Post-Phase Reviewer. Phase {phase.id} ("{phase.name}") wurde gerade abgeschlossen.
+        files_list = chr(10).join(f'- {f}' for f in all_files) if all_files else '(siehe git diff)'
+        prompt = f"""<task>Post-Phase Review fuer Phase {phase.id} ("{phase.name}").</task>
 
-# Deine Aufgabe
+<instructions>
 Fuehre zwei Schritte sequentiell aus:
 
-## Schritt 1: Code Review (Agent)
+<step id="1" name="Code Review">
 Starte einen Agent mit folgendem Auftrag:
-- Pruefe den Diff der letzten {commit_count} Commits: `{diff_cmd}`
-- Lies die geaenderten Dateien und pruefe auf:
-  1. **Bugs**: None-Checks, fehlende Parameter-Validierung, falsche Typen
-  2. **API-Kompatibilitaet**: Werden bestehende Funktionssignaturen gebrochen? Werden Parameter die None sein koennen ohne Guard verwendet?
-  3. **Unvollstaendige Arbeit**: TODOs, auskommentierter Code, fehlende Imports
-  4. **Logik-Fehler**: Off-by-one, falsche Vergleiche, fehlende Edge Cases
-- Schreibe die Findings in .dirigent/reviews/phase-{phase.id}-REVIEW.md
-- Format: Severity (CRITICAL/WARN/INFO), Datei:Zeile, Beschreibung, Fix-Vorschlag
+<review-scope>
+<diff>{diff_cmd}</diff>
+<checklist>
+<check category="Bugs">None-Checks, fehlende Parameter-Validierung, falsche Typen</check>
+<check category="API-Kompatibilitaet">Werden bestehende Funktionssignaturen gebrochen? Werden Parameter die None sein koennen ohne Guard verwendet?</check>
+<check category="Unvollstaendige Arbeit">TODOs, auskommentierter Code, fehlende Imports</check>
+<check category="Logik-Fehler">Off-by-one, falsche Vergleiche, fehlende Edge Cases</check>
+</checklist>
+<changed-files>
+{files_list}
+</changed-files>
+</review-scope>
+<output file=".dirigent/reviews/phase-{phase.id}-REVIEW.md">Format: Severity (CRITICAL/WARN/INFO), Datei:Zeile, Beschreibung, Fix-Vorschlag</output>
+</step>
 
-Dateien die in dieser Phase geaendert wurden:
-{chr(10).join(f'- {f}' for f in all_files) if all_files else '(siehe git diff)'}
-
-## Schritt 2: Fix (Agent)
+<step id="2" name="Fix" depends-on="1">
 Starte einen zweiten Agent der:
 - .dirigent/reviews/phase-{phase.id}-REVIEW.md liest
 - Alle CRITICAL und WARN Findings fixt
-- git add -A && git commit -m "fix(phase-{phase.id}): post-review fixes"
+- git add -A &amp;&amp; git commit -m "fix(phase-{phase.id}): post-review fixes"
 - Wenn keine Findings: nichts tun
+</step>
+</instructions>
 
-Wichtig:
-- Schritt 2 erst starten NACHDEM Schritt 1 fertig ist
-- Keine neuen Features einfuehren, nur Bugs fixen
-- Wenn der Review keine CRITICAL/WARN Findings hat, ueberspringe Schritt 2
+<constraints>
+<constraint>Schritt 2 erst starten NACHDEM Schritt 1 fertig ist</constraint>
+<constraint>Keine neuen Features einfuehren, nur Bugs fixen</constraint>
+<constraint>Wenn der Review keine CRITICAL/WARN Findings hat, ueberspringe Schritt 2</constraint>
+</constraints>
 """
 
-        sys_prompt = f"""Du orchestrierst zwei Agents sequentiell: erst Review, dann Fix.
-Nutze den Agent-Tool fuer beide Schritte. Warte auf das Ergebnis von Schritt 1 bevor du Schritt 2 startest.
-Keine eigenen Code-Aenderungen — nur ueber die Agents arbeiten."""
+        sys_prompt = """<role>Du orchestrierst zwei Agents sequentiell: erst Review, dann Fix.</role>
+<constraints>
+<constraint>Nutze den Agent-Tool fuer beide Schritte.</constraint>
+<constraint>Warte auf das Ergebnis von Schritt 1 bevor du Schritt 2 startest.</constraint>
+<constraint>Keine eigenen Code-Aenderungen — nur ueber die Agents arbeiten.</constraint>
+</constraints>"""
 
         success, stdout, stderr = self.runner._run_claude(
             prompt, timeout=600, system_prompt=sys_prompt,

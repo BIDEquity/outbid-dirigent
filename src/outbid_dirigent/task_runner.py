@@ -276,50 +276,50 @@ LIMIT 30;
         run_files = self._get_run_file_list()
         business_rules = self._load_business_rules()
 
-        sections = [f"Du führst Task {task.id} aus: {task.name}"]
+        sections = [f"<task id=\"{task.id}\">{task.name}</task>"]
 
         # Plan position
         pos = plan.task_position(task.id)
         if pos:
-            sections.append(f"""
-# Deine Position im Plan
-Position: Task {pos['index']}/{pos['total']}, Phase {pos['phase_id']}/{pos['total_phases']} ({pos['phase_name']})""")
+            sections.append(f"<plan-position task=\"{pos['index']}/{pos['total']}\" phase=\"{pos['phase_id']}/{pos['total_phases']}\" phase-name=\"{pos['phase_name']}\">")
             if "prev_id" in pos:
-                sections.append(f"Vorheriger Task: {pos['prev_id']} - {pos['prev_name']}")
+                sections.append(f"<prev-task id=\"{pos['prev_id']}\">{pos['prev_name']}</prev-task>")
             if "next_id" in pos:
-                sections.append(f"Nächster Task: {pos['next_id']} - {pos['next_name']}")
+                sections.append(f"<next-task id=\"{pos['next_id']}\">{pos['next_name']}</next-task>")
+            sections.append("</plan-position>")
 
         # Assumptions & out of scope
         if plan.assumptions:
-            sections.append("\n# Annahmen\n" + "\n".join(f"- {a}" for a in plan.assumptions))
+            sections.append("<assumptions>\n" + "\n".join(f"- {a}" for a in plan.assumptions) + "\n</assumptions>")
         if plan.out_of_scope:
-            sections.append("\n# NICHT dein Job (out of scope)\n" + "\n".join(f"- {x}" for x in plan.out_of_scope))
+            sections.append("<out-of-scope>\n" + "\n".join(f"- {x}" for x in plan.out_of_scope) + "\n</out-of-scope>")
 
         # Spec
-        sections.append(f"\n# Gesamt-Spec\n{self.spec_content}")
+        sections.append(f"<spec>\n{self.spec_content}\n</spec>")
 
         # Reference spec images if available
         if self.spec_images:
             img_list = "\n".join(f"- .planning/assets/{img.name}" for img in self.spec_images)
-            sections.append(f"\n# Visuelle Referenzen\nFolgende Bilder sind verfügbar (nutze Read tool um sie zu betrachten):\n{img_list}")
+            sections.append(f"<visual-references hint=\"nutze Read tool um sie zu betrachten\">\n{img_list}\n</visual-references>")
 
         # Progress
-        sections.append(f"\n# Bisheriger Fortschritt\n{previous_summaries}")
+        sections.append(f"<previous-progress>\n{previous_summaries}\n</previous-progress>")
 
         # Recent changes
         if recent_diff:
-            sections.append(f"\n# Letzte Änderungen (was vorherige Tasks gemacht haben)\n```\n{recent_diff}\n```")
+            sections.append(f"<recent-changes hint=\"was vorherige Tasks gemacht haben\">\n{recent_diff}\n</recent-changes>")
         if run_files:
-            sections.append(f"\n# Alle bisher geänderten/erstellten Dateien in diesem Run\n{run_files}")
+            sections.append(f"<files-changed-this-run>\n{run_files}\n</files-changed-this-run>")
 
         # Task description
-        sections.append(f"\n# Dein Task\n{task.description}")
-        sections.append(f"Dateien zu erstellen: {', '.join(task.files_to_create) or 'keine'}")
-        sections.append(f"Dateien zu modifizieren: {', '.join(task.files_to_modify) or 'keine'}")
+        sections.append(f"<your-task>\n<description>{task.description}</description>")
+        sections.append(f"<files-to-create>{', '.join(task.files_to_create) or 'keine'}</files-to-create>")
+        sections.append(f"<files-to-modify>{', '.join(task.files_to_modify) or 'keine'}</files-to-modify>")
+        sections.append("</your-task>")
 
         # Business rules
         if business_rules:
-            sections.append(f"\n## Business Rules (MÜSSEN erhalten bleiben!)\n{business_rules[:2000]}")
+            sections.append(f"<business-rules hint=\"MUESSEN erhalten bleiben!\">\n{business_rules[:2000]}\n</business-rules>")
 
         # Test manifest context
         manifest = TestManifest.load(self.repo_path)
@@ -329,45 +329,45 @@ Position: Task {pos['index']}/{pos['total']}, Phase {pos['phase_id']}/{pos['tota
         # Session recall — lessons from past runs
         recall = self._recall_from_sessions()
         if recall:
-            sections.append(f"""
-# Bekannte Probleme aus frueheren Runs (Session Recall)
-Diese Bugs/Blocker wurden in frueheren Runs auf diesem Repo gefunden.
-Pruefe ob sie fuer deinen Task relevant sind und vermeide sie proaktiv:
-{recall}""")
+            sections.append(f"""<session-recall hint="Bekannte Probleme aus frueheren Runs — pruefe ob relevant und vermeide proaktiv">
+{recall}
+</session-recall>""")
 
         # Summary format hint (deviation rules are in system prompt)
-        sections.append(f"""
-## Summary Format
+        sections.append(f"""<output-instructions>
 Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 - Was wurde gemacht
-- Geänderte Dateien
+- Geaenderte Dateien
 - Deviations (falls vorhanden)
-- Nächste Schritte (falls relevant)""")
+- Naechste Schritte (falls relevant)
+</output-instructions>""")
 
         return "\n".join(sections)
 
     # ── Task execution ──
 
-    SYSTEM_PROMPT_SUFFIX = """Du bist ein autonomer Coding-Agent der Tasks aus einem Plan ausführt.
+    SYSTEM_PROMPT_SUFFIX = """<role>Du bist ein autonomer Coding-Agent der Tasks aus einem Plan ausfuehrt.</role>
 
-Deviation Rules:
-1. Bug gefunden → Automatisch fixen, in Summary als "DEVIATION: Bug-Fix" dokumentieren
-2. Kritisches fehlt → Hinzufügen, als "DEVIATION: Added Missing" dokumentieren
-3. Blocker entdeckt → Beheben, als "DEVIATION: Resolved Blocker" dokumentieren
-4. Architektur-Frage → STOPP – Frage für Oracle dokumentieren
+<deviation-rules>
+<rule trigger="Bug gefunden">Automatisch fixen, in Summary als "DEVIATION: Bug-Fix" dokumentieren</rule>
+<rule trigger="Kritisches fehlt">Hinzufuegen, als "DEVIATION: Added Missing" dokumentieren</rule>
+<rule trigger="Blocker entdeckt">Beheben, als "DEVIATION: Resolved Blocker" dokumentieren</rule>
+<rule trigger="Architektur-Frage">STOPP — Frage fuer Oracle dokumentieren</rule>
+</deviation-rules>
 
-Session Recall Skills (bei Fehlern oder Blockern):
-- /dirigent:search-memories <keyword> — Suche in frueheren Sessions
-- /dirigent:find-edits <datei> — Finde alle Aenderungen an einer Datei
-- /dirigent:find-errors — Finde bekannte Fehler aus frueheren Runs
-- /dirigent:query-data <sql> — Ad-hoc DuckDB Query auf beliebige Dateien
-Nutze diese nur bei echten Blockern, nicht fuer jeden Schritt.
+<session-recall-skills hint="Nur bei echten Blockern nutzen, nicht fuer jeden Schritt">
+<skill>/dirigent:search-memories &lt;keyword&gt; — Suche in frueheren Sessions</skill>
+<skill>/dirigent:find-edits &lt;datei&gt; — Finde alle Aenderungen an einer Datei</skill>
+<skill>/dirigent:find-errors — Finde bekannte Fehler aus frueheren Runs</skill>
+<skill>/dirigent:query-data &lt;sql&gt; — Ad-hoc DuckDB Query auf beliebige Dateien</skill>
+</session-recall-skills>
 
-Nach Abschluss:
-1. git add -A && git commit -m "feat(TASK_ID): TASK_NAME"
-2. Summary in .dirigent/summaries/TASK_ID-SUMMARY.md erstellen
+<completion-steps>
+<step>git add -A &amp;&amp; git commit -m "feat(TASK_ID): TASK_NAME"</step>
+<step>Summary in .dirigent/summaries/TASK_ID-SUMMARY.md erstellen</step>
+</completion-steps>
 
-Keine Rückfragen. Kein Warten. Durcharbeiten und committen."""
+<constraints>Keine Rueckfragen. Kein Warten. Durcharbeiten und committen.</constraints>"""
 
     def run_task(self, task: Task, plan: Plan, phase_num: int | str = 1) -> TaskResult:
         """Execute a single task with retries."""

@@ -81,7 +81,7 @@ class Oracle:
         ]
         for spec_path in spec_patterns:
             if spec_path.exists():
-                context_parts.append(f"## SPEC\n{spec_path.read_text(encoding='utf-8')}")
+                context_parts.append(f"<spec>\n{spec_path.read_text(encoding='utf-8')}\n</spec>")
                 break
 
         # Analyse laden
@@ -89,32 +89,31 @@ class Oracle:
         if analysis_file.exists():
             with open(analysis_file, encoding="utf-8") as f:
                 analysis = json.load(f)
-            context_parts.append(f"## ANALYSIS\n```json\n{json.dumps(analysis, indent=2)}\n```")
+            context_parts.append(f"<analysis>\n{json.dumps(analysis, indent=2)}\n</analysis>")
 
         # Plan laden falls vorhanden
         plan_file = self.repo_path / ".dirigent" / "PLAN.json"
         if plan_file.exists():
             with open(plan_file, encoding="utf-8") as f:
                 plan = json.load(f)
-            context_parts.append(f"## PLAN\n```json\n{json.dumps(plan, indent=2)}\n```")
+            context_parts.append(f"<plan>\n{json.dumps(plan, indent=2)}\n</plan>")
 
         # Business Rules laden falls vorhanden
         rules_file = self.repo_path / ".dirigent" / "BUSINESS_RULES.md"
         if rules_file.exists():
             rules_content = rules_file.read_text(encoding="utf-8")
-            # Limitiere auf erste 5000 Zeichen
             if len(rules_content) > 5000:
                 rules_content = rules_content[:5000] + "\n... (truncated)"
-            context_parts.append(f"## BUSINESS_RULES\n{rules_content}")
+            context_parts.append(f"<business-rules>\n{rules_content}\n</business-rules>")
 
         # Bisherige Entscheidungen
         if self.decisions.get("decisions"):
-            recent_decisions = self.decisions["decisions"][-5:]  # Letzte 5
+            recent_decisions = self.decisions["decisions"][-5:]
             decisions_text = "\n".join([
-                f"- {d['question'][:100]}... → {d['decision']}"
+                f"<decision question=\"{d['question'][:100]}\">{d['decision']}</decision>"
                 for d in recent_decisions
             ])
-            context_parts.append(f"## PREVIOUS DECISIONS\n{decisions_text}")
+            context_parts.append(f"<previous-decisions>\n{decisions_text}\n</previous-decisions>")
 
         return "\n\n".join(context_parts)
 
@@ -153,28 +152,30 @@ class Oracle:
         if options:
             options_text = f"\nOptionen:\n" + "\n".join([f"- {opt}" for opt in options])
 
-        prompt = f"""Du bist ein Software-Architektur-Oracle. Deine Aufgabe ist es, architekturelle
-Entscheidungen zu treffen basierend auf dem gegebenen Kontext.
+        prompt = f"""<role>Du bist ein Software-Architektur-Oracle. Triff architekturelle Entscheidungen basierend auf dem Kontext.</role>
 
+<context>
 {context}
+</context>
 
----
-
-Frage: {question}
+<question>{question}</question>
 {options_text}
 
-Antworte als JSON mit diesem Format:
+<output-format>
+Antworte als JSON:
 {{
-    "decision": "Deine Entscheidung (kurz und präzise)",
-    "reason": "Begründung (1-2 Sätze)",
+    "decision": "Deine Entscheidung (kurz und praezise)",
+    "reason": "Begruendung (1-2 Saetze)",
     "confidence": "high|medium|low"
 }}
+</output-format>
 
-Wichtig:
-- Entscheide basierend auf dem Kontext
-- Sei präzise und praktisch
-- Bei Unsicherheit wähle die sicherere Option
-- Antworte NUR mit dem JSON, kein anderer Text
+<rules>
+<rule>Entscheide basierend auf dem Kontext</rule>
+<rule>Sei praezise und praktisch</rule>
+<rule>Bei Unsicherheit waehle die sicherere Option</rule>
+<rule>Antworte NUR mit dem JSON, kein anderer Text</rule>
+</rules>
 """
 
         # API-Aufruf
@@ -370,12 +371,11 @@ Wichtig:
         Returns:
             Dict mit 'valid' (bool), 'decision' und 'reason'
         """
-        question = f"""Ist dieser Ansatz valide?
-
-Ansatz: {approach}
-Sorge: {concern}
-
-Soll der Ansatz so beibehalten werden, oder gibt es ein besseres Vorgehen?"""
+        question = f"""<validation>
+<approach>{approach}</approach>
+<concern>{concern}</concern>
+<question>Soll der Ansatz so beibehalten werden, oder gibt es ein besseres Vorgehen?</question>
+</validation>"""
 
         result = self.query(question, ["Ansatz beibehalten", "Ansatz modifizieren", "Anderen Ansatz wählen"])
 
@@ -402,12 +402,12 @@ Soll der Ansatz so beibehalten werden, oder gibt es ein besseres Vorgehen?"""
         Returns:
             Dict mit 'decision' und 'reason'
         """
-        question = f"""Konflikt: {conflict}
-
-Option A: {option_a}
-Option B: {option_b}
-
-Welche Option soll gewählt werden?"""
+        question = f"""<conflict>
+<description>{conflict}</description>
+<option id="A">{option_a}</option>
+<option id="B">{option_b}</option>
+<question>Welche Option soll gewaehlt werden?</question>
+</conflict>"""
 
         return self.query(question, [option_a, option_b])
 
