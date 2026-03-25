@@ -1,0 +1,90 @@
+try again
+
+---
+
+try again
+
+---
+
+the priblem is i need to restart to load the hooks.
+
+---
+
+does ot work when i --resume?
+
+---
+
+and there is no command to reload settings?
+
+---
+
+re-entered.
+
+---
+
+didnt
+
+---
+
+restarted
+
+---
+
+hello again sag ich mal
+
+---
+
+ruf ein tool auf
+
+---
+
+ne
+
+---
+
+ja
+
+---
+
+hello
+
+---
+
+are there global hooks? claude runs in a workspace we control
+
+---
+
+Can I ship hooks within a plugin?
+
+---
+
+https://code.claude.com/docs/en/hooks -> please do. we would love to know when the dirigent: starts a session, ends a session, a tool is used, a task is completed with all info we can get. send this to a script that - right now - does nothing but in the future sends this to any kind of logger (outbid-portal?)
+
+---
+
+gitignore firecrawl. branch and add the changes.
+
+---
+
+use entire to understand what happened ;)
+
+---
+
+apply our changes on top of pr #5 while at the same time making both changes work together.\
+\
+Step:\
+- apply our changes on #5\
+- fix merge conflicts
+- fix contentual conflicts.
+
+---
+
+now we have a python and a shell hook. are both needed?
+
+---
+
+shell it is.
+
+---
+
+remove. then push again
