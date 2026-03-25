@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  validate-version:
+    name: Validate version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install bump-my-version
+        run: uv tool install "bump-my-version>=0.28.0"
+
+      - name: Validate version is valid semver
+        run: |
+          VERSION=$(grep -m1 '^version' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "Version: $VERSION"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version '$VERSION' is not valid semver (MAJOR.MINOR.PATCH)"
+            exit 1
+          fi
+
+      - name: Check bump-my-version config is consistent
+        run: bump-my-version show current_version
+
+      - name: Ensure version was bumped on PR
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE_VERSION=$(git show origin/${{ github.base_ref }}:pyproject.toml | grep -m1 '^version' | sed 's/.*"\(.*\)".*/\1/')
+          HEAD_VERSION=$(grep -m1 '^version' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "Base version: $BASE_VERSION"
+          echo "Head version: $HEAD_VERSION"
+          if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
+            echo "::warning::Version was not bumped. If this PR includes user-facing changes, bump with: bump-my-version bump patch|minor|major"
+          fi
