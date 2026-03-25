@@ -583,6 +583,10 @@ Starte einen zweiten Agent der:
         if not pr_url:
             pr_url = self.shipped_pr_url
 
+        # Extract test instructions and manual hints for the summary
+        test_instructions = self._extract_test_instructions()
+        manual_hints = self._generate_manual_test_hints(files_changed)
+
         markdown = self._generate_summary_markdown(
             plan_title, plan, summaries, decisions, files_changed, deviations, cost_totals
         )
@@ -598,7 +602,10 @@ Starte einen zweiten Agent der:
                 total_output_tokens=cost_totals["total_output_tokens"],
             )
 
-        self._send_summary_to_portal(markdown, files_changed, decisions, deviations, branch_name, pr_url)
+        self._send_summary_to_portal(
+            markdown, files_changed, decisions, deviations, branch_name, pr_url,
+            test_instructions, manual_hints
+        )
 
         return {"markdown": markdown, "files_changed": files_changed, "decisions": decisions,
                 "deviations": deviations, "cost_totals": cost_totals, "branch_name": branch_name, "pr_url": pr_url}
@@ -659,6 +666,24 @@ Starte einen zweiten Agent der:
         md.append(f"- **API-Kosten:** ${cost_usd:.2f}")
         md.append(f"- **Tokens:** {cost_totals['total_input_tokens']:,} in / {cost_totals['total_output_tokens']:,} out\n")
 
+        # Test instructions from spec acceptance criteria
+        test_instructions = self._extract_test_instructions()
+        if test_instructions:
+            md.append("## Test-Anleitung\n")
+            md.append("So kannst du die Änderungen testen:\n")
+            for i, step in enumerate(test_instructions, 1):
+                md.append(f"{i}. {step}")
+            md.append("")
+
+        # Manual testing hints based on file changes
+        manual_steps = self._generate_manual_test_hints(files)
+        if manual_steps:
+            md.append("## Manuell zu prüfen\n")
+            md.append("Diese Punkte sollten manuell verifiziert werden:\n")
+            for step in manual_steps:
+                md.append(f"- {step}")
+            md.append("")
+
         if files:
             md.append("## Geänderte Dateien\n")
             for f in files[:30]:
@@ -691,10 +716,86 @@ Starte einen zweiten Agent der:
 
         return "\n".join(md)
 
+    def _extract_test_instructions(self) -> list[str]:
+        """Extract test instructions from spec acceptance criteria."""
+        spec_file = self.dirigent_dir / "SPEC.md"
+        if not spec_file.exists():
+            spec_file = self.repo_path / ".planning" / "SPEC.md"
+        if not spec_file.exists():
+            return []
+
+        try:
+            content = spec_file.read_text(encoding="utf-8")
+            # Find acceptance criteria section
+            ac_match = re.search(
+                r"##\s*(?:Acceptance Criteria|Akzeptanzkriterien|AC)\s*\n(.*?)(?=\n##|\Z)",
+                content, re.DOTALL | re.IGNORECASE
+            )
+            if not ac_match:
+                return []
+
+            ac_section = ac_match.group(1).strip()
+            # Extract bullet points
+            criteria = re.findall(r"[-*]\s*(.+?)(?=\n[-*]|\Z)", ac_section, re.DOTALL)
+            # Convert to test steps
+            test_steps = []
+            for criterion in criteria[:8]:  # Max 8 steps
+                step = criterion.strip().replace("\n", " ")
+                # Make it actionable
+                if not step.lower().startswith(("verify", "check", "test", "prüfe", "teste")):
+                    step = f"Verifiziere: {step}"
+                test_steps.append(step)
+            return test_steps
+        except Exception:
+            return []
+
+    def _generate_manual_test_hints(self, files: list[dict]) -> list[str]:
+        """Generate manual testing hints based on changed files."""
+        hints = []
+
+        # Categorize files
+        ui_files = [f for f in files if any(x in f["path"].lower() for x in
+            ["component", "page", "view", ".tsx", ".jsx", ".vue", ".svelte", "template"])]
+        api_files = [f for f in files if any(x in f["path"].lower() for x in
+            ["api/", "route", "endpoint", "controller", "handler"])]
+        test_files = [f for f in files if any(x in f["path"].lower() for x in
+            ["test", "spec", ".test.", ".spec."])]
+        migration_files = [f for f in files if any(x in f["path"].lower() for x in
+            ["migration", "schema", ".sql"])]
+        config_files = [f for f in files if any(x in f["path"].lower() for x in
+            ["config", ".env", "settings", "package.json", "requirements"])]
+
+        if ui_files:
+            hints.append(f"UI-Änderungen in {len(ui_files)} Dateien - Browser öffnen und visuell prüfen")
+
+        if api_files:
+            hints.append(f"API-Änderungen in {len(api_files)} Dateien - API-Endpunkte mit Postman/curl testen")
+
+        if not test_files and (ui_files or api_files):
+            hints.append("Keine Tests hinzugefügt - manuelle Tests empfohlen")
+
+        if migration_files:
+            hints.append("Datenbank-Migrationen geändert - auf staging deployen und prüfen")
+
+        if config_files:
+            hints.append("Konfigurationsdateien geändert - Umgebungsvariablen prüfen")
+
+        # Check for new dependencies
+        for f in files:
+            if "package.json" in f["path"] and f["lines_added"] > 0:
+                hints.append("`npm install` ausführen (neue Dependencies)")
+                break
+            if "requirements" in f["path"] and f["lines_added"] > 0:
+                hints.append("`pip install -r requirements.txt` ausführen (neue Dependencies)")
+                break
+
+        return hints[:6]  # Max 6 hints
+
     def _send_summary_to_portal(
         self, markdown: str, files_changed: list[dict],
         decisions: list[dict], deviations: list[dict],
         branch_name: Optional[str], pr_url: Optional[str],
+        test_instructions: list[str] = None, manual_hints: list[str] = None,
     ):
         from outbid_dirigent.dirigent import get_questioner
         questioner = get_questioner()
@@ -720,6 +821,8 @@ Starte einen zweiten Agent der:
                             "prUrl": pr_url,
                             "totalCommits": self._legacy_logger._total_commits if self._legacy_logger else 0,
                             "durationMs": int(elapsed.total_seconds() * 1000),
+                            "testInstructions": test_instructions or [],
+                            "manualHints": manual_hints or [],
                         }
                     }
                 },
