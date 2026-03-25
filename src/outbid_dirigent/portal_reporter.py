@@ -76,6 +76,68 @@ class PortalReporter:
             return False
 
     # ══════════════════════════════════════════
+    # PRE-CLAUDE STAGE EVENTS
+    # ══════════════════════════════════════════
+
+    def stage_start(self, stage: str, description: str = "") -> bool:
+        """Signal that a pre-Claude stage has started.
+
+        Stages: 'analysis', 'routing', 'manifest', 'planning', 'execution', 'shipping'
+        """
+        return self._send_event("stage_start", {
+            "stage": stage,
+            "description": description,
+        })
+
+    def stage_complete(
+        self,
+        stage: str,
+        result: str = "",
+        details: Dict[str, Any] = None,
+    ) -> bool:
+        """Signal that a pre-Claude stage has completed."""
+        data = {"stage": stage}
+        if result:
+            data["result"] = result
+        if details:
+            data["details"] = details
+        return self._send_event("stage_complete", data)
+
+    def analysis_result(
+        self,
+        language: str,
+        framework: str,
+        commit_count: int,
+        file_count: int,
+        route: str,
+        confidence: str,
+    ) -> bool:
+        """Send the analysis result summary."""
+        return self._send_event("analysis_result", {
+            "language": language,
+            "framework": framework,
+            "commitCount": commit_count,
+            "fileCount": file_count,
+            "route": route,
+            "confidence": confidence,
+        })
+
+    def route_determined(
+        self,
+        route_type: str,
+        reason: str,
+        steps: List[str],
+        estimated_tasks: int,
+    ) -> bool:
+        """Send the routing decision."""
+        return self._send_event("route_determined", {
+            "routeType": route_type,
+            "reason": reason,
+            "steps": steps,
+            "estimatedTasks": estimated_tasks,
+        })
+
+    # ══════════════════════════════════════════
     # PLAN EVENTS
     # ══════════════════════════════════════════
 

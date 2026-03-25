@@ -23,11 +23,14 @@ from outbid_dirigent.analyzer import Analyzer, load_analysis
 from outbid_dirigent.router import Router, Route, RouteType, StepType, load_route, load_state, mark_step_complete
 from outbid_dirigent.executor import Executor, create_executor
 from outbid_dirigent.questioner import create_questioner, create_dummy_questioner
+from outbid_dirigent.portal_reporter import PortalReporter, create_portal_reporter
 
 # Global questioner instance (set in main)
 _questioner = None
 # Global execution mode (autonomous, plan_first, interactive)
 _execution_mode = "autonomous"
+# Global portal reporter instance
+_portal_reporter = None
 
 def get_questioner():
     """Gibt die globale Questioner-Instanz zurück."""
@@ -48,6 +51,16 @@ def set_execution_mode(mode: str):
     """Setzt den Execution Mode."""
     global _execution_mode
     _execution_mode = mode
+
+def get_portal_reporter():
+    """Gibt die globale PortalReporter-Instanz zurück."""
+    global _portal_reporter
+    return _portal_reporter
+
+def set_portal_reporter(reporter):
+    """Setzt die globale PortalReporter-Instanz."""
+    global _portal_reporter
+    _portal_reporter = reporter
 
 
 def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
@@ -77,26 +90,85 @@ def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
 def run_analysis(repo_path: Path, spec_path: Path, force: bool = False):
     """Führt die Analyse durch."""
     logger = get_logger()
+    reporter = get_portal_reporter()
 
     # Prüfe ob Analyse bereits existiert
     if not force:
         existing = load_analysis(str(repo_path))
         if existing:
             logger.info(f"Existierende Analyse gefunden (Route: {existing['route']})")
+            # Send analysis result even for cached analysis
+            if reporter:
+                reporter.analysis_result(
+                    language=existing.get("primary_language", "Unknown"),
+                    framework=existing.get("framework_detected") or "None",
+                    commit_count=existing.get("commit_count", 0),
+                    file_count=existing.get("file_count", 0),
+                    route=existing.get("route", "hybrid"),
+                    confidence=existing.get("confidence", "medium"),
+                )
             return existing
+
+    # Send stage start event
+    if reporter:
+        reporter.stage_start("analysis", "Analysiere Repository-Struktur und Spec")
 
     # Neue Analyse durchführen
     analyzer = Analyzer(str(repo_path), str(spec_path))
     result = analyzer.analyze()
+
+    # Send analysis result event
+    if reporter:
+        reporter.analysis_result(
+            language=result.repo.primary_language,
+            framework=result.repo.framework_detected or "None",
+            commit_count=result.repo.commit_count,
+            file_count=result.repo.file_count,
+            route=result.route,
+            confidence=result.confidence,
+        )
+        reporter.stage_complete(
+            "analysis",
+            result=f"Route: {result.route} ({result.confidence} confidence)",
+            details={
+                "language": result.repo.primary_language,
+                "framework": result.repo.framework_detected,
+                "route": result.route,
+            },
+        )
 
     return result
 
 
 def run_routing(repo_path: Path, analysis) -> Route:
     """Bestimmt und speichert die Route."""
+    reporter = get_portal_reporter()
+
+    # Send stage start event
+    if reporter:
+        reporter.stage_start("routing", "Bestimme optimalen Ausführungspfad")
+
     router = Router(str(repo_path))
     route = router.determine_route(analysis)
     router.save_route(route)
+
+    # Send route determined event
+    if reporter:
+        reporter.route_determined(
+            route_type=route.route_type.value,
+            reason=route.reason,
+            steps=[step.name for step in route.steps],
+            estimated_tasks=route.estimated_tasks,
+        )
+        reporter.stage_complete(
+            "routing",
+            result=f"{route.route_type.value} Route mit {len(route.steps)} Schritten",
+            details={
+                "routeType": route.route_type.value,
+                "steps": [step.step_type.value for step in route.steps],
+            },
+        )
+
     return route
 
 
@@ -113,6 +185,7 @@ def run_execution(
     """Führt alle Schritte basierend auf der Route aus."""
     import json
     logger = get_logger()
+    reporter = get_portal_reporter()
     executor = create_executor(str(repo_path), str(spec_path), dry_run, use_proteus, model, effort)
     questioner = get_questioner()
 
@@ -130,13 +203,25 @@ def run_execution(
         success = False
 
         if step.step_type == StepType.BUSINESS_RULE_EXTRACTION:
+            if reporter:
+                reporter.stage_start("business_rules", "Extrahiere Business Rules aus der Codebase")
             success = executor.extract_business_rules()
+            if reporter:
+                reporter.stage_complete("business_rules", "Business Rules extrahiert" if success else "Fehler bei Extraktion")
 
         elif step.step_type == StepType.QUICK_SCAN:
+            if reporter:
+                reporter.stage_start("quick_scan", "Scanne relevante Dateien für das Feature")
             success = executor.quick_scan()
+            if reporter:
+                reporter.stage_complete("quick_scan", "Quick Scan abgeschlossen" if success else "Fehler bei Quick Scan")
 
         elif step.step_type == StepType.MANIFEST_GENERATION:
+            if reporter:
+                reporter.stage_start("manifest", "Generiere Test-Manifest (3x Sonnet + Haiku)")
             success = executor.generate_test_manifest()
+            if reporter:
+                reporter.stage_complete("manifest", "Test-Manifest generiert" if success else "Manifest-Generierung fehlgeschlagen")
 
         elif step.step_type == StepType.PLANNING:
             # Skip planning if PLAN.json already exists (e.g. from --plan-only)
@@ -145,6 +230,8 @@ def run_execution(
                 logger.info("Existierender Plan gefunden, überspringe Planung")
                 success = True
             else:
+                if reporter:
+                    reporter.stage_start("planning", "Erstelle Ausführungsplan mit Claude Code")
                 success = executor.create_plan()
 
             # plan_first: Nach Plan-Erstellung auf Genehmigung warten
@@ -184,13 +271,25 @@ def run_execution(
                         return False
 
         elif step.step_type == StepType.EXECUTION:
+            if reporter:
+                reporter.stage_start("execution", "Führe Tasks mit Claude Code aus")
             success = executor.execute_plan()
+            if reporter:
+                reporter.stage_complete("execution", "Ausführung abgeschlossen" if success else "Ausführung fehlgeschlagen")
 
         elif step.step_type == StepType.TEST:
+            if reporter:
+                reporter.stage_start("testing", "Führe Test-Suite aus")
             success = executor.run_tests()
+            if reporter:
+                reporter.stage_complete("testing", "Tests bestanden" if success else "Tests fehlgeschlagen")
 
         elif step.step_type == StepType.SHIP:
+            if reporter:
+                reporter.stage_start("shipping", "Erstelle Branch und PR")
             success = executor.ship()
+            if reporter:
+                reporter.stage_complete("shipping", "PR erstellt" if success else "Shipping fehlgeschlagen")
 
         if success:
             mark_step_complete(str(repo_path), step_name)
@@ -440,9 +539,23 @@ Beispiele:
     logger = init_logger(str(repo_path), verbose, output_json)
     logger.start()
 
+    # Portal Reporter initialisieren (für Events an Portal)
+    has_credentials = args.portal_url and args.execution_id and args.reporter_token
+
+    if has_credentials:
+        reporter = create_portal_reporter(
+            portal_url=args.portal_url,
+            execution_id=args.execution_id,
+            reporter_token=args.reporter_token,
+        )
+        set_portal_reporter(reporter)
+        logger.info(f"Portal-Reporter aktiviert: {args.portal_url}")
+    else:
+        set_portal_reporter(None)
+        logger.debug("Portal-Reporter deaktiviert (keine Credentials)")
+
     # Questioner initialisieren (für interaktive Fragen und plan_first)
     needs_questioner = args.interactive or args.execution_mode in ["interactive", "plan_first"]
-    has_credentials = args.portal_url and args.execution_id and args.reporter_token
 
     if needs_questioner and has_credentials:
         questioner = create_questioner(
@@ -453,7 +566,7 @@ Beispiele:
         )
         questioner.set_logger(logger)
         set_questioner(questioner)
-        logger.info(f"Portal-Integration aktiviert (Timeout: {args.question_timeout}min)")
+        logger.info(f"Questioner aktiviert (Timeout: {args.question_timeout}min)")
     else:
         set_questioner(create_dummy_questioner())
         if needs_questioner:
