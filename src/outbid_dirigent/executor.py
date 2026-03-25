@@ -43,12 +43,20 @@ class Executor:
         use_proteus: bool = False,
         model: str = "",
         effort: str = "",
+        portal_url: str = "",
+        execution_id: str = "",
+        reporter_token: str = "",
     ):
         self.repo_path = Path(repo_path).resolve()
         self.spec_path = Path(spec_path).resolve()
         self.use_proteus = use_proteus
         self.dry_run = dry_run
         self.oracle = create_oracle(str(self.repo_path))
+
+        # Portal connection info
+        self.portal_url = portal_url
+        self.execution_id = execution_id
+        self.reporter_token = reporter_token
 
         # Directories
         self.dirigent_dir = self.repo_path / ".dirigent"
@@ -64,6 +72,9 @@ class Executor:
             spec_content=self.spec_content,
             default_model=model,
             default_effort=effort,
+            portal_url=portal_url,
+            execution_id=execution_id,
+            reporter_token=reporter_token,
         )
         self.planner = Planner(
             repo_path=self.repo_path,
@@ -273,8 +284,22 @@ Keine vollstaendige Codebase-Analyse noetig.
             return False
 
         if self._legacy_logger:
+            # Include full task details for portal display
             phase_details = [
-                {"phase": p.id, "name": p.name, "taskCount": len(p.tasks)}
+                {
+                    "phase": p.id,
+                    "name": p.name,
+                    "description": p.description,
+                    "taskCount": len(p.tasks),
+                    "tasks": [
+                        {
+                            "id": t.id,
+                            "name": t.name,
+                            "description": t.description,
+                        }
+                        for t in p.tasks
+                    ],
+                }
                 for p in plan.phases
             ]
             self._legacy_logger.plan_done(len(plan.phases), plan.total_tasks, phase_details)
@@ -936,6 +961,10 @@ def create_executor(
     repo_path: str, spec_path: str,
     dry_run: bool = False, use_proteus: bool = False,
     model: str = "", effort: str = "",
+    portal_url: str = "", execution_id: str = "", reporter_token: str = "",
 ) -> Executor:
     """Factory function for Executor."""
-    return Executor(repo_path, spec_path, dry_run, use_proteus, model, effort)
+    return Executor(
+        repo_path, spec_path, dry_run, use_proteus, model, effort,
+        portal_url, execution_id, reporter_token,
+    )

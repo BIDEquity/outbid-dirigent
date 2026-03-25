@@ -54,6 +54,9 @@ class TaskRunner:
         spec_content: str,
         default_model: str = "",
         default_effort: str = "",
+        portal_url: str = "",
+        execution_id: str = "",
+        reporter_token: str = "",
     ):
         self.repo_path = repo_path
         self.spec_content = spec_content
@@ -62,8 +65,22 @@ class TaskRunner:
         self.dirigent_dir = repo_path / ".dirigent"
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
+        # Portal connection for hooks
+        self.portal_url = portal_url
+        self.execution_id = execution_id
+        self.reporter_token = reporter_token
+        # Current task context for hooks
+        self._current_task_id: Optional[str] = None
+        self._current_phase: Optional[int] = None
         # Discover spec images in .planning/assets/
         self.spec_images = self._discover_spec_images()
+
+    def set_task_context(self, task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Set current task context for hook environment variables."""
+        if task_id is not None:
+            self._current_task_id = task_id
+        if phase is not None:
+            self._current_phase = phase
 
     def _discover_spec_images(self) -> list[Path]:
         """Find all images in .planning/assets/ directory."""
@@ -118,6 +135,16 @@ class TaskRunner:
                 p for p in clean_env.get("PATH", "").split(os.pathsep)
                 if p != venv_bin
             )
+
+        # Add portal connection info for hooks
+        if self.portal_url and self.execution_id and self.reporter_token:
+            clean_env["OUTBID_PORTAL_URL"] = self.portal_url
+            clean_env["OUTBID_EXECUTION_ID"] = self.execution_id
+            clean_env["OUTBID_REPORTER_TOKEN"] = self.reporter_token
+            if self._current_task_id:
+                clean_env["OUTBID_CURRENT_TASK_ID"] = self._current_task_id
+            if self._current_phase is not None:
+                clean_env["OUTBID_CURRENT_PHASE"] = str(self._current_phase)
 
         try:
             result = subprocess.run(
