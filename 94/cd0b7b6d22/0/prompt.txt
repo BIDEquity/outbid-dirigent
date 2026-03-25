@@ -67,3 +67,12 @@ gitignore firecrawl. branch and add the changes.
 ---
 
 use entire to understand what happened ;)
+
+---
+
+apply our changes on top of pr #5 while at the same time making both changes work together.\
+\
+Step:\
+- apply our changes on #5\
+- fix merge conflicts
+- fix contentual conflicts.

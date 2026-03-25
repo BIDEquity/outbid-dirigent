@@ -3,12 +3,8 @@
   "checkpoint_id": "94cd0b7b6d22",
   "strategy": "manual-commit",
   "branch": "feat/plugin-hooks",
-  "checkpoints_count": 6,
-  "files_touched": [
-    "src/outbid_dirigent/plugin/.claude-plugin/plugin.json",
-    "src/outbid_dirigent/plugin/hooks/dirigent-hook.sh",
-    "src/outbid_dirigent/plugin/hooks/hooks.json"
-  ],
+  "checkpoints_count": 1,
+  "files_touched": null,
   "sessions": [
     {
       "metadata": "/94/cd0b7b6d22/0/metadata.json",
@@ -18,10 +14,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 1899,
-    "cache_creation_tokens": 537277,
-    "cache_read_tokens": 6002015,
-    "output_tokens": 14418,
-    "api_call_count": 99
+    "input_tokens": 1921,
+    "cache_creation_tokens": 549886,
+    "cache_read_tokens": 7915181,
+    "output_tokens": 18102,
+    "api_call_count": 119
   }
 }
