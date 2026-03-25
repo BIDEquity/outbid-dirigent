@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "94cd0b7b6d22",
+  "session_id": "ce380e04-0149-4b43-9a62-7b8808d3c6bc",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-25T16:40:58.69575Z",
+  "branch": "feat/plugin-hooks",
+  "checkpoints_count": 6,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/.claude-plugin/plugin.json",
+    "src/outbid_dirigent/plugin/hooks/dirigent-hook.sh",
+    "src/outbid_dirigent/plugin/hooks/hooks.json"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "d74ece2799f6",
+  "token_usage": {
+    "input_tokens": 1899,
+    "cache_creation_tokens": 537277,
+    "cache_read_tokens": 6002015,
+    "output_tokens": 14418,
+    "api_call_count": 99
+  },
+  "session_metrics": {
+    "turn_count": 15
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-25T16:40:58.517225Z",
+    "agent_lines": 121,
+    "human_added": 1,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 122,
+    "agent_percentage": 99.18032786885246
+  }
+}
