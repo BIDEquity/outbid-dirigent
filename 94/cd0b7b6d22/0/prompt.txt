@@ -59,3 +59,11 @@ Can I ship hooks within a plugin?
 ---
 
 https://code.claude.com/docs/en/hooks -> please do. we would love to know when the dirigent: starts a session, ends a session, a tool is used, a task is completed with all info we can get. send this to a script that - right now - does nothing but in the future sends this to any kind of logger (outbid-portal?)
+
+---
+
+gitignore firecrawl. branch and add the changes.
+
+---
+
+use entire to understand what happened ;)
