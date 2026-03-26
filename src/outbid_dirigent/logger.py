@@ -45,6 +45,15 @@ class DirigentLogger:
         "skip": "⏭️",
         "retry": "🔁",
         "stop": "🛑",
+        # New icons for enhanced logging
+        "thinking": "🧠",
+        "file_read": "📄",
+        "file_write": "✏️",
+        "file_create": "📝",
+        "bash": "💻",
+        "search": "🔎",
+        "test": "🧪",
+        "lint": "🔧",
     }
 
     def __init__(self, repo_path: str, verbose: bool = True, output_json: bool = False):
@@ -426,6 +435,122 @@ class DirigentLogger:
     def debug(self, message: str, data: Optional[dict] = None):
         if self.verbose:
             self._log("stats", f"[DEBUG] {message}", level=LogLevel.DEBUG, data=data)
+
+    # ══════════════════════════════════════════
+    # ENHANCED LOGGING - Granular Activity Events
+    # ══════════════════════════════════════════
+
+    def thinking(self, message: str, task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits a thinking/status event - what the agent is currently doing."""
+        self._log("thinking", message)
+        data = {"message": message}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("thinking", data)
+
+    def file_read(self, file_path: str, task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when a file is read."""
+        self._log("file_read", f"Lese: {file_path}")
+        data = {"path": file_path, "action": "read"}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("file_operation", data)
+
+    def file_write(self, file_path: str, lines_changed: int = 0,
+                   task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when a file is written/modified."""
+        msg = f"Schreibe: {file_path}"
+        if lines_changed:
+            msg += f" ({lines_changed} Zeilen)"
+        self._log("file_write", msg)
+        data = {"path": file_path, "action": "write", "linesChanged": lines_changed}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("file_operation", data)
+
+    def file_create(self, file_path: str, task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when a new file is created."""
+        self._log("file_create", f"Erstelle: {file_path}")
+        data = {"path": file_path, "action": "create"}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("file_operation", data)
+
+    def bash_command(self, command: str, exit_code: Optional[int] = None,
+                     task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when a bash command is executed."""
+        # Truncate long commands for display
+        display_cmd = command[:100] + "..." if len(command) > 100 else command
+        self._log("bash", f"$ {display_cmd}")
+        data = {"command": command}
+        if exit_code is not None:
+            data["exitCode"] = exit_code
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("bash", data)
+
+    def search(self, query: str, results_count: int = 0,
+               task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when searching the codebase."""
+        self._log("search", f"Suche: '{query}' ({results_count} Ergebnisse)")
+        data = {"query": query, "resultsCount": results_count}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("search", data)
+
+    def test_run(self, test_command: str, passed: bool = True, details: str = "",
+                 task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when tests are run."""
+        status = "bestanden" if passed else "fehlgeschlagen"
+        self._log("test", f"Tests {status}: {test_command}")
+        data = {"command": test_command, "passed": passed}
+        if details:
+            data["details"] = details
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("test", data)
+
+    def lint_run(self, passed: bool = True, errors: int = 0, warnings: int = 0,
+                 task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event when linting is run."""
+        status = "bestanden" if passed else f"fehlgeschlagen ({errors} Fehler, {warnings} Warnungen)"
+        self._log("lint", f"Linting {status}")
+        data = {"passed": passed, "errors": errors, "warnings": warnings}
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("lint", data)
+
+    def tool_use(self, tool_name: str, tool_input: dict, tool_use_id: str = "",
+                 task_id: Optional[str] = None, phase: Optional[int] = None):
+        """Emits event for any Claude tool use - enables hook integration."""
+        self._log("stats", f"Tool: {tool_name}", data={"tool": tool_name})
+        data = {
+            "toolName": tool_name,
+            "toolInput": tool_input,
+        }
+        if tool_use_id:
+            data["toolUseId"] = tool_use_id
+        if task_id:
+            data["taskId"] = task_id
+        if phase is not None:
+            data["phase"] = phase
+        self._emit_json("tool_use", data)
 
 
 # Singleton-Pattern für globalen Logger
