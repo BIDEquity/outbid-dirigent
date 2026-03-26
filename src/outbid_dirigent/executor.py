@@ -791,6 +791,53 @@ Starte einen zweiten Agent der:
 
         return hints[:6]  # Max 6 hints
 
+    def _collect_hook_token_usage(self) -> dict:
+        """Read token usage from hook events.jsonl file.
+
+        The hooks write SessionEnd events with usage data parsed from Claude transcripts.
+        This method sums up all token usage from completed sessions.
+        """
+        events_file = self.dirigent_dir / "hooks" / "events.jsonl"
+        if not events_file.exists():
+            logger.debug(f"No hook events file found at {events_file}")
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
+
+        total_input = 0
+        total_output = 0
+        total_cache_creation = 0
+        total_cache_read = 0
+        session_count = 0
+
+        try:
+            with open(events_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                        if event.get("event") == "SessionEnd" and "usage" in event:
+                            usage = event["usage"]
+                            total_input += usage.get("input_tokens", 0)
+                            total_output += usage.get("output_tokens", 0)
+                            total_cache_creation += usage.get("cache_creation_input_tokens", 0)
+                            total_cache_read += usage.get("cache_read_input_tokens", 0)
+                            session_count += 1
+                    except json.JSONDecodeError:
+                        continue
+
+            logger.info(f"Collected token usage from {session_count} Claude Code sessions: "
+                       f"{total_input + total_cache_creation + total_cache_read:,} input, {total_output:,} output")
+        except Exception as e:
+            logger.warning(f"Failed to read hook events: {e}")
+
+        return {
+            "input_tokens": total_input + total_cache_creation + total_cache_read,
+            "output_tokens": total_output,
+            "cache_creation_tokens": total_cache_creation,
+            "cache_read_tokens": total_cache_read,
+        }
+
     def _send_summary_to_portal(
         self, markdown: str, files_changed: list[dict],
         decisions: list[dict], deviations: list[dict],
@@ -801,6 +848,9 @@ Starte einen zweiten Agent der:
         questioner = get_questioner()
         if not questioner or not hasattr(questioner, 'portal_url'):
             return
+
+        # Collect token usage from Claude Code sessions (via hooks)
+        hook_usage = self._collect_hook_token_usage()
 
         try:
             elapsed = datetime.now() - (self._legacy_logger._start_time if self._legacy_logger else datetime.now())
@@ -823,6 +873,9 @@ Starte einen zweiten Agent der:
                             "durationMs": int(elapsed.total_seconds() * 1000),
                             "testInstructions": test_instructions or [],
                             "manualHints": manual_hints or [],
+                            # Token usage from Claude Code sessions
+                            "totalInputTokens": hook_usage["input_tokens"],
+                            "totalOutputTokens": hook_usage["output_tokens"],
                         }
                     }
                 },
