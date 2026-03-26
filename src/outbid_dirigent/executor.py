@@ -797,10 +797,21 @@ Starte einen zweiten Agent der:
         The hooks write SessionEnd events with usage data parsed from Claude transcripts.
         This method sums up all token usage from completed sessions.
         """
+        # Primary location: {repo}/.dirigent/hooks/events.jsonl
         events_file = self.dirigent_dir / "hooks" / "events.jsonl"
+
+        # Log the path we're looking for
+        logger.debug(f"Looking for hook events at: {events_file}")
+
         if not events_file.exists():
-            logger.debug(f"No hook events file found at {events_file}")
-            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
+            # Try alternate location (home directory .dirigent)
+            home_dirigent = Path.home() / ".dirigent" / "hooks" / "events.jsonl"
+            if home_dirigent.exists():
+                logger.info(f"Found events at alternate location: {home_dirigent}")
+                events_file = home_dirigent
+            else:
+                logger.warning(f"No hook events file found at {events_file} or {home_dirigent}")
+                return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
 
         total_input = 0
         total_output = 0
@@ -809,6 +820,7 @@ Starte einen zweiten Agent der:
         session_count = 0
 
         try:
+            logger.info(f"Reading hook events from: {events_file}")
             with open(events_file, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
@@ -818,18 +830,28 @@ Starte einen zweiten Agent der:
                         event = json.loads(line)
                         if event.get("event") == "SessionEnd" and "usage" in event:
                             usage = event["usage"]
-                            total_input += usage.get("input_tokens", 0)
-                            total_output += usage.get("output_tokens", 0)
-                            total_cache_creation += usage.get("cache_creation_input_tokens", 0)
-                            total_cache_read += usage.get("cache_read_input_tokens", 0)
+                            inp = usage.get("input_tokens", 0)
+                            out = usage.get("output_tokens", 0)
+                            cache_create = usage.get("cache_creation_input_tokens", 0)
+                            cache_read = usage.get("cache_read_input_tokens", 0)
+
+                            total_input += inp
+                            total_output += out
+                            total_cache_creation += cache_create
+                            total_cache_read += cache_read
                             session_count += 1
-                    except json.JSONDecodeError:
+
+                            logger.debug(f"SessionEnd #{session_count}: {inp + cache_create + cache_read:,} in, {out:,} out")
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"Skipping malformed line: {e}")
                         continue
 
+            total_in = total_input + total_cache_creation + total_cache_read
             logger.info(f"Collected token usage from {session_count} Claude Code sessions: "
-                       f"{total_input + total_cache_creation + total_cache_read:,} input, {total_output:,} output")
+                       f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
+                       f"{total_output:,} output")
         except Exception as e:
-            logger.warning(f"Failed to read hook events: {e}")
+            logger.error(f"Failed to read hook events: {e}")
 
         return {
             "input_tokens": total_input + total_cache_creation + total_cache_read,
@@ -844,45 +866,78 @@ Starte einen zweiten Agent der:
         branch_name: Optional[str], pr_url: Optional[str],
         test_instructions: list[str] = None, manual_hints: list[str] = None,
     ):
-        from outbid_dirigent.dirigent import get_questioner
-        questioner = get_questioner()
-        if not questioner or not hasattr(questioner, 'portal_url'):
+        # Use direct credentials from Executor, fallback to questioner
+        portal_url = self.portal_url
+        execution_id = self.execution_id
+        reporter_token = self.reporter_token
+
+        if not portal_url or not execution_id:
+            # Try questioner as fallback
+            from outbid_dirigent.dirigent import get_questioner
+            questioner = get_questioner()
+            if questioner and hasattr(questioner, 'portal_url'):
+                portal_url = questioner.portal_url
+                execution_id = questioner.execution_id
+                reporter_token = questioner.reporter_token
+
+        if not portal_url or not execution_id:
+            logger.debug("No portal credentials available, skipping summary upload")
             return
 
         # Collect token usage from Claude Code sessions (via hooks)
         hook_usage = self._collect_hook_token_usage()
+        logger.info(f"Token usage collected: {hook_usage['input_tokens']:,} input, {hook_usage['output_tokens']:,} output")
+
+        # Calculate duration
+        elapsed_ms = 0
+        if self._legacy_logger and hasattr(self._legacy_logger, '_start_time') and self._legacy_logger._start_time:
+            elapsed = datetime.now() - self._legacy_logger._start_time
+            elapsed_ms = int(elapsed.total_seconds() * 1000)
+
+        # Build summary payload
+        summary_data = {
+            "markdown": markdown,
+            "filesChanged": files_changed,
+            "decisions": [
+                {"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]}
+                for d in decisions
+            ] if decisions else [],
+            "deviations": deviations or [],
+            "branchName": branch_name,
+            "prUrl": pr_url,
+            "totalCommits": self._legacy_logger._total_commits if self._legacy_logger and hasattr(self._legacy_logger, '_total_commits') else 0,
+            "durationMs": elapsed_ms,
+            "testInstructions": test_instructions or [],
+            "manualHints": manual_hints or [],
+            # Token usage from Claude Code sessions
+            "totalInputTokens": hook_usage["input_tokens"],
+            "totalOutputTokens": hook_usage["output_tokens"],
+        }
 
         try:
-            elapsed = datetime.now() - (self._legacy_logger._start_time if self._legacy_logger else datetime.now())
-            requests.post(
-                f"{questioner.portal_url}/api/execution-event",
-                headers={"X-Reporter-Token": questioner.reporter_token},
+            logger.info(f"Sending summary to portal: {portal_url}/api/execution-event")
+            response = requests.post(
+                f"{portal_url}/api/execution-event",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Reporter-Token": reporter_token,
+                },
                 json={
-                    "execution_id": questioner.execution_id,
+                    "execution_id": execution_id,
                     "event": {
                         "type": "summary",
                         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                        "data": {
-                            "markdown": markdown,
-                            "filesChanged": files_changed,
-                            "decisions": [{"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]} for d in decisions],
-                            "deviations": deviations,
-                            "branchName": branch_name,
-                            "prUrl": pr_url,
-                            "totalCommits": self._legacy_logger._total_commits if self._legacy_logger else 0,
-                            "durationMs": int(elapsed.total_seconds() * 1000),
-                            "testInstructions": test_instructions or [],
-                            "manualHints": manual_hints or [],
-                            # Token usage from Claude Code sessions
-                            "totalInputTokens": hook_usage["input_tokens"],
-                            "totalOutputTokens": hook_usage["output_tokens"],
-                        }
+                        "data": summary_data,
                     }
                 },
                 timeout=30,
             )
+            if response.ok:
+                logger.info(f"Summary sent successfully: {len(files_changed)} files, {hook_usage['input_tokens']:,} input tokens")
+            else:
+                logger.warning(f"Summary upload failed: {response.status_code} - {response.text[:200]}")
         except requests.RequestException as e:
-            logger.debug(f"Summary upload failed: {e}")
+            logger.error(f"Summary upload failed: {e}")
 
     # ══════════════════════════════════════════
     # PREVIEW SCRIPT GENERATION
