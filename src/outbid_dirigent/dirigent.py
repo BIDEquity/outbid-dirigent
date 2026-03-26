@@ -506,6 +506,19 @@ Beispiele:
         help="Reporter-Token für Portal-Integration (env: REPORTER_TOKEN)",
     )
 
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Demo-Modus: Sendet simulierte Events ohne echte Ausführung (für UI-Tests und Demos)",
+    )
+
+    parser.add_argument(
+        "--demo-speed",
+        type=float,
+        default=1.0,
+        help="Geschwindigkeit des Demo-Modus (1.0 = normal, 2.0 = doppelt so schnell)",
+    )
+
     args = parser.parse_args()
 
     # Pfade auflösen
@@ -553,6 +566,27 @@ Beispiele:
     else:
         set_portal_reporter(None)
         logger.debug("Portal-Reporter deaktiviert (keine Credentials)")
+
+    # Demo-Modus: Simulierte Events senden und beenden
+    if args.demo:
+        if not has_credentials:
+            logger.error("Demo-Modus benötigt Portal-Credentials (--portal-url, --execution-id, --reporter-token)")
+            sys.exit(1)
+
+        logger.info("🎭 Demo-Modus aktiviert - sende simulierte Events")
+        from outbid_dirigent.demo_runner import run_demo
+        try:
+            run_demo(
+                portal_url=args.portal_url,
+                execution_id=args.execution_id,
+                reporter_token=args.reporter_token,
+                speed=args.demo_speed,
+            )
+            logger.info("🎭 Demo-Modus abgeschlossen")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Demo-Modus fehlgeschlagen: {e}")
+            sys.exit(1)
 
     # Questioner initialisieren (für interaktive Fragen und plan_first)
     needs_questioner = args.interactive or args.execution_mode in ["interactive", "plan_first"]
