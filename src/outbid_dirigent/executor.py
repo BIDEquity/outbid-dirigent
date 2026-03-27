@@ -947,7 +947,7 @@ Starte einen zweiten Agent der:
                 timeout=30,
             )
             if response.ok:
-                logger.info(f"Summary sent successfully: {len(files_changed)} files, {hook_usage['input_tokens']:,} input tokens")
+                logger.info(f"Summary sent successfully: {len(files_changed)} files, {token_usage['input_tokens']:,} input tokens")
             else:
                 logger.warning(f"Summary upload failed: {response.status_code} - {response.text[:200]}")
         except requests.RequestException as e:
