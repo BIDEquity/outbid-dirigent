@@ -623,9 +623,41 @@ Starte einen zweiten Agent der:
             return None
 
     def _get_files_changed(self) -> list[dict]:
+        """Get files changed during this execution only.
+
+        Uses the state's started_at timestamp to find the first commit
+        of this execution, then diffs from there to HEAD.
+        """
         try:
+            # Load state to get execution start time
+            state = load_state(str(self.repo_path))
+            started_at = state.get("started_at") if state else None
+
+            if started_at:
+                # Find commits made after the execution started
+                # Use --since to get only commits from this execution
+                result = subprocess.run(
+                    ["git", "log", "--since", started_at, "--format=%H", "--reverse"],
+                    cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+                )
+                commits = [c.strip() for c in result.stdout.strip().split("\n") if c.strip()]
+
+                if commits:
+                    # Get the first commit of this execution
+                    first_commit = commits[0]
+                    # Diff from parent of first commit to HEAD
+                    diff_cmd = ["git", "diff", "--numstat", f"{first_commit}^..HEAD"]
+                else:
+                    # No commits in this execution
+                    return []
+            else:
+                # Fallback: use completed_tasks count as proxy for commit count
+                completed_tasks = len(state.get("completed_tasks", [])) if state else 0
+                commit_count = max(1, completed_tasks + 2)  # +2 for review commits
+                diff_cmd = ["git", "diff", "--numstat", f"HEAD~{commit_count}..HEAD"]
+
             result = subprocess.run(
-                ["git", "diff", "--numstat", "HEAD~20..HEAD"],
+                diff_cmd,
                 cwd=self.repo_path, capture_output=True, text=True, timeout=30,
             )
             files = []
@@ -638,7 +670,8 @@ Starte einen zweiten Agent der:
                         "lines_removed": int(parts[1]) if parts[1] != '-' else 0,
                     })
             return files
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Error getting files changed: {e}")
             return []
 
     def _collect_all_deviations(self, summaries: list[str]) -> list[dict]:
@@ -796,12 +829,26 @@ Starte einen zweiten Agent der:
 
         Claude Code stores session transcripts in ~/.claude/projects/<project-key>/*.jsonl
         Each assistant message contains usage data that we sum up.
+
+        Only counts transcripts created after the execution started (from state.started_at)
+        to avoid counting tokens from previous executions on the same workspace.
         """
         total_input = 0
         total_output = 0
         total_cache_creation = 0
         total_cache_read = 0
         files_processed = 0
+        files_skipped = 0
+
+        # Get execution start time from state
+        state = load_state(str(self.repo_path))
+        started_at_str = state.get("started_at") if state else None
+        started_at_ts = None
+        if started_at_str:
+            try:
+                started_at_ts = datetime.fromisoformat(started_at_str).timestamp()
+            except (ValueError, TypeError):
+                pass
 
         # Find Claude projects directory
         claude_projects_dir = Path.home() / ".claude" / "projects"
@@ -836,10 +883,17 @@ Starte einen zweiten Agent der:
 
         logger.info(f"Found {len(matching_dirs)} Claude project directories matching repo")
 
-        # Read all JSONL transcript files
+        # Read JSONL transcript files (only those created after execution started)
         for project_dir in matching_dirs:
             for transcript_file in project_dir.glob("*.jsonl"):
                 try:
+                    # Skip files created before this execution started
+                    if started_at_ts:
+                        file_mtime = transcript_file.stat().st_mtime
+                        if file_mtime < started_at_ts:
+                            files_skipped += 1
+                            continue
+
                     with open(transcript_file, "r", encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
@@ -863,7 +917,8 @@ Starte einen zweiten Agent der:
                     continue
 
         total_in = total_input + total_cache_creation + total_cache_read
-        logger.info(f"Collected token usage from {files_processed} transcript files: "
+        logger.info(f"Collected token usage from {files_processed} transcript files "
+                   f"(skipped {files_skipped} older files): "
                    f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
                    f"{total_output:,} output")
 
