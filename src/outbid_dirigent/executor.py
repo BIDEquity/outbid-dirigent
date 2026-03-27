@@ -791,67 +791,81 @@ Starte einen zweiten Agent der:
 
         return hints[:6]  # Max 6 hints
 
-    def _collect_hook_token_usage(self) -> dict:
-        """Read token usage from hook events.jsonl file.
+    def _collect_token_usage(self) -> dict:
+        """Read token usage directly from Claude Code transcript files.
 
-        The hooks write SessionEnd events with usage data parsed from Claude transcripts.
-        This method sums up all token usage from completed sessions.
+        Claude Code stores session transcripts in ~/.claude/projects/<project-key>/*.jsonl
+        Each assistant message contains usage data that we sum up.
         """
-        # Primary location: {repo}/.dirigent/hooks/events.jsonl
-        events_file = self.dirigent_dir / "hooks" / "events.jsonl"
-
-        # Log the path we're looking for
-        logger.debug(f"Looking for hook events at: {events_file}")
-
-        if not events_file.exists():
-            # Try alternate location (home directory .dirigent)
-            home_dirigent = Path.home() / ".dirigent" / "hooks" / "events.jsonl"
-            if home_dirigent.exists():
-                logger.info(f"Found events at alternate location: {home_dirigent}")
-                events_file = home_dirigent
-            else:
-                logger.warning(f"No hook events file found at {events_file} or {home_dirigent}")
-                return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
-
         total_input = 0
         total_output = 0
         total_cache_creation = 0
         total_cache_read = 0
-        session_count = 0
+        files_processed = 0
 
-        try:
-            logger.info(f"Reading hook events from: {events_file}")
-            with open(events_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        event = json.loads(line)
-                        if event.get("event") == "SessionEnd" and "usage" in event:
-                            usage = event["usage"]
-                            inp = usage.get("input_tokens", 0)
-                            out = usage.get("output_tokens", 0)
-                            cache_create = usage.get("cache_creation_input_tokens", 0)
-                            cache_read = usage.get("cache_read_input_tokens", 0)
+        # Find Claude projects directory
+        claude_projects_dir = Path.home() / ".claude" / "projects"
+        if not claude_projects_dir.exists():
+            logger.warning(f"Claude projects directory not found: {claude_projects_dir}")
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
 
-                            total_input += inp
-                            total_output += out
-                            total_cache_creation += cache_create
-                            total_cache_read += cache_read
-                            session_count += 1
+        # Build project key pattern from repo path (Claude uses path with dashes)
+        # e.g., /home/coder/outbit-portal -> -home-coder-outbit-portal
+        repo_path_str = str(self.repo_path.resolve())
+        project_key = repo_path_str.replace("/", "-")
+        if not project_key.startswith("-"):
+            project_key = "-" + project_key
 
-                            logger.debug(f"SessionEnd #{session_count}: {inp + cache_create + cache_read:,} in, {out:,} out")
-                    except json.JSONDecodeError as e:
-                        logger.debug(f"Skipping malformed line: {e}")
-                        continue
+        # Find matching project directories
+        matching_dirs = []
+        for d in claude_projects_dir.iterdir():
+            if d.is_dir() and project_key in d.name:
+                matching_dirs.append(d)
 
-            total_in = total_input + total_cache_creation + total_cache_read
-            logger.info(f"Collected token usage from {session_count} Claude Code sessions: "
-                       f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
-                       f"{total_output:,} output")
-        except Exception as e:
-            logger.error(f"Failed to read hook events: {e}")
+        if not matching_dirs:
+            # Try without leading dash
+            project_key_alt = project_key.lstrip("-")
+            for d in claude_projects_dir.iterdir():
+                if d.is_dir() and project_key_alt in d.name:
+                    matching_dirs.append(d)
+
+        if not matching_dirs:
+            logger.warning(f"No Claude project directory found matching: {project_key}")
+            logger.debug(f"Available directories: {[d.name for d in claude_projects_dir.iterdir() if d.is_dir()]}")
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
+
+        logger.info(f"Found {len(matching_dirs)} Claude project directories matching repo")
+
+        # Read all JSONL transcript files
+        for project_dir in matching_dirs:
+            for transcript_file in project_dir.glob("*.jsonl"):
+                try:
+                    with open(transcript_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                entry = json.loads(line)
+                                # Look for assistant messages with usage data
+                                if entry.get("type") == "assistant" and "message" in entry:
+                                    usage = entry["message"].get("usage", {})
+                                    if usage:
+                                        total_input += usage.get("input_tokens", 0)
+                                        total_output += usage.get("output_tokens", 0)
+                                        total_cache_creation += usage.get("cache_creation_input_tokens", 0)
+                                        total_cache_read += usage.get("cache_read_input_tokens", 0)
+                            except json.JSONDecodeError:
+                                continue
+                    files_processed += 1
+                except Exception as e:
+                    logger.debug(f"Error reading transcript {transcript_file}: {e}")
+                    continue
+
+        total_in = total_input + total_cache_creation + total_cache_read
+        logger.info(f"Collected token usage from {files_processed} transcript files: "
+                   f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
+                   f"{total_output:,} output")
 
         return {
             "input_tokens": total_input + total_cache_creation + total_cache_read,
@@ -884,9 +898,9 @@ Starte einen zweiten Agent der:
             logger.debug("No portal credentials available, skipping summary upload")
             return
 
-        # Collect token usage from Claude Code sessions (via hooks)
-        hook_usage = self._collect_hook_token_usage()
-        logger.info(f"Token usage collected: {hook_usage['input_tokens']:,} input, {hook_usage['output_tokens']:,} output")
+        # Collect token usage directly from Claude Code transcripts
+        token_usage = self._collect_token_usage()
+        logger.info(f"Token usage collected: {token_usage['input_tokens']:,} input, {token_usage['output_tokens']:,} output")
 
         # Calculate duration
         elapsed_ms = 0
@@ -910,8 +924,8 @@ Starte einen zweiten Agent der:
             "testInstructions": test_instructions or [],
             "manualHints": manual_hints or [],
             # Token usage from Claude Code sessions
-            "totalInputTokens": hook_usage["input_tokens"],
-            "totalOutputTokens": hook_usage["output_tokens"],
+            "totalInputTokens": token_usage["input_tokens"],
+            "totalOutputTokens": token_usage["output_tokens"],
         }
 
         try:
