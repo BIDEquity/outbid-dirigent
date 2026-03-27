@@ -181,12 +181,18 @@ def run_execution(
     execution_mode: str = "autonomous",
     model: str = "",
     effort: str = "",
+    portal_url: str = "",
+    execution_id: str = "",
+    reporter_token: str = "",
 ) -> bool:
     """Führt alle Schritte basierend auf der Route aus."""
     import json
     logger = get_logger()
     reporter = get_portal_reporter()
-    executor = create_executor(str(repo_path), str(spec_path), dry_run, use_proteus, model, effort)
+    executor = create_executor(
+        str(repo_path), str(spec_path), dry_run, use_proteus, model, effort,
+        portal_url=portal_url, execution_id=execution_id, reporter_token=reporter_token,
+    )
     questioner = get_questioner()
 
     state = load_state(str(repo_path)) or {"completed_steps": []}
@@ -664,13 +670,21 @@ Beispiele:
                 logger.info(f"Geschätzte Tasks: {route.estimated_tasks}")
             else:
                 success = run_execution(
-                    repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort
+                    repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort,
+                    portal_url=args.portal_url or "",
+                    execution_id=args.execution_id or "",
+                    reporter_token=args.reporter_token or "",
                 )
                 if not success:
                     sys.exit(1)
 
                 # Summary generieren nach erfolgreicher Execution
-                executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model)
+                executor = create_executor(
+                    str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model, args.effort,
+                    portal_url=args.portal_url or "",
+                    execution_id=args.execution_id or "",
+                    reporter_token=args.reporter_token or "",
+                )
                 executor.generate_summary()
 
                 # Preview-Script generieren für Workspace-Vorschau
