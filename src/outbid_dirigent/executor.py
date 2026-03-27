@@ -937,11 +937,12 @@ Starte einen zweiten Agent der:
 
         logger.info(f"Found {len(matching_dirs)} Claude project directories matching repo")
 
-        # Read JSONL transcript files (only those created after execution started)
+        # Read JSONL transcript files (only entries created after execution started)
         for project_dir in matching_dirs:
             for transcript_file in project_dir.glob("*.jsonl"):
                 try:
-                    # Skip files created before this execution started
+                    # Skip files that haven't been modified since execution started
+                    # (optimization to avoid reading old files entirely)
                     if started_at_ts:
                         file_mtime = transcript_file.stat().st_mtime
                         if file_mtime < started_at_ts:
@@ -955,6 +956,21 @@ Starte einen zweiten Agent der:
                                 continue
                             try:
                                 entry = json.loads(line)
+
+                                # Filter by entry timestamp (not just file mtime)
+                                # Each entry has a 'timestamp' field like "2025-03-27T13:11:52.636Z"
+                                if started_at_ts and "timestamp" in entry:
+                                    try:
+                                        entry_ts_str = entry["timestamp"]
+                                        # Parse ISO timestamp (handle both with and without Z suffix)
+                                        if entry_ts_str.endswith("Z"):
+                                            entry_ts_str = entry_ts_str[:-1] + "+00:00"
+                                        entry_ts = datetime.fromisoformat(entry_ts_str).timestamp()
+                                        if entry_ts < started_at_ts:
+                                            continue  # Skip entries from before this execution
+                                    except (ValueError, TypeError):
+                                        pass  # If we can't parse, include the entry
+
                                 # Look for assistant messages with usage data
                                 if entry.get("type") == "assistant" and "message" in entry:
                                     message = entry["message"]
