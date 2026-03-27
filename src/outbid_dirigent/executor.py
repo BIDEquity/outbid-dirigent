@@ -26,6 +26,56 @@ from outbid_dirigent.shipper import Shipper
 from outbid_dirigent.task_runner import TaskRunner, TaskResult
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ANTHROPIC API PRICING (per million tokens, in USD)
+# Source: https://platform.claude.com/docs/en/about-claude/pricing (March 2025)
+# ══════════════════════════════════════════════════════════════════════════════
+# Format: model_pattern -> (input_price_per_mtok, output_price_per_mtok)
+# Cache pricing: reads = 0.1x input, writes = 1.25x input
+CLAUDE_PRICING = {
+    # Opus models
+    "claude-opus-4-5": (5.0, 25.0),    # Opus 4.5/4.6
+    "claude-4-opus": (15.0, 75.0),      # Opus 4/4.1
+    # Sonnet models
+    "claude-sonnet-4": (3.0, 15.0),     # Sonnet 4/4.5/4.6
+    "claude-3-5-sonnet": (3.0, 15.0),   # Sonnet 3.5
+    "claude-3-sonnet": (3.0, 15.0),     # Sonnet 3
+    # Haiku models
+    "claude-haiku-4": (1.0, 5.0),       # Haiku 4.5
+    "claude-3-5-haiku": (0.80, 4.0),    # Haiku 3.5
+    "claude-3-haiku": (0.25, 1.25),     # Haiku 3
+}
+
+# Fallback pricing if model not matched (use Sonnet pricing as reasonable default)
+DEFAULT_PRICING = (3.0, 15.0)
+
+
+def _get_model_pricing(model_id: str) -> tuple[float, float]:
+    """Get pricing for a model ID.
+
+    Returns (input_price_per_mtok, output_price_per_mtok).
+    """
+    if not model_id:
+        return DEFAULT_PRICING
+
+    model_lower = model_id.lower()
+
+    # Try to match against known patterns
+    for pattern, pricing in CLAUDE_PRICING.items():
+        if pattern in model_lower:
+            return pricing
+
+    # Fallback based on model family
+    if "opus" in model_lower:
+        return CLAUDE_PRICING["claude-opus-4-5"]
+    elif "sonnet" in model_lower:
+        return CLAUDE_PRICING["claude-sonnet-4"]
+    elif "haiku" in model_lower:
+        return CLAUDE_PRICING["claude-3-5-haiku"]
+
+    return DEFAULT_PRICING
+
+
 class Executor:
     """Orchestrates the full dirigent execution pipeline.
 
@@ -591,16 +641,10 @@ Starte einen zweiten Agent der:
             plan_title, plan, summaries, decisions, files_changed, deviations, cost_totals
         )
 
-        if self._legacy_logger:
-            self._legacy_logger.summary(
-                markdown=markdown,
-                files_changed=files_changed,
-                decisions=[{"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]} for d in decisions],
-                deviations=deviations,
-                total_cost_cents=cost_totals["total_cost_cents"],
-                total_input_tokens=cost_totals["total_input_tokens"],
-                total_output_tokens=cost_totals["total_output_tokens"],
-            )
+        # NOTE: We no longer call _legacy_logger.summary() here because:
+        # 1. It sends a summary event with cost_totals from legacy logger (which doesn't track transcripts)
+        # 2. _send_summary_to_portal() collects token usage directly from Claude Code transcripts
+        # 3. The daemon would forward the legacy event first, causing the portal to reject our accurate one
 
         self._send_summary_to_portal(
             markdown, files_changed, decisions, deviations, branch_name, pr_url,
@@ -623,9 +667,41 @@ Starte einen zweiten Agent der:
             return None
 
     def _get_files_changed(self) -> list[dict]:
+        """Get files changed during this execution only.
+
+        Uses the state's started_at timestamp to find the first commit
+        of this execution, then diffs from there to HEAD.
+        """
         try:
+            # Load state to get execution start time
+            state = load_state(str(self.repo_path))
+            started_at = state.get("started_at") if state else None
+
+            if started_at:
+                # Find commits made after the execution started
+                # Use --since to get only commits from this execution
+                result = subprocess.run(
+                    ["git", "log", "--since", started_at, "--format=%H", "--reverse"],
+                    cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+                )
+                commits = [c.strip() for c in result.stdout.strip().split("\n") if c.strip()]
+
+                if commits:
+                    # Get the first commit of this execution
+                    first_commit = commits[0]
+                    # Diff from parent of first commit to HEAD
+                    diff_cmd = ["git", "diff", "--numstat", f"{first_commit}^..HEAD"]
+                else:
+                    # No commits in this execution
+                    return []
+            else:
+                # Fallback: use completed_tasks count as proxy for commit count
+                completed_tasks = len(state.get("completed_tasks", [])) if state else 0
+                commit_count = max(1, completed_tasks + 2)  # +2 for review commits
+                diff_cmd = ["git", "diff", "--numstat", f"HEAD~{commit_count}..HEAD"]
+
             result = subprocess.run(
-                ["git", "diff", "--numstat", "HEAD~20..HEAD"],
+                diff_cmd,
                 cwd=self.repo_path, capture_output=True, text=True, timeout=30,
             )
             files = []
@@ -638,7 +714,8 @@ Starte einen zweiten Agent der:
                         "lines_removed": int(parts[1]) if parts[1] != '-' else 0,
                     })
             return files
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Error getting files changed: {e}")
             return []
 
     def _collect_all_deviations(self, summaries: list[str]) -> list[dict]:
@@ -791,45 +868,253 @@ Starte einen zweiten Agent der:
 
         return hints[:6]  # Max 6 hints
 
+    def _collect_token_usage(self) -> dict:
+        """Read token usage directly from Claude Code transcript files.
+
+        Claude Code stores session transcripts in ~/.claude/projects/<project-key>/*.jsonl
+        Each assistant message contains usage data that we sum up.
+
+        Only counts transcripts created after the execution started (from state.started_at)
+        to avoid counting tokens from previous executions on the same workspace.
+
+        Returns dict with:
+            - input_tokens: total input (including cache)
+            - output_tokens: total output
+            - cache_creation_tokens: tokens written to cache
+            - cache_read_tokens: tokens read from cache (discounted)
+            - cost_cents: calculated cost in cents based on model pricing
+            - usage_by_model: breakdown by model
+        """
+        total_input = 0
+        total_output = 0
+        total_cache_creation = 0
+        total_cache_read = 0
+        total_cost_cents = 0.0
+        files_processed = 0
+        files_skipped = 0
+        usage_by_model: dict[str, dict] = {}  # model -> {input, output, cache_read, cache_write, cost}
+
+        # Get execution start time from state
+        state = load_state(str(self.repo_path))
+        started_at_str = state.get("started_at") if state else None
+        started_at_ts = None
+        if started_at_str:
+            try:
+                started_at_ts = datetime.fromisoformat(started_at_str).timestamp()
+            except (ValueError, TypeError):
+                pass
+
+        # Find Claude projects directory
+        claude_projects_dir = Path.home() / ".claude" / "projects"
+        if not claude_projects_dir.exists():
+            logger.warning(f"Claude projects directory not found: {claude_projects_dir}")
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0, "cost_cents": 0, "usage_by_model": {}}
+
+        # Build project key pattern from repo path (Claude uses path with dashes)
+        # e.g., /home/coder/outbit-portal -> -home-coder-outbit-portal
+        repo_path_str = str(self.repo_path.resolve())
+        project_key = repo_path_str.replace("/", "-")
+        if not project_key.startswith("-"):
+            project_key = "-" + project_key
+
+        # Find matching project directories
+        matching_dirs = []
+        for d in claude_projects_dir.iterdir():
+            if d.is_dir() and project_key in d.name:
+                matching_dirs.append(d)
+
+        if not matching_dirs:
+            # Try without leading dash
+            project_key_alt = project_key.lstrip("-")
+            for d in claude_projects_dir.iterdir():
+                if d.is_dir() and project_key_alt in d.name:
+                    matching_dirs.append(d)
+
+        if not matching_dirs:
+            logger.warning(f"No Claude project directory found matching: {project_key}")
+            logger.debug(f"Available directories: {[d.name for d in claude_projects_dir.iterdir() if d.is_dir()]}")
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0, "cost_cents": 0, "usage_by_model": {}}
+
+        logger.info(f"Found {len(matching_dirs)} Claude project directories matching repo")
+
+        # Read JSONL transcript files (only those created after execution started)
+        for project_dir in matching_dirs:
+            for transcript_file in project_dir.glob("*.jsonl"):
+                try:
+                    # Skip files created before this execution started
+                    if started_at_ts:
+                        file_mtime = transcript_file.stat().st_mtime
+                        if file_mtime < started_at_ts:
+                            files_skipped += 1
+                            continue
+
+                    with open(transcript_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                entry = json.loads(line)
+                                # Look for assistant messages with usage data
+                                if entry.get("type") == "assistant" and "message" in entry:
+                                    message = entry["message"]
+                                    usage = message.get("usage", {})
+                                    model = message.get("model", "unknown")
+
+                                    if usage:
+                                        input_tokens = usage.get("input_tokens", 0)
+                                        output_tokens = usage.get("output_tokens", 0)
+                                        cache_creation = usage.get("cache_creation_input_tokens", 0)
+                                        cache_read = usage.get("cache_read_input_tokens", 0)
+
+                                        # Accumulate totals
+                                        total_input += input_tokens
+                                        total_output += output_tokens
+                                        total_cache_creation += cache_creation
+                                        total_cache_read += cache_read
+
+                                        # Calculate cost for this message
+                                        input_price, output_price = _get_model_pricing(model)
+
+                                        # Cost calculation:
+                                        # - Regular input: full price
+                                        # - Cache writes: 1.25x input price
+                                        # - Cache reads: 0.1x input price
+                                        # - Output: full output price
+                                        input_cost = (input_tokens / 1_000_000) * input_price
+                                        cache_write_cost = (cache_creation / 1_000_000) * input_price * 1.25
+                                        cache_read_cost = (cache_read / 1_000_000) * input_price * 0.1
+                                        output_cost = (output_tokens / 1_000_000) * output_price
+
+                                        message_cost = input_cost + cache_write_cost + cache_read_cost + output_cost
+                                        total_cost_cents += message_cost * 100  # Convert to cents
+
+                                        # Track by model
+                                        if model not in usage_by_model:
+                                            usage_by_model[model] = {
+                                                "input_tokens": 0,
+                                                "output_tokens": 0,
+                                                "cache_read_tokens": 0,
+                                                "cache_write_tokens": 0,
+                                                "cost_cents": 0.0,
+                                            }
+                                        usage_by_model[model]["input_tokens"] += input_tokens
+                                        usage_by_model[model]["output_tokens"] += output_tokens
+                                        usage_by_model[model]["cache_read_tokens"] += cache_read
+                                        usage_by_model[model]["cache_write_tokens"] += cache_creation
+                                        usage_by_model[model]["cost_cents"] += message_cost * 100
+                            except json.JSONDecodeError:
+                                continue
+                    files_processed += 1
+                except Exception as e:
+                    logger.debug(f"Error reading transcript {transcript_file}: {e}")
+                    continue
+
+        total_in = total_input + total_cache_creation + total_cache_read
+        cost_usd = total_cost_cents / 100
+
+        logger.info(f"Collected token usage from {files_processed} transcript files "
+                   f"(skipped {files_skipped} older files): "
+                   f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
+                   f"{total_output:,} output, ${cost_usd:.4f} estimated cost")
+
+        # Log breakdown by model if multiple models used
+        if len(usage_by_model) > 1:
+            for model, stats in sorted(usage_by_model.items(), key=lambda x: -x[1]["cost_cents"]):
+                logger.debug(f"  {model}: {stats['input_tokens']:,} in, {stats['output_tokens']:,} out, "
+                           f"${stats['cost_cents']/100:.4f}")
+
+        return {
+            "input_tokens": total_input + total_cache_creation + total_cache_read,
+            "output_tokens": total_output,
+            "cache_creation_tokens": total_cache_creation,
+            "cache_read_tokens": total_cache_read,
+            "cost_cents": round(total_cost_cents, 2),
+            "usage_by_model": usage_by_model,
+        }
+
     def _send_summary_to_portal(
         self, markdown: str, files_changed: list[dict],
         decisions: list[dict], deviations: list[dict],
         branch_name: Optional[str], pr_url: Optional[str],
         test_instructions: list[str] = None, manual_hints: list[str] = None,
     ):
-        from outbid_dirigent.dirigent import get_questioner
-        questioner = get_questioner()
-        if not questioner or not hasattr(questioner, 'portal_url'):
+        # Use direct credentials from Executor, fallback to questioner
+        portal_url = self.portal_url
+        execution_id = self.execution_id
+        reporter_token = self.reporter_token
+
+        if not portal_url or not execution_id:
+            # Try questioner as fallback
+            from outbid_dirigent.dirigent import get_questioner
+            questioner = get_questioner()
+            if questioner and hasattr(questioner, 'portal_url'):
+                portal_url = questioner.portal_url
+                execution_id = questioner.execution_id
+                reporter_token = questioner.reporter_token
+
+        if not portal_url or not execution_id:
+            logger.debug("No portal credentials available, skipping summary upload")
             return
 
+        # Collect token usage directly from Claude Code transcripts
+        token_usage = self._collect_token_usage()
+        cost_cents = token_usage.get("cost_cents", 0)
+        logger.info(f"Token usage collected: {token_usage['input_tokens']:,} input, "
+                   f"{token_usage['output_tokens']:,} output, ${cost_cents/100:.4f} cost")
+
+        # Calculate duration
+        elapsed_ms = 0
+        if self._legacy_logger and hasattr(self._legacy_logger, '_start_time') and self._legacy_logger._start_time:
+            elapsed = datetime.now() - self._legacy_logger._start_time
+            elapsed_ms = int(elapsed.total_seconds() * 1000)
+
+        # Build summary payload
+        summary_data = {
+            "markdown": markdown,
+            "filesChanged": files_changed,
+            "decisions": [
+                {"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]}
+                for d in decisions
+            ] if decisions else [],
+            "deviations": deviations or [],
+            "branchName": branch_name,
+            "prUrl": pr_url,
+            "totalCommits": self._legacy_logger._total_commits if self._legacy_logger and hasattr(self._legacy_logger, '_total_commits') else 0,
+            "durationMs": elapsed_ms,
+            "testInstructions": test_instructions or [],
+            "manualHints": manual_hints or [],
+            # Token usage from Claude Code sessions
+            "totalInputTokens": token_usage["input_tokens"],
+            "totalOutputTokens": token_usage["output_tokens"],
+            "totalCostCents": token_usage.get("cost_cents", 0),
+        }
+
         try:
-            elapsed = datetime.now() - (self._legacy_logger._start_time if self._legacy_logger else datetime.now())
-            requests.post(
-                f"{questioner.portal_url}/api/execution-event",
-                headers={"X-Reporter-Token": questioner.reporter_token},
+            logger.info(f"Sending summary to portal: {portal_url}/api/execution-event")
+            response = requests.post(
+                f"{portal_url}/api/execution-event",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Reporter-Token": reporter_token,
+                },
                 json={
-                    "execution_id": questioner.execution_id,
+                    "execution_id": execution_id,
                     "event": {
                         "type": "summary",
                         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                        "data": {
-                            "markdown": markdown,
-                            "filesChanged": files_changed,
-                            "decisions": [{"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]} for d in decisions],
-                            "deviations": deviations,
-                            "branchName": branch_name,
-                            "prUrl": pr_url,
-                            "totalCommits": self._legacy_logger._total_commits if self._legacy_logger else 0,
-                            "durationMs": int(elapsed.total_seconds() * 1000),
-                            "testInstructions": test_instructions or [],
-                            "manualHints": manual_hints or [],
-                        }
+                        "data": summary_data,
                     }
                 },
                 timeout=30,
             )
+            if response.ok:
+                logger.info(f"Summary sent successfully: {len(files_changed)} files, "
+                          f"{token_usage['input_tokens']:,} input tokens, ${cost_cents/100:.4f}")
+            else:
+                logger.warning(f"Summary upload failed: {response.status_code} - {response.text[:200]}")
         except requests.RequestException as e:
-            logger.debug(f"Summary upload failed: {e}")
+            logger.error(f"Summary upload failed: {e}")
 
     # ══════════════════════════════════════════
     # PREVIEW SCRIPT GENERATION

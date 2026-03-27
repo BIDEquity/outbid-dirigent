@@ -23,11 +23,49 @@ case "$EVENT" in
     PORTAL_TYPE="session_start"
     ;;
   SessionEnd)
-    ENTRY=$(echo "$INPUT" | jq -c --arg ts "$TIMESTAMP" '{
+    # Extract transcript path to parse token usage
+    TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // ""')
+
+    # Initialize usage counters
+    TOTAL_INPUT=0
+    TOTAL_OUTPUT=0
+    TOTAL_CACHE_CREATION=0
+    TOTAL_CACHE_READ=0
+
+    # Parse transcript file if it exists
+    if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+      # Sum up all usage fields from assistant messages in the JSONL
+      USAGE_SUMS=$(cat "$TRANSCRIPT_PATH" | jq -s '
+        [.[] | select(.type == "assistant" and .message.usage != null) | .message.usage] |
+        {
+          input_tokens: (map(.input_tokens // 0) | add // 0),
+          output_tokens: (map(.output_tokens // 0) | add // 0),
+          cache_creation_input_tokens: (map(.cache_creation_input_tokens // 0) | add // 0),
+          cache_read_input_tokens: (map(.cache_read_input_tokens // 0) | add // 0)
+        }
+      ' 2>/dev/null || echo '{}')
+
+      TOTAL_INPUT=$(echo "$USAGE_SUMS" | jq -r '.input_tokens // 0')
+      TOTAL_OUTPUT=$(echo "$USAGE_SUMS" | jq -r '.output_tokens // 0')
+      TOTAL_CACHE_CREATION=$(echo "$USAGE_SUMS" | jq -r '.cache_creation_input_tokens // 0')
+      TOTAL_CACHE_READ=$(echo "$USAGE_SUMS" | jq -r '.cache_read_input_tokens // 0')
+    fi
+
+    ENTRY=$(echo "$INPUT" | jq -c --arg ts "$TIMESTAMP" \
+      --argjson input "$TOTAL_INPUT" \
+      --argjson output "$TOTAL_OUTPUT" \
+      --argjson cache_create "$TOTAL_CACHE_CREATION" \
+      --argjson cache_read "$TOTAL_CACHE_READ" '{
       timestamp: $ts,
       event: .hook_event_name,
       session_id: .session_id,
-      reason: .reason
+      reason: .reason,
+      usage: {
+        input_tokens: $input,
+        output_tokens: $output,
+        cache_creation_input_tokens: $cache_create,
+        cache_read_input_tokens: $cache_read
+      }
     }')
     PORTAL_TYPE="session_end"
     ;;
