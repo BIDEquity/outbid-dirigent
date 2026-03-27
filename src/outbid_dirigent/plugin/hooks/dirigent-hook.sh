@@ -113,8 +113,7 @@ mkdir -p "$LOG_DIR"
 echo "$ENTRY" >> "$LOG_DIR/events.jsonl"
 
 # --- 2. Portal forwarding (when credentials are set) ---
-# Skip tool_use events - they spam the activity feed and are only useful for local debugging
-if [ -n "${OUTBID_PORTAL_URL:-}" ] && [ -n "${OUTBID_EXECUTION_ID:-}" ] && [ -n "${OUTBID_REPORTER_TOKEN:-}" ] && [ "$PORTAL_TYPE" != "tool_use" ]; then
+if [ -n "${OUTBID_PORTAL_URL:-}" ] && [ -n "${OUTBID_EXECUTION_ID:-}" ] && [ -n "${OUTBID_REPORTER_TOKEN:-}" ]; then
   PORTAL_PAYLOAD=$(echo "$ENTRY" | jq -c --arg type "$PORTAL_TYPE" --arg eid "$OUTBID_EXECUTION_ID" '{
     execution_id: $eid,
     event: {
