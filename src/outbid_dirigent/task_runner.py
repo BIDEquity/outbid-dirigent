@@ -146,6 +146,10 @@ class TaskRunner:
             if self._current_phase is not None:
                 clean_env["OUTBID_CURRENT_PHASE"] = str(self._current_phase)
 
+        # Set hook log directory to match where Executor looks for events
+        # This ensures hooks write to {repo}/.dirigent/hooks/events.jsonl
+        clean_env["DIRIGENT_HOOK_LOG_DIR"] = str(self.dirigent_dir / "hooks")
+
         try:
             result = subprocess.run(
                 cmd,
