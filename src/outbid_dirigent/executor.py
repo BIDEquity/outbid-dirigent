@@ -1029,7 +1029,7 @@ Starte einen zweiten Agent der:
             "output_tokens": total_output,
             "cache_creation_tokens": total_cache_creation,
             "cache_read_tokens": total_cache_read,
-            "cost_cents": round(total_cost_cents, 2),
+            "cost_cents": int(round(total_cost_cents)),
             "usage_by_model": usage_by_model,
         }
 
