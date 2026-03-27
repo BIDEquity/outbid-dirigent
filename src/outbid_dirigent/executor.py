@@ -26,6 +26,56 @@ from outbid_dirigent.shipper import Shipper
 from outbid_dirigent.task_runner import TaskRunner, TaskResult
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ANTHROPIC API PRICING (per million tokens, in USD)
+# Source: https://platform.claude.com/docs/en/about-claude/pricing (March 2025)
+# ══════════════════════════════════════════════════════════════════════════════
+# Format: model_pattern -> (input_price_per_mtok, output_price_per_mtok)
+# Cache pricing: reads = 0.1x input, writes = 1.25x input
+CLAUDE_PRICING = {
+    # Opus models
+    "claude-opus-4-5": (5.0, 25.0),    # Opus 4.5/4.6
+    "claude-4-opus": (15.0, 75.0),      # Opus 4/4.1
+    # Sonnet models
+    "claude-sonnet-4": (3.0, 15.0),     # Sonnet 4/4.5/4.6
+    "claude-3-5-sonnet": (3.0, 15.0),   # Sonnet 3.5
+    "claude-3-sonnet": (3.0, 15.0),     # Sonnet 3
+    # Haiku models
+    "claude-haiku-4": (1.0, 5.0),       # Haiku 4.5
+    "claude-3-5-haiku": (0.80, 4.0),    # Haiku 3.5
+    "claude-3-haiku": (0.25, 1.25),     # Haiku 3
+}
+
+# Fallback pricing if model not matched (use Sonnet pricing as reasonable default)
+DEFAULT_PRICING = (3.0, 15.0)
+
+
+def _get_model_pricing(model_id: str) -> tuple[float, float]:
+    """Get pricing for a model ID.
+
+    Returns (input_price_per_mtok, output_price_per_mtok).
+    """
+    if not model_id:
+        return DEFAULT_PRICING
+
+    model_lower = model_id.lower()
+
+    # Try to match against known patterns
+    for pattern, pricing in CLAUDE_PRICING.items():
+        if pattern in model_lower:
+            return pricing
+
+    # Fallback based on model family
+    if "opus" in model_lower:
+        return CLAUDE_PRICING["claude-opus-4-5"]
+    elif "sonnet" in model_lower:
+        return CLAUDE_PRICING["claude-sonnet-4"]
+    elif "haiku" in model_lower:
+        return CLAUDE_PRICING["claude-3-5-haiku"]
+
+    return DEFAULT_PRICING
+
+
 class Executor:
     """Orchestrates the full dirigent execution pipeline.
 
@@ -832,13 +882,23 @@ Starte einen zweiten Agent der:
 
         Only counts transcripts created after the execution started (from state.started_at)
         to avoid counting tokens from previous executions on the same workspace.
+
+        Returns dict with:
+            - input_tokens: total input (including cache)
+            - output_tokens: total output
+            - cache_creation_tokens: tokens written to cache
+            - cache_read_tokens: tokens read from cache (discounted)
+            - cost_cents: calculated cost in cents based on model pricing
+            - usage_by_model: breakdown by model
         """
         total_input = 0
         total_output = 0
         total_cache_creation = 0
         total_cache_read = 0
+        total_cost_cents = 0.0
         files_processed = 0
         files_skipped = 0
+        usage_by_model: dict[str, dict] = {}  # model -> {input, output, cache_read, cache_write, cost}
 
         # Get execution start time from state
         state = load_state(str(self.repo_path))
@@ -854,7 +914,7 @@ Starte einen zweiten Agent der:
         claude_projects_dir = Path.home() / ".claude" / "projects"
         if not claude_projects_dir.exists():
             logger.warning(f"Claude projects directory not found: {claude_projects_dir}")
-            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0, "cost_cents": 0, "usage_by_model": {}}
 
         # Build project key pattern from repo path (Claude uses path with dashes)
         # e.g., /home/coder/outbit-portal -> -home-coder-outbit-portal
@@ -879,7 +939,7 @@ Starte einen zweiten Agent der:
         if not matching_dirs:
             logger.warning(f"No Claude project directory found matching: {project_key}")
             logger.debug(f"Available directories: {[d.name for d in claude_projects_dir.iterdir() if d.is_dir()]}")
-            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0}
+            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0, "cost_cents": 0, "usage_by_model": {}}
 
         logger.info(f"Found {len(matching_dirs)} Claude project directories matching repo")
 
@@ -903,12 +963,52 @@ Starte einen zweiten Agent der:
                                 entry = json.loads(line)
                                 # Look for assistant messages with usage data
                                 if entry.get("type") == "assistant" and "message" in entry:
-                                    usage = entry["message"].get("usage", {})
+                                    message = entry["message"]
+                                    usage = message.get("usage", {})
+                                    model = message.get("model", "unknown")
+
                                     if usage:
-                                        total_input += usage.get("input_tokens", 0)
-                                        total_output += usage.get("output_tokens", 0)
-                                        total_cache_creation += usage.get("cache_creation_input_tokens", 0)
-                                        total_cache_read += usage.get("cache_read_input_tokens", 0)
+                                        input_tokens = usage.get("input_tokens", 0)
+                                        output_tokens = usage.get("output_tokens", 0)
+                                        cache_creation = usage.get("cache_creation_input_tokens", 0)
+                                        cache_read = usage.get("cache_read_input_tokens", 0)
+
+                                        # Accumulate totals
+                                        total_input += input_tokens
+                                        total_output += output_tokens
+                                        total_cache_creation += cache_creation
+                                        total_cache_read += cache_read
+
+                                        # Calculate cost for this message
+                                        input_price, output_price = _get_model_pricing(model)
+
+                                        # Cost calculation:
+                                        # - Regular input: full price
+                                        # - Cache writes: 1.25x input price
+                                        # - Cache reads: 0.1x input price
+                                        # - Output: full output price
+                                        input_cost = (input_tokens / 1_000_000) * input_price
+                                        cache_write_cost = (cache_creation / 1_000_000) * input_price * 1.25
+                                        cache_read_cost = (cache_read / 1_000_000) * input_price * 0.1
+                                        output_cost = (output_tokens / 1_000_000) * output_price
+
+                                        message_cost = input_cost + cache_write_cost + cache_read_cost + output_cost
+                                        total_cost_cents += message_cost * 100  # Convert to cents
+
+                                        # Track by model
+                                        if model not in usage_by_model:
+                                            usage_by_model[model] = {
+                                                "input_tokens": 0,
+                                                "output_tokens": 0,
+                                                "cache_read_tokens": 0,
+                                                "cache_write_tokens": 0,
+                                                "cost_cents": 0.0,
+                                            }
+                                        usage_by_model[model]["input_tokens"] += input_tokens
+                                        usage_by_model[model]["output_tokens"] += output_tokens
+                                        usage_by_model[model]["cache_read_tokens"] += cache_read
+                                        usage_by_model[model]["cache_write_tokens"] += cache_creation
+                                        usage_by_model[model]["cost_cents"] += message_cost * 100
                             except json.JSONDecodeError:
                                 continue
                     files_processed += 1
@@ -917,16 +1017,26 @@ Starte einen zweiten Agent der:
                     continue
 
         total_in = total_input + total_cache_creation + total_cache_read
+        cost_usd = total_cost_cents / 100
+
         logger.info(f"Collected token usage from {files_processed} transcript files "
                    f"(skipped {files_skipped} older files): "
                    f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
-                   f"{total_output:,} output")
+                   f"{total_output:,} output, ${cost_usd:.4f} estimated cost")
+
+        # Log breakdown by model if multiple models used
+        if len(usage_by_model) > 1:
+            for model, stats in sorted(usage_by_model.items(), key=lambda x: -x[1]["cost_cents"]):
+                logger.debug(f"  {model}: {stats['input_tokens']:,} in, {stats['output_tokens']:,} out, "
+                           f"${stats['cost_cents']/100:.4f}")
 
         return {
             "input_tokens": total_input + total_cache_creation + total_cache_read,
             "output_tokens": total_output,
             "cache_creation_tokens": total_cache_creation,
             "cache_read_tokens": total_cache_read,
+            "cost_cents": round(total_cost_cents, 2),
+            "usage_by_model": usage_by_model,
         }
 
     def _send_summary_to_portal(
@@ -955,7 +1065,9 @@ Starte einen zweiten Agent der:
 
         # Collect token usage directly from Claude Code transcripts
         token_usage = self._collect_token_usage()
-        logger.info(f"Token usage collected: {token_usage['input_tokens']:,} input, {token_usage['output_tokens']:,} output")
+        cost_cents = token_usage.get("cost_cents", 0)
+        logger.info(f"Token usage collected: {token_usage['input_tokens']:,} input, "
+                   f"{token_usage['output_tokens']:,} output, ${cost_cents/100:.4f} cost")
 
         # Calculate duration
         elapsed_ms = 0
@@ -981,6 +1093,7 @@ Starte einen zweiten Agent der:
             # Token usage from Claude Code sessions
             "totalInputTokens": token_usage["input_tokens"],
             "totalOutputTokens": token_usage["output_tokens"],
+            "totalCostCents": token_usage.get("cost_cents", 0),
         }
 
         try:
@@ -1002,7 +1115,8 @@ Starte einen zweiten Agent der:
                 timeout=30,
             )
             if response.ok:
-                logger.info(f"Summary sent successfully: {len(files_changed)} files, {token_usage['input_tokens']:,} input tokens")
+                logger.info(f"Summary sent successfully: {len(files_changed)} files, "
+                          f"{token_usage['input_tokens']:,} input tokens, ${cost_cents/100:.4f}")
             else:
                 logger.warning(f"Summary upload failed: {response.status_code} - {response.text[:200]}")
         except requests.RequestException as e:
