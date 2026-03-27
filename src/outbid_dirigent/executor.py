@@ -641,16 +641,10 @@ Starte einen zweiten Agent der:
             plan_title, plan, summaries, decisions, files_changed, deviations, cost_totals
         )
 
-        if self._legacy_logger:
-            self._legacy_logger.summary(
-                markdown=markdown,
-                files_changed=files_changed,
-                decisions=[{"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]} for d in decisions],
-                deviations=deviations,
-                total_cost_cents=cost_totals["total_cost_cents"],
-                total_input_tokens=cost_totals["total_input_tokens"],
-                total_output_tokens=cost_totals["total_output_tokens"],
-            )
+        # NOTE: We no longer call _legacy_logger.summary() here because:
+        # 1. It sends a summary event with cost_totals from legacy logger (which doesn't track transcripts)
+        # 2. _send_summary_to_portal() collects token usage directly from Claude Code transcripts
+        # 3. The daemon would forward the legacy event first, causing the portal to reject our accurate one
 
         self._send_summary_to_portal(
             markdown, files_changed, decisions, deviations, branch_name, pr_url,
