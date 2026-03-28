@@ -19,12 +19,16 @@ class RouteType(Enum):
     GREENFIELD = "greenfield"
     LEGACY = "legacy"
     HYBRID = "hybrid"
+    TESTABILITY = "testability"
+    TRACKING = "tracking"
 
 
 class StepType(Enum):
     INIT = "init"
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
+    INCREASE_TESTABILITY = "increase_testability"
+    ADD_TRACKING = "add_tracking"
     PLANNING = "planning"
     EXECUTION = "execution"
     TEST = "test"
@@ -155,6 +159,81 @@ class Router:
         ),
     ]
 
+    TESTABILITY_STEPS = [
+        RouteStep(
+            step_type=StepType.INIT,
+            name="Init Phase",
+            description="Bootstrap dev environment, assess current testability",
+            required=True,
+        ),
+        RouteStep(
+            step_type=StepType.INCREASE_TESTABILITY,
+            name="Testability-Analyse",
+            description="Analyse testability gaps and produce recommendations",
+        ),
+        RouteStep(
+            step_type=StepType.PLANNING,
+            name="Testability Plan",
+            description="Plan tasks to implement testability recommendations",
+        ),
+        RouteStep(
+            step_type=StepType.EXECUTION,
+            name="Testability verbessern",
+            description="Implement test infrastructure, seed data, health checks, e2e setup",
+        ),
+        RouteStep(
+            step_type=StepType.TEST,
+            name="Verification",
+            description="Run new test infrastructure to verify it works",
+            required=False,
+        ),
+        RouteStep(
+            step_type=StepType.SHIP,
+            name="Shipping",
+            description="Branch erstellen, Push, PR erstellen",
+        ),
+    ]
+
+    TRACKING_STEPS = [
+        RouteStep(
+            step_type=StepType.INIT,
+            name="Init Phase",
+            description="Bootstrap dev environment, detect existing analytics",
+            required=False,
+        ),
+        RouteStep(
+            step_type=StepType.QUICK_SCAN,
+            name="Tracking Scan",
+            description="Scan for existing analytics, identify key user flows to track",
+        ),
+        RouteStep(
+            step_type=StepType.ADD_TRACKING,
+            name="PostHog Setup",
+            description="Install PostHog SDK and identify tracking points",
+        ),
+        RouteStep(
+            step_type=StepType.PLANNING,
+            name="Tracking Plan",
+            description="Plan event instrumentation across identified user flows",
+        ),
+        RouteStep(
+            step_type=StepType.EXECUTION,
+            name="Tracking implementieren",
+            description="Add PostHog initialization, event tracking, feature flags, and user identification",
+        ),
+        RouteStep(
+            step_type=StepType.TEST,
+            name="Verification",
+            description="Verify tracking events fire correctly",
+            required=False,
+        ),
+        RouteStep(
+            step_type=StepType.SHIP,
+            name="Shipping",
+            description="Branch erstellen, Push, PR erstellen",
+        ),
+    ]
+
     def __init__(self, repo_path: str):
         self.repo_path = Path(repo_path)
         self.logger = get_logger()
@@ -178,21 +257,19 @@ class Router:
 
         route_type = RouteType(route_str)
 
-        if route_type == RouteType.GREENFIELD:
-            return self._build_route_from_data(
-                RouteType.GREENFIELD, route_reason, estimated_scope,
-                file_count, commit_count, self.GREENFIELD_STEPS
-            )
-        elif route_type == RouteType.LEGACY:
-            return self._build_route_from_data(
-                RouteType.LEGACY, route_reason, estimated_scope,
-                file_count, commit_count, self.LEGACY_STEPS
-            )
-        else:
-            return self._build_route_from_data(
-                RouteType.HYBRID, route_reason, estimated_scope,
-                file_count, commit_count, self.HYBRID_STEPS
-            )
+        steps_map = {
+            RouteType.GREENFIELD: self.GREENFIELD_STEPS,
+            RouteType.LEGACY: self.LEGACY_STEPS,
+            RouteType.HYBRID: self.HYBRID_STEPS,
+            RouteType.TESTABILITY: self.TESTABILITY_STEPS,
+            RouteType.TRACKING: self.TRACKING_STEPS,
+        }
+        steps = steps_map.get(route_type, self.HYBRID_STEPS)
+
+        return self._build_route_from_data(
+            route_type, route_reason, estimated_scope,
+            file_count, commit_count, steps,
+        )
 
     def _build_route_from_data(self, route_type: RouteType, reason: str,
                                 estimated_scope: str, file_count: int,

@@ -17,6 +17,7 @@
     "./commands/run-init.md",
     "./commands/show-progress.md",
     "./commands/show-plan.md",
-    "./commands/increase-testability.md"
+    "./commands/increase-testability.md",
+    "./commands/add-posthog.md"
   ]
 }

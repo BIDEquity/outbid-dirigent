@@ -188,6 +188,58 @@ class Executor:
             logger.info(output)
 
     # ══════════════════════════════════════════
+    # INCREASE TESTABILITY (Testability Route)
+    # ══════════════════════════════════════════
+
+    def increase_testability(self) -> bool:
+        """Run testability analysis and produce recommendations."""
+        logger.info("Running testability analysis...")
+        prompt = "Run /dirigent:increase-testability"
+        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
+
+        if not success:
+            logger.error(f"Testability analysis failed: {stderr[:200]}")
+            return False
+
+        recs_file = self.dirigent_dir / "testability-recommendations.json"
+        if recs_file.exists():
+            import json as _json
+            try:
+                recs = _json.loads(recs_file.read_text(encoding="utf-8"))
+                current = recs.get("current_score", "?")
+                potential = recs.get("potential_score", "?")
+                count = len(recs.get("recommendations", []))
+                logger.info(f"Testability: {current}/10 → {potential}/10 ({count} recommendations)")
+            except Exception:
+                pass
+            return True
+
+        logger.warning("testability-recommendations.json was not created")
+        return False
+
+    # ══════════════════════════════════════════
+    # ADD TRACKING (Tracking Route)
+    # ══════════════════════════════════════════
+
+    def add_tracking(self) -> bool:
+        """Run PostHog tracking setup analysis."""
+        logger.info("Running tracking setup analysis...")
+        prompt = "Run /dirigent:add-posthog"
+        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
+
+        if not success:
+            logger.error(f"Tracking analysis failed: {stderr[:200]}")
+            return False
+
+        tracking_file = self.dirigent_dir / "tracking-plan.json"
+        if tracking_file.exists():
+            logger.info("Tracking plan created")
+            return True
+
+        logger.warning("tracking-plan.json was not created")
+        return False
+
+    # ══════════════════════════════════════════
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 
