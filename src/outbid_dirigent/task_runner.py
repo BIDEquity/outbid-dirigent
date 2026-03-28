@@ -364,6 +364,30 @@ LIMIT 30;
 {recall}
 </session-recall>""")
 
+        # Init environment context (e2e framework, services, ports)
+        init_env_file = self.dirigent_dir / "init-env.json"
+        if init_env_file.exists():
+            try:
+                import json
+                init_env = json.loads(init_env_file.read_text(encoding="utf-8"))
+                if init_env.get("e2e_framework"):
+                    sections.append(f"""<e2e-environment>
+<framework>{init_env['e2e_framework']}</framework>
+<config-file>{init_env.get('e2e_config_file', 'unknown')}</config-file>
+<auth-setup>{'yes' if init_env.get('e2e_has_auth') else 'no'}</auth-setup>
+<ports>{', '.join(str(p) for p in init_env.get('ports_listening', []))}</ports>
+</e2e-environment>""")
+            except Exception:
+                pass
+
+        # Contract context (acceptance criteria for current phase)
+        phase_pos = plan.task_position(task.id)
+        if phase_pos:
+            contract_file = self.dirigent_dir / "contracts" / f"phase-{phase_pos['phase_id']}-CONTRACT.md"
+            if contract_file.exists():
+                contract_text = contract_file.read_text(encoding="utf-8")[:2000]
+                sections.append(f"<phase-contract hint=\"dein Task muss zu diesen Kriterien beitragen\">\n{contract_text}\n</phase-contract>")
+
         # Summary format hint (deviation rules are in system prompt)
         sections.append(f"""<output-instructions>
 Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
@@ -377,26 +401,28 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
     # ── Task execution ──
 
-    SYSTEM_PROMPT_SUFFIX = """<role>Du bist ein autonomer Coding-Agent der Tasks aus einem Plan ausfuehrt.</role>
+    @staticmethod
+    def _load_skill_content(skill_name: str) -> str:
+        """Load a skill's SKILL.md content from the plugin directory."""
+        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
+        if skill_path.exists():
+            return skill_path.read_text(encoding="utf-8")
+        return ""
 
-<deviation-rules>
-<rule trigger="Bug gefunden">Automatisch fixen, in Summary als "DEVIATION: Bug-Fix" dokumentieren</rule>
-<rule trigger="Kritisches fehlt">Hinzufuegen, als "DEVIATION: Added Missing" dokumentieren</rule>
-<rule trigger="Blocker entdeckt">Beheben, als "DEVIATION: Resolved Blocker" dokumentieren</rule>
-<rule trigger="Architektur-Frage">STOPP — Frage fuer Oracle dokumentieren</rule>
-</deviation-rules>
+    def _build_system_prompt(self, task_id: str, task_name: str) -> str:
+        """Build the system prompt from the execute-task skill."""
+        skill_content = self._load_skill_content("execute-task")
 
-<session-recall-skills hint="Nur bei echten Blockern nutzen, nicht fuer jeden Schritt">
-<skill>/dirigent:search-memories &lt;keyword&gt; — Suche in frueheren Sessions</skill>
-<skill>/dirigent:find-edits &lt;datei&gt; — Finde alle Aenderungen an einer Datei</skill>
-<skill>/dirigent:find-errors — Finde bekannte Fehler aus frueheren Runs</skill>
-<skill>/dirigent:query-data &lt;sql&gt; — Ad-hoc DuckDB Query auf beliebige Dateien</skill>
-</session-recall-skills>
+        # Replace placeholders
+        skill_content = skill_content.replace("TASK_ID", task_id).replace("TASK_NAME", task_name)
 
-<completion-steps>
-<step>git add -A &amp;&amp; git commit -m "feat(TASK_ID): TASK_NAME"</step>
-<step>Summary in .dirigent/summaries/TASK_ID-SUMMARY.md erstellen</step>
-</completion-steps>
+        project_key = "-" + str(self.repo_path).replace("/", "-").lstrip("-")
+
+        return f"""<skill-instructions>
+{skill_content}
+</skill-instructions>
+
+<project-key>{project_key}</project-key>
 
 <constraints>Keine Rueckfragen. Kein Warten. Durcharbeiten und committen.</constraints>"""
 
@@ -409,14 +435,8 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
         task_model = task.model or self.default_model
         task_effort = task.effort or self.default_effort
 
-        # Inject static rules via system prompt (keeps user prompt focused)
-        project_key = "-" + str(self.repo_path).replace("/", "-").lstrip("-")
-        sys_prompt = (
-            self.SYSTEM_PROMPT_SUFFIX
-            .replace("TASK_ID", task.id)
-            .replace("TASK_NAME", task.name)
-            .replace("PROJ", project_key)
-        )
+        # Build system prompt from execute-task skill
+        sys_prompt = self._build_system_prompt(task.id, task.name)
 
         for attempt in range(1, self.MAX_RETRIES + 1):
             if attempt > 1:

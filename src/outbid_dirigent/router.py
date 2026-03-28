@@ -22,6 +22,7 @@ class RouteType(Enum):
 
 
 class StepType(Enum):
+    INIT = "init"
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
     MANIFEST_GENERATION = "manifest_generation"
@@ -57,6 +58,12 @@ class Router:
     # Definitionen der Pfade
     GREENFIELD_STEPS = [
         RouteStep(
+            step_type=StepType.INIT,
+            name="Init Phase",
+            description="Bootstrap dev environment, seed data, configure e2e credentials",
+            required=False,
+        ),
+        RouteStep(
             step_type=StepType.MANIFEST_GENERATION,
             name="Test-Manifest Generierung",
             description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
@@ -86,6 +93,12 @@ class Router:
     ]
 
     LEGACY_STEPS = [
+        RouteStep(
+            step_type=StepType.INIT,
+            name="Init Phase",
+            description="Bootstrap dev environment, seed data, configure e2e credentials",
+            required=False,
+        ),
         RouteStep(
             step_type=StepType.BUSINESS_RULE_EXTRACTION,
             name="Business Rule Extraktion",
@@ -121,6 +134,12 @@ class Router:
     ]
 
     HYBRID_STEPS = [
+        RouteStep(
+            step_type=StepType.INIT,
+            name="Init Phase",
+            description="Bootstrap dev environment, seed data, configure e2e credentials",
+            required=False,
+        ),
         RouteStep(
             step_type=StepType.QUICK_SCAN,
             name="Quick Scan",

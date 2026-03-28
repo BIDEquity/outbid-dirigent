@@ -1,7 +1,7 @@
 {
   "name": "dirigent",
-  "description": "Session recall, data exploration, and manifest generation skills for Dirigent subprocesses. Search past sessions, find file edits, discover known errors, run ad-hoc DuckDB queries, and build test/preview manifests.",
-  "version": "0.2.0",
+  "description": "Session recall, data exploration, manifest generation, and orchestration skills for Dirigent subprocesses. Includes plan creation, phase contracts, review/fix cycles, progress reporting, init bootstrapping, and session recall.",
+  "version": "0.3.0",
   "hooks": "./hooks/hooks.json",
   "commands": [
     "./commands/build-manifest.md",
@@ -9,6 +9,13 @@
     "./commands/find-errors.md",
     "./commands/query-data.md",
     "./commands/search-memories.md",
-    "./commands/validate-manifest.md"
+    "./commands/validate-manifest.md",
+    "./commands/create-plan.md",
+    "./commands/create-contract.md",
+    "./commands/review-phase.md",
+    "./commands/fix-review.md",
+    "./commands/run-init.md",
+    "./commands/show-progress.md",
+    "./commands/show-plan.md"
   ]
 }

@@ -17,9 +17,12 @@ from typing import Optional
 from loguru import logger
 
 from outbid_dirigent.analyzer import load_analysis
+from outbid_dirigent.contract import ContractManager
+from outbid_dirigent.init_phase import InitPhase
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.planner import Planner
+from outbid_dirigent.progress import ProgressRenderer
 from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
 from outbid_dirigent.router import load_state, save_state, mark_step_complete
 from outbid_dirigent.shipper import Shipper
@@ -132,6 +135,15 @@ class Executor:
             runner=self.runner,
         )
 
+        # Contract manager for review/fix iteration loop
+        self.contract_manager = ContractManager(self.repo_path, self.runner)
+
+        # Init phase handler
+        self.init_phase = InitPhase(self.repo_path, self.runner)
+
+        # Progress renderer
+        self.progress = ProgressRenderer(self.repo_path)
+
         # Ship results (set by ship(), read by generate_summary())
         self.shipped_branch_name: Optional[str] = None
         self.shipped_pr_url: Optional[str] = None
@@ -142,6 +154,36 @@ class Executor:
             self._legacy_logger = get_logger()
         except Exception:
             self._legacy_logger = None
+
+    # ══════════════════════════════════════════
+    # INIT PHASE
+    # ══════════════════════════════════════════
+
+    def run_init(self) -> bool:
+        """Run init phase: discover and execute init scripts, detect e2e framework."""
+        if self._legacy_logger:
+            self._legacy_logger.info("Init Phase: Bootstrapping development environment")
+
+        return self.init_phase.run()
+
+    # ══════════════════════════════════════════
+    # PROGRESS OUTPUT
+    # ══════════════════════════════════════════
+
+    def log_progress(self, fmt: str = "text"):
+        """Log current progress in the specified format."""
+        if fmt == "console":
+            output = self.progress.console()
+        elif fmt == "json":
+            import json as _json
+            output = _json.dumps(self.progress.to_json(), indent=2)
+        else:
+            output = self.progress.text()
+
+        if self._legacy_logger:
+            self._legacy_logger.info(output)
+        else:
+            logger.info(output)
 
     # ══════════════════════════════════════════
     # TEST MANIFEST GENERATION
@@ -165,6 +207,13 @@ class Executor:
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 
+    def _load_skill(self, skill_name: str) -> str:
+        """Load a skill's SKILL.md content from the plugin directory."""
+        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
+        if skill_path.exists():
+            return skill_path.read_text(encoding="utf-8")
+        return ""
+
     def extract_business_rules(self) -> bool:
         """Extract business rules from the codebase (Legacy route)."""
         if self._legacy_logger:
@@ -172,6 +221,8 @@ class Executor:
 
         if self.use_proteus:
             return self._extract_with_proteus()
+
+        skill_content = self._load_skill("extract-business-rules")
 
         # Primary language from analysis
         analysis_file = self.dirigent_dir / "ANALYSIS.json"
@@ -182,37 +233,11 @@ class Executor:
 
         prompt = f"""<task>Analysiere diese {language} Codebase und extrahiere alle Business Rules.</task>
 
-<output file=".dirigent/BUSINESS_RULES.md">
-# Business Rules – {self.repo_path.name}
+<skill-instructions>
+{skill_content}
+</skill-instructions>
 
-## Kern-Entitaeten
-(Alle Domain-Objekte und ihre Felder)
-
-## Geschaeftsregeln
-(Validierungen, Berechnungen, Constraints)
-
-## Domain Events
-(Was passiert wann? User erstellt X → Y wird ausgeloest)
-
-## API Endpoints
-(Alle Routes mit Parametern und Response-Format)
-
-## Datenbank
-(Schema, Relationen, Constraints)
-
-## Externe Abhaengigkeiten
-(APIs, Services, Integrations)
-
-## Edge Cases
-(Bekannte Sonderfaelle und wie sie behandelt werden)
-</output>
-
-<rules>
-<rule>Sei praezise. Keine Annahmen. Nur was du im Code siehst.</rule>
-<rule>Dokumentiere numerische Werte exakt (Limits, Timeouts, etc.)</rule>
-<rule>Bei Unsicherheit, markiere es mit [UNKLAR]</rule>
-<rule>Analysiere alle relevanten Dateien systematisch</rule>
-</rules>
+<project-name>{self.repo_path.name}</project-name>
 
 Erstelle die Datei jetzt.
 """
@@ -286,32 +311,18 @@ Erstelle die Datei jetzt.
     def quick_scan(self) -> bool:
         """Quick scan of relevant files (Hybrid route)."""
         logger.info("Starting Quick Scan...")
+        skill_content = self._load_skill("quick-scan")
         prompt = f"""<task>Analysiere diese Codebase um das folgende Feature zu implementieren.</task>
+
+<skill-instructions>
+{skill_content}
+</skill-instructions>
 
 <spec>
 {self.spec_content}
 </spec>
 
-<output file=".dirigent/CONTEXT.md">
-# Relevante Dateien fuer Feature
-
-## Hauptdateien
-(Die Dateien die direkt modifiziert werden muessen)
-
-## Abhaengigkeiten
-(Dateien die verstanden werden muessen aber nicht geaendert werden)
-
-## Patterns
-(Coding-Patterns die im Projekt verwendet werden)
-
-## Integration Points
-(Wo das neue Feature sich einfuegen muss)
-</output>
-
-<constraints>
-Fokussiere dich NUR auf die fuer dieses Feature relevanten Teile.
-Keine vollstaendige Codebase-Analyse noetig.
-</constraints>
+Erstelle .dirigent/CONTEXT.md jetzt.
 """
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
         if not success:
@@ -395,6 +406,13 @@ Keine vollstaendige Codebase-Analyse noetig.
                 logger.info(f"Phase {phase.id} already completed, skipping")
                 continue
 
+            # Create contract (acceptance criteria) before phase execution
+            contract_ok = self._create_phase_contract(phase, plan)
+            if contract_ok:
+                logger.info(f"Phase {phase.id} contract created")
+            else:
+                logger.warning(f"Phase {phase.id} contract creation failed (non-blocking)")
+
             if self._legacy_logger:
                 self._legacy_logger.phase_start(phase.id, phase.name, len(phase.tasks))
 
@@ -470,80 +488,32 @@ Keine vollstaendige Codebase-Analyse noetig.
         return state
 
     # ══════════════════════════════════════════
-    # PHASE REVIEW (code review + fix)
+    # CONTRACT + PHASE REVIEW (review/fix loop)
     # ══════════════════════════════════════════
 
+    def _create_phase_contract(self, phase, plan: Plan) -> bool:
+        """Create acceptance criteria contract before a phase begins."""
+        return self.contract_manager.create_contract(phase, plan, self.spec_content)
+
     def _review_phase(self, phase, plan: Plan):
-        """Launch a Claude process that runs code-review then fix on the phase's changes."""
-        # Collect what this phase changed
+        """Run the contract-based review/fix iteration loop.
+
+        Flow:
+        1. Reviewer reviews changes against the phase contract → PASS/FAIL
+        2. If FAIL: Executor fixes the findings (reviewer never fixes directly)
+        3. Re-review until PASS or max iterations reached
+        """
         commit_count = len(phase.tasks)
         if commit_count == 0:
             return
 
-        logger.info(f"Phase {phase.id} review: reviewing {commit_count} task commits")
+        logger.info(f"Phase {phase.id} review: contract-based review/fix loop")
+        passed = self.contract_manager.review_fix_loop(phase, plan)
 
-        # Build the diff of this phase's work
-        diff_cmd = f"git diff HEAD~{commit_count} --stat"
+        # Log progress after review
+        self.log_progress("text")
 
-        # File list for context
-        files_modified = []
-        files_created = []
-        for task in phase.tasks:
-            files_modified.extend(task.files_to_modify)
-            files_created.extend(task.files_to_create)
-        all_files = sorted(set(files_modified + files_created))
-
-        files_list = chr(10).join(f'- {f}' for f in all_files) if all_files else '(siehe git diff)'
-        prompt = f"""<task>Post-Phase Review fuer Phase {phase.id} ("{phase.name}").</task>
-
-<instructions>
-Fuehre zwei Schritte sequentiell aus:
-
-<step id="1" name="Code Review">
-Starte einen Agent mit folgendem Auftrag:
-<review-scope>
-<diff>{diff_cmd}</diff>
-<checklist>
-<check category="Bugs">None-Checks, fehlende Parameter-Validierung, falsche Typen</check>
-<check category="API-Kompatibilitaet">Werden bestehende Funktionssignaturen gebrochen? Werden Parameter die None sein koennen ohne Guard verwendet?</check>
-<check category="Unvollstaendige Arbeit">TODOs, auskommentierter Code, fehlende Imports</check>
-<check category="Logik-Fehler">Off-by-one, falsche Vergleiche, fehlende Edge Cases</check>
-</checklist>
-<changed-files>
-{files_list}
-</changed-files>
-</review-scope>
-<output file=".dirigent/reviews/phase-{phase.id}-REVIEW.md">Format: Severity (CRITICAL/WARN/INFO), Datei:Zeile, Beschreibung, Fix-Vorschlag</output>
-</step>
-
-<step id="2" name="Fix" depends-on="1">
-Starte einen zweiten Agent der:
-- .dirigent/reviews/phase-{phase.id}-REVIEW.md liest
-- Alle CRITICAL und WARN Findings fixt
-- git add -A &amp;&amp; git commit -m "fix(phase-{phase.id}): post-review fixes"
-- Wenn keine Findings: nichts tun
-</step>
-</instructions>
-
-<constraints>
-<constraint>Schritt 2 erst starten NACHDEM Schritt 1 fertig ist</constraint>
-<constraint>Keine neuen Features einfuehren, nur Bugs fixen</constraint>
-<constraint>Wenn der Review keine CRITICAL/WARN Findings hat, ueberspringe Schritt 2</constraint>
-</constraints>
-"""
-
-        sys_prompt = """<role>Du orchestrierst zwei Agents sequentiell: erst Review, dann Fix.</role>
-<constraints>
-<constraint>Nutze den Agent-Tool fuer beide Schritte.</constraint>
-<constraint>Warte auf das Ergebnis von Schritt 1 bevor du Schritt 2 startest.</constraint>
-<constraint>Keine eigenen Code-Aenderungen — nur ueber die Agents arbeiten.</constraint>
-</constraints>"""
-
-        success, stdout, stderr = self.runner._run_claude(
-            prompt, timeout=600, system_prompt=sys_prompt,
-        )
-
-        if success:
+        if passed:
             review_file = self.dirigent_dir / "reviews" / f"phase-{phase.id}-REVIEW.md"
             if review_file.exists():
                 content = review_file.read_text(encoding="utf-8")
@@ -553,7 +523,7 @@ Starte einen zweiten Agent der:
             else:
                 logger.info(f"Phase {phase.id} review: no review file created")
         else:
-            logger.warning(f"Phase {phase.id} review failed (non-blocking): {stderr[:200]}")
+            logger.warning(f"Phase {phase.id} review did not pass (non-blocking)")
 
     # ══════════════════════════════════════════
     # TEST STEP

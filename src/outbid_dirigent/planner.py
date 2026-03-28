@@ -2,7 +2,7 @@
 Planner — creates execution plans via Claude Code.
 
 Extracted from the Executor god class. Handles:
-- Building the plan creation prompt
+- Building the plan creation prompt (using the create-plan skill)
 - Running Claude Code to generate PLAN.json
 - Loading and validating the result
 """
@@ -26,8 +26,17 @@ class Planner:
         self.runner = runner
         self.dirigent_dir = repo_path / ".dirigent"
 
+    def _load_skill(self, skill_name: str) -> str:
+        """Load a skill's SKILL.md content from the plugin directory."""
+        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
+        if skill_path.exists():
+            return skill_path.read_text(encoding="utf-8")
+        return ""
+
     def create_plan(self) -> Optional[Plan]:
         """Generate PLAN.json via Claude Code. Returns Plan or None on failure."""
+        skill_content = self._load_skill("create-plan")
+
         business_rules = self.runner._load_business_rules()
         br_context = ""
         if business_rules:
@@ -39,6 +48,18 @@ class Planner:
         repo_context = ""
         if context_file.exists():
             repo_context = f"<repo-context>\n{context_file.read_text(encoding='utf-8')}\n</repo-context>"
+
+        # Init report context (from init phase)
+        init_context = ""
+        init_report = self.dirigent_dir / "INIT_REPORT.md"
+        if init_report.exists():
+            init_context = f"<init-report>\n{init_report.read_text(encoding='utf-8')}\n</init-report>"
+
+        # Init env context (e2e framework, ports, services)
+        init_env_context = ""
+        init_env = self.dirigent_dir / "init-env.json"
+        if init_env.exists():
+            init_env_context = f"<init-environment>\n{init_env.read_text(encoding='utf-8')}\n</init-environment>"
 
         # Test manifest context
         manifest = TestManifest.load(self.repo_path)
@@ -67,32 +88,24 @@ class Planner:
 
         prompt = f"""<task>Erstelle einen Ausfuehrungsplan fuer dieses Feature.</task>
 
+<skill-instructions>
+{skill_content}
+</skill-instructions>
+
 <spec>
 {self.spec_content}
 </spec>
 
 {br_context}
 {repo_context}
+{init_context}
+{init_env_context}
 {manifest_context}
 
 <output-format>
 Erstelle die Datei .dirigent/PLAN.json mit diesem Format:
 {Plan.json_template()}
 </output-format>
-
-<rules>
-<rule>Maximal 4 Phasen</rule>
-<rule>Maximal 4 Tasks pro Phase</rule>
-<rule>Jeder Task ist atomar (macht genau eine Sache)</rule>
-<rule>Keine Abhaengigkeiten zwischen Tasks innerhalb einer Phase</rule>
-<rule>Tasks muessen konkret und ausfuehrbar sein</rule>
-<rule>Bei Legacy-Migration: Alle Business Rules muessen erhalten bleiben</rule>
-<rule name="model">Verwende "haiku" fuer einfache Tasks (delete files, add imports, kleine Aenderungen), "sonnet" fuer Standard-Tasks (neue Methoden, Tests, Refactoring), "opus" nur fuer sehr komplexe Architektur-Tasks</rule>
-<rule name="effort">"low" fuer mechanische Tasks, "medium" fuer Standard, "high" fuer komplexe Logik</rule>
-<rule name="test_level">"L1" wenn der Task mit Unit Tests/Lint verifiziert werden soll, "L2" wenn Integration Tests noetig sind, leer wenn kein Testing noetig</rule>
-<rule name="assumptions">Liste alle Annahmen ueber die Codebase auf (z.B. "Tests laufen mit pytest")</rule>
-<rule name="out_of_scope">Liste explizit auf was NICHT gemacht werden soll</rule>
-</rules>
 
 Erstelle den Plan jetzt.
 """
