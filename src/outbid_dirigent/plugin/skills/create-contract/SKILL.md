@@ -9,7 +9,8 @@ description: Create acceptance criteria contract for a phase before execution be
 <step id="1">Read `.dirigent/PLAN.json` and find the phase matching the provided phase ID. Understand all its tasks, descriptions, and files they change.</step>
 <step id="2">Read `.dirigent/SPEC.md` for the feature context.</step>
 <step id="3">If `outbid-test-manifest.yaml` exists, read it for available test commands to use as verification methods.</step>
-<step id="4">Create the contract JSON file at `.dirigent/contracts/phase-{PHASE_ID}.json` using the exact schema below.</step>
+<step id="4">If `.dirigent/test-harness.json` exists, read it. Use its verification_commands and health_checks as verification methods for acceptance criteria. This is how the reviewer will actually test things end-to-end.</step>
+<step id="5">Create the contract JSON file at `.dirigent/contracts/phase-{PHASE_ID}.json` using the exact schema below.</step>
 </instructions>
 
 <output file=".dirigent/contracts/phase-{PHASE_ID}.json">
@@ -50,6 +51,8 @@ description: Create acceptance criteria contract for a phase before execution be
 <rule>Derive criteria from the task descriptions in the phase</rule>
 <rule>Include both functional criteria (category "functional") and quality criteria (category "quality")</rule>
 <rule>If test manifest commands exist, reference them as verification methods</rule>
+<rule>If test-harness.json has verification_commands, use them as verification methods for relevant criteria (e.g. "Run: curl -sf http://localhost:3000/api/health" or "Run: npx playwright test")</rule>
+<rule>If test-harness.json has an auth.login_command, criteria that test authenticated endpoints should reference it</rule>
 <rule>The "id" field MUST follow the pattern AC-{PHASE_ID}-{NN} (e.g. AC-01-01, AC-01-02)</rule>
 <rule>The output MUST be valid JSON matching the schema exactly</rule>
 </rules>

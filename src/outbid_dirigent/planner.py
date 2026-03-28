@@ -31,8 +31,7 @@ class Planner:
         #   - .dirigent/SPEC.md (written by Executor.__init__)
         #   - .dirigent/BUSINESS_RULES.md (from extract step)
         #   - .dirigent/CONTEXT.md (from quick-scan step)
-        #   - .dirigent/INIT_REPORT.md (from init step)
-        #   - .dirigent/init-env.json (from init step)
+        #   - .dirigent/test-harness.json (from init step)
         #   - outbid-test-manifest.yaml (from manifest step)
         prompt = "Run /dirigent:create-plan"
 

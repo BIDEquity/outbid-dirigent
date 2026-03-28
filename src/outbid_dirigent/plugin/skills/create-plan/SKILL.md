@@ -12,9 +12,8 @@ Read all available context files:
 1. **Required:** `.dirigent/SPEC.md` — the feature specification
 2. **Optional:** `.dirigent/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
 3. **Optional:** `.dirigent/CONTEXT.md` — relevant file analysis (Hybrid route)
-4. **Optional:** `.dirigent/INIT_REPORT.md` — dev environment bootstrap results
-5. **Optional:** `.dirigent/init-env.json` — e2e framework, ports, services
-6. **Optional:** `outbid-test-manifest.yaml` — test infrastructure and commands
+4. **Optional:** `.dirigent/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
+5. **Optional:** `outbid-test-manifest.yaml` — test infrastructure and commands
 
 ## Step 2: Analyze the Repo
 
@@ -70,4 +69,4 @@ Write `.dirigent/PLAN.json` with this exact format:
 7. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic
 8. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed
 9. If `outbid-test-manifest.yaml` exists: only use test commands defined there
-10. If `init-env.json` shows e2e framework: plan e2e test tasks using that framework
+10. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command. The reviewer will use these to verify features end-to-end.
