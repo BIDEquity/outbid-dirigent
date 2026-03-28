@@ -13,7 +13,8 @@ description: Inspect repo and produce a test harness specification for e2e verif
 <step id="5">Build health check commands that confirm each required service is alive.</step>
 <step id="6">Build verification commands — concrete curl/CLI commands the reviewer can run to test the running system.</step>
 <step id="7">Detect e2e framework (Playwright/Puppeteer/Cypress) and its run command.</step>
-<step id="8">Write `.dirigent/test-harness.json` with the exact schema below.</step>
+<step id="8">Assess testability: score 0-10 based on what's available, write rationale, description, and gaps.</step>
+<step id="9">Write `.dirigent/test-harness.json` with the exact schema below.</step>
 </instructions>
 
 <discovery-hints>
@@ -81,10 +82,26 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
     }
   ],
   "services": ["postgres", "redis"],
+  "testability_score": 7,
+  "testability_rationale": "Why this score — what contributes and what detracts",
+  "testability_description": "Plain text: what the test setup looks like, what the reviewer can do",
+  "testability_gaps": [
+    "Each gap is an actionable improvement the project could make",
+    "e.g. No seed data for edge cases",
+    "e.g. No e2e auth setup — reviewer can only test public endpoints"
+  ],
   "status": "ready",
   "notes": ""
 }
 </output>
+
+<testability-rubric>
+<score value="0-2" label="Untestable">No dev server config, no test framework, no seed data, no health checks. Reviewer can only read code.</score>
+<score value="3-4" label="Minimal">Dev server can start but no auth, no seed data, no e2e framework. Reviewer can curl public endpoints only.</score>
+<score value="5-6" label="Partial">Dev server + some seed data OR auth setup, but gaps remain. Reviewer can test some flows but not all.</score>
+<score value="7-8" label="Good">Dev server + auth + seed data + e2e framework configured. Reviewer can verify most features end-to-end. Minor gaps.</score>
+<score value="9-10" label="Excellent">Full stack running, auth works, rich seed data, e2e suite passes, health checks green, API contracts validated. Reviewer can verify everything.</score>
+</testability-rubric>
 
 <rules>
 <rule>The output MUST be valid JSON matching the schema exactly</rule>

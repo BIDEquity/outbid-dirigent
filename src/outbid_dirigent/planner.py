@@ -32,7 +32,6 @@ class Planner:
         #   - .dirigent/BUSINESS_RULES.md (from extract step)
         #   - .dirigent/CONTEXT.md (from quick-scan step)
         #   - .dirigent/test-harness.json (from init step)
-        #   - outbid-test-manifest.yaml (from manifest step)
         prompt = "Run /dirigent:create-plan"
 
         success, _, stderr = self.runner._run_claude(prompt, timeout=1800)

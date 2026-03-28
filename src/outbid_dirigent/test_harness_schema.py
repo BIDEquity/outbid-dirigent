@@ -117,6 +117,26 @@ class TestHarness(BaseModel):
     # Services that init started (for context)
     services: list[str] = Field(default_factory=list, description="e.g. ['postgres', 'redis']")
 
+    # ── Testability assessment ──
+
+    testability_score: int = Field(
+        0, ge=0, le=10,
+        description="0-10 score: how well can the reviewer verify this project end-to-end?"
+    )
+    testability_rationale: str = Field(
+        "",
+        description="Why this score? What contributes to or detracts from testability?"
+    )
+    testability_description: str = Field(
+        "",
+        description="Plain-text description of the test setup: what works, what's available, "
+                    "how the reviewer can verify features"
+    )
+    testability_gaps: list[str] = Field(
+        default_factory=list,
+        description="What's missing or broken — each gap is an actionable improvement"
+    )
+
     # Overall status
     status: str = Field("ready", description="ready, partial, failed")
     notes: str = ""
@@ -197,6 +217,15 @@ class TestHarness(BaseModel):
     }
   ],
   "services": ["postgres", "redis"],
+  "testability_score": 7,
+  "testability_rationale": "Playwright configured with auth setup and seed data. Health checks pass. Missing: no API contract tests, no visual regression tests.",
+  "testability_description": "Dev server runs on localhost:3000 with Postgres. Auth via bearer token from login endpoint. Test user seeded. Playwright e2e suite available. Reviewer can run curl commands for API verification and npx playwright test for UI flows.",
+  "testability_gaps": [
+    "No API contract/schema tests (e.g. OpenAPI validation)",
+    "No visual regression testing configured",
+    "Seed data is minimal — only 1 user, no edge-case data",
+    "No load/performance test baseline"
+  ],
   "status": "ready",
   "notes": ""
 }"""
@@ -225,4 +254,10 @@ class TestHarness(BaseModel):
                 lines.append(f"  - {v.name}: {v.command}")
         if self.e2e_framework.framework != "none":
             lines.append(f"E2e: {self.e2e_framework.run_command}")
+        if self.testability_score:
+            lines.append(f"Testability: {self.testability_score}/10 — {self.testability_rationale}")
+        if self.testability_gaps:
+            lines.append("Gaps:")
+            for g in self.testability_gaps:
+                lines.append(f"  - {g}")
         return "\n".join(lines)

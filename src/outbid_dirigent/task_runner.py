@@ -18,7 +18,6 @@ from loguru import logger
 
 from outbid_dirigent.plan_schema import Plan, Task
 from outbid_dirigent.router import load_state, save_state
-from outbid_dirigent.test_manifest import TestManifest
 
 
 class TaskResult:
@@ -351,11 +350,6 @@ LIMIT 30;
         # Business rules
         if business_rules:
             sections.append(f"<business-rules hint=\"MUESSEN erhalten bleiben!\">\n{business_rules[:2000]}\n</business-rules>")
-
-        # Test manifest context
-        manifest = TestManifest.load(self.repo_path)
-        if manifest:
-            sections.append(f"\n{manifest.summary_for_task(task.test_level)}")
 
         # Session recall — lessons from past runs
         recall = self._recall_from_sessions()
