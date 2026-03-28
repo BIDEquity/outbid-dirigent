@@ -188,24 +188,6 @@ class Executor:
             logger.info(output)
 
     # ══════════════════════════════════════════
-    # TEST MANIFEST GENERATION
-    # ══════════════════════════════════════════
-
-    def generate_test_manifest(self) -> bool:
-        """Generate outbid-test-manifest.yaml via 3x sonnet + haiku consolidation."""
-        from outbid_dirigent.test_manifest import TestManifest, ManifestGenerator
-
-        # Skip if manifest already exists
-        manifest_path = self.repo_path / "outbid-test-manifest.yaml"
-        if manifest_path.exists():
-            logger.info(f"Test manifest already exists: {manifest_path}")
-            return True
-
-        generator = ManifestGenerator(self.repo_path, self.runner)
-        manifest = generator.generate()
-        return manifest is not None
-
-    # ══════════════════════════════════════════
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 
@@ -506,30 +488,61 @@ class Executor:
     # ══════════════════════════════════════════
 
     def run_tests(self) -> bool:
-        """Run full test suite from test manifest. Returns True if passed or no manifest."""
-        from outbid_dirigent.test_manifest import TestManifest, TestStepRunner
+        """Run verification commands from the test harness. Returns True if passed or no harness."""
+        from outbid_dirigent.test_harness_schema import TestHarness
 
-        manifest = TestManifest.load(self.repo_path)
-        if not manifest:
-            logger.info("No test manifest found, skipping test step")
+        harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
+        if not harness or not harness.verification_commands:
+            logger.info("No test harness or verification commands, skipping test step")
             return True
 
-        logger.info("Running test suite from manifest...")
-        runner = TestStepRunner(self.repo_path, manifest)
-        result = runner.run()
+        logger.info(f"Running {len(harness.verification_commands)} verification commands...")
+        import subprocess as sp
+        all_passed = True
 
-        if result.summary:
-            logger.info(f"Test results:\n{result.summary}")
+        for cmd in harness.verification_commands:
+            try:
+                result = sp.run(
+                    ["bash", "-c", cmd.command],
+                    cwd=self.repo_path, capture_output=True, text=True, timeout=120,
+                )
+                if result.returncode == 0:
+                    logger.info(f"  PASS: {cmd.name}")
+                else:
+                    logger.error(f"  FAIL: {cmd.name} (exit {result.returncode})")
+                    if result.stderr:
+                        logger.error(f"    stderr: {result.stderr[:200]}")
+                    all_passed = False
+            except sp.TimeoutExpired:
+                logger.error(f"  TIMEOUT: {cmd.name}")
+                all_passed = False
+            except Exception as e:
+                logger.error(f"  ERROR: {cmd.name}: {e}")
+                all_passed = False
 
-        if result.skipped_levels:
-            logger.warning(f"Skipped test levels: {', '.join(result.skipped_levels)}")
+        # Also run e2e framework suite if configured
+        if harness.e2e_framework.run_command and harness.e2e_framework.framework != "none":
+            logger.info(f"Running e2e suite: {harness.e2e_framework.run_command}")
+            try:
+                result = sp.run(
+                    ["bash", "-c", harness.e2e_framework.run_command],
+                    cwd=self.repo_path, capture_output=True, text=True, timeout=600,
+                )
+                if result.returncode == 0:
+                    logger.info("  E2e suite: PASS")
+                else:
+                    logger.error(f"  E2e suite: FAIL (exit {result.returncode})")
+                    all_passed = False
+            except Exception as e:
+                logger.error(f"  E2e suite error: {e}")
+                all_passed = False
 
-        if result.passed:
-            logger.info("All tests passed")
+        if all_passed:
+            logger.info("All verification commands passed")
         else:
-            logger.error("Tests failed — blocking ship")
+            logger.error("Verification failed — blocking ship")
 
-        return result.passed
+        return all_passed
 
     # ══════════════════════════════════════════
     # SHIPPING
@@ -1083,110 +1096,9 @@ class Executor:
     # ══════════════════════════════════════════
 
     def generate_preview_script(self) -> bool:
-        """Generate ~/preview-start.sh for workspace preview.
-
-        Uses the test manifest as source of truth. Falls back to RuntimeAnalysis
-        for repos that don't have a manifest yet.
-        """
-        from outbid_dirigent.test_manifest import TestManifest
-
+        """Generate ~/preview-start.sh for workspace preview."""
         logger.info("Generating preview script...")
-
-        manifest = TestManifest.load(self.repo_path)
-        if manifest and manifest.preview.start_command:
-            return self._generate_preview_from_manifest(manifest)
-
         return self._generate_preview_from_runtime()
-
-    def _generate_preview_from_manifest(self, manifest) -> bool:
-        """Generate preview script from the test manifest (preferred path)."""
-        preview = manifest.preview
-        project_name = self.repo_path.name
-
-        # Collect real (non-mocked) components with start commands
-        startable = [c for c in manifest.components if not c.is_mocked and c.effective_start_cmd]
-
-        script_lines = [
-            "#!/bin/bash",
-            "# Preview Start Script - Generated by Outbid Dirigent (from manifest)",
-            "# This script starts all necessary services and the dev server",
-            "",
-            "set -e",
-            "",
-            "# Accept Doppler token as argument or from environment",
-            'DOPPLER_TOKEN="${1:-$DOPPLER_TOKEN}"',
-            "",
-        ]
-
-        # Start components in dependency order
-        if startable:
-            script_lines.append("# ─── Start Required Services ───")
-            script_lines.append("")
-
-            for comp in startable:
-                start_cmd = comp.effective_start_cmd
-                ready_cmd = comp.effective_ready_check
-                timeout = comp.ready_timeout
-                if comp.start and comp.start.ready_check.timeout:
-                    timeout = comp.start.ready_check.timeout
-
-                script_lines.append(f"# {comp.name} ({comp.type})")
-                script_lines.append(f'echo "Starting {comp.name}..."')
-                script_lines.append(f"{start_cmd}")
-
-                if ready_cmd:
-                    script_lines.append(f'echo "Waiting for {comp.name}..."')
-                    script_lines.append(f"timeout={timeout}")
-                    script_lines.append(f'until {ready_cmd} 2>/dev/null; do sleep 1; timeout=$((timeout-1)); [ $timeout -le 0 ] && echo "{comp.name} not ready" && break; done')
-
-                script_lines.append("")
-
-            script_lines.append('echo "All services ready!"')
-            script_lines.append("")
-
-        # Change to project directory
-        script_lines.append("# ─── Setup Project ───")
-        script_lines.append("")
-        script_lines.append(f"cd ~/{project_name}")
-        script_lines.append("")
-
-        # Setup steps
-        if preview.setup_steps:
-            script_lines.append("# Run setup if needed")
-            script_lines.append('if [ ! -f ".setup_done" ]; then')
-            for step in preview.setup_steps:
-                script_lines.append(f'  echo "Running: {step}"')
-                script_lines.append(f"  {step}")
-            script_lines.append('  touch ".setup_done"')
-            script_lines.append("fi")
-            script_lines.append("")
-
-        # Start the dev server
-        script_lines.append("# ─── Start Dev Server ───")
-        script_lines.append("")
-
-        start_command = preview.start_command
-        if preview.uses_doppler:
-            script_lines.append('if [ -n "$DOPPLER_TOKEN" ]; then')
-            script_lines.append('  echo "Starting with Doppler secrets..."')
-            script_lines.append(f'  exec doppler run --token "$DOPPLER_TOKEN" -- {start_command}')
-            script_lines.append("else")
-            script_lines.append('  echo "Warning: No Doppler token provided, starting without secrets"')
-            script_lines.append(f"  exec {start_command}")
-            script_lines.append("fi")
-        else:
-            script_lines.append('if [ -n "$DOPPLER_TOKEN" ]; then')
-            script_lines.append('  echo "Starting with Doppler secrets..."')
-            script_lines.append(f'  exec doppler run --token "$DOPPLER_TOKEN" -- {start_command}')
-            script_lines.append("else")
-            script_lines.append(f"  exec {start_command}")
-            script_lines.append("fi")
-
-        return self._write_preview_script(
-            script_lines, preview.port, preview.framework,
-            start_command, [c.name for c in startable],
-            preview.uses_doppler, preview.health_check,
-        )
 
     def _generate_preview_from_runtime(self) -> bool:
         """Fallback: generate preview script from RuntimeAnalysis."""

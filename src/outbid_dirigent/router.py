@@ -25,7 +25,6 @@ class StepType(Enum):
     INIT = "init"
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
-    MANIFEST_GENERATION = "manifest_generation"
     PLANNING = "planning"
     EXECUTION = "execution"
     TEST = "test"
@@ -64,12 +63,6 @@ class Router:
             required=False,
         ),
         RouteStep(
-            step_type=StepType.MANIFEST_GENERATION,
-            name="Test-Manifest Generierung",
-            description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
-            required=False,
-        ),
-        RouteStep(
             step_type=StepType.PLANNING,
             name="Planung",
             description="Claude Code analysiert Repo-Struktur und erstellt Ausführungsplan",
@@ -105,12 +98,6 @@ class Router:
             description="Claude Code liest komplette Codebase und extrahiert alle Business Rules",
         ),
         RouteStep(
-            step_type=StepType.MANIFEST_GENERATION,
-            name="Test-Manifest Generierung",
-            description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
-            required=False,
-        ),
-        RouteStep(
             step_type=StepType.PLANNING,
             name="Planung mit Guardrails",
             description="Plan erstellen der BUSINESS_RULES.md als Kontext nutzt",
@@ -144,12 +131,6 @@ class Router:
             step_type=StepType.QUICK_SCAN,
             name="Quick Scan",
             description="Claude Code analysiert nur die zum Feature relevanten Dateien",
-        ),
-        RouteStep(
-            step_type=StepType.MANIFEST_GENERATION,
-            name="Test-Manifest Generierung",
-            description="3x Sonnet analysiert Test-Infrastruktur, Haiku konsolidiert",
-            required=False,
         ),
         RouteStep(
             step_type=StepType.PLANNING,

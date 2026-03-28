@@ -1,15 +1,13 @@
 {
   "name": "dirigent",
-  "description": "Orchestration skills for Dirigent subprocesses: plan creation, phase contracts, review/fix cycles, init bootstrapping, progress reporting, and session recall.",
-  "version": "0.4.0",
+  "description": "Orchestration skills for Dirigent subprocesses: plan creation, phase contracts, review/fix cycles, init/test harness, progress reporting, testability analysis, and session recall.",
+  "version": "0.5.0",
   "hooks": "./hooks/hooks.json",
   "commands": [
-    "./commands/build-manifest.md",
     "./commands/find-edits.md",
     "./commands/find-errors.md",
     "./commands/query-data.md",
     "./commands/search-memories.md",
-    "./commands/validate-manifest.md",
     "./commands/create-plan.md",
     "./commands/create-contract.md",
     "./commands/review-phase.md",
@@ -18,6 +16,7 @@
     "./commands/quick-scan.md",
     "./commands/run-init.md",
     "./commands/show-progress.md",
-    "./commands/show-plan.md"
+    "./commands/show-plan.md",
+    "./commands/increase-testability.md"
   ]
 }

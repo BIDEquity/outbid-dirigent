@@ -229,13 +229,6 @@ def run_execution(
             if reporter:
                 reporter.stage_complete("quick_scan", "Quick Scan abgeschlossen" if success else "Fehler bei Quick Scan")
 
-        elif step.step_type == StepType.MANIFEST_GENERATION:
-            if reporter:
-                reporter.stage_start("manifest", "Generiere Test-Manifest (3x Sonnet + Haiku)")
-            success = executor.generate_test_manifest()
-            if reporter:
-                reporter.stage_complete("manifest", "Test-Manifest generiert" if success else "Manifest-Generierung fehlgeschlagen")
-
         elif step.step_type == StepType.PLANNING:
             # Skip planning if PLAN.json already exists (e.g. from --plan-only)
             plan_file = repo_path / ".dirigent" / "PLAN.json"
@@ -409,7 +402,7 @@ Beispiele:
 
     parser.add_argument(
         "--phase",
-        choices=["analyze", "manifest", "execute", "ship", "all"],
+        choices=["analyze", "execute", "ship", "all"],
         default="all",
         help="Welche Phase ausführen (default: all)",
     )
@@ -632,16 +625,6 @@ Beispiele:
             if args.phase == "analyze":
                 logger.info("Analyse abgeschlossen. Beende.")
                 sys.exit(0)
-
-        # Manifest-only
-        if args.phase == "manifest":
-            executor = create_executor(str(repo_path), str(spec_path), model=args.model, effort=args.effort)
-            success = executor.generate_test_manifest()
-            if success:
-                logger.info(f"Test manifest generated: {repo_path / 'outbid-test-manifest.yaml'}")
-            else:
-                logger.error("Manifest generation failed")
-            sys.exit(0 if success else 1)
 
         # Route bestimmen
         analysis = run_analysis(repo_path, spec_path, force=False)
