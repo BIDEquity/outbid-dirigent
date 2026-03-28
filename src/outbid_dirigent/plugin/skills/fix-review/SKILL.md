@@ -1,46 +1,41 @@
 ---
 name: fix-review
-description: Fix issues found during phase review (executor role in review loop)
-arguments: none - review context provided via prompt
+description: Fix issues found during phase review (executor role)
 ---
 
 # Fix Review Findings
 
-Fix all issues identified in the phase review. You are the EXECUTOR — you fix what the reviewer found.
-
-## Role
-
-Du bist der Executor. Der Reviewer hat Findings dokumentiert. Deine Aufgabe ist es, alle CRITICAL und WARN Findings zu fixen.
+You are the EXECUTOR. The reviewer identified issues. Your job is to fix them.
 
 ## Process
 
 ### Step 1: Read the Review
 
-Read `.dirigent/reviews/phase-{PHASE_ID}-REVIEW.md` to understand all findings.
+Read `.dirigent/reviews/phase-{PHASE_ID}-REVIEW.md` for all findings.
 
 ### Step 2: Prioritize
 
-1. Fix all CRITICAL findings first
-2. Fix all WARN findings
-3. INFO findings are optional — only fix if trivial
+1. Fix all **CRITICAL** findings first
+2. Fix all **WARN** findings
+3. **INFO** findings are optional — only fix if trivial
 
 ### Step 3: Fix Each Finding
 
 For each finding:
-1. Navigate to the file and line mentioned
+1. Navigate to the file and line
 2. Understand the issue
-3. Apply the fix
+3. Apply a minimal, focused fix
 4. Verify the fix doesn't break anything
 
 ### Step 4: Commit
 
 ```bash
-git add -A && git commit -m "fix(phase-{PHASE_ID}): post-review fixes"
+git add -A && git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"
 ```
 
-### Step 5: Update Review Status
+### Step 5: Report
 
-Write `.dirigent/reviews/phase-{PHASE_ID}-FIXES.md` documenting what was fixed:
+Write `.dirigent/reviews/phase-{PHASE_ID}-FIXES.md`:
 
 ```markdown
 # Phase {PHASE_ID} Fixes
@@ -55,12 +50,10 @@ Write `.dirigent/reviews/phase-{PHASE_ID}-FIXES.md` documenting what was fixed:
 
 | # | Finding | Reason |
 |---|---------|--------|
-| 1 | ... | ... |
 ```
 
 ## Constraints
 
-- Keine neuen Features einfuehren, nur Bugs fixen.
-- Wenn der Review keine CRITICAL/WARN Findings hat, nichts tun.
-- Jeder Fix muss minimal und fokussiert sein.
-- Nicht mehr aendern als noetig um das Finding zu beheben.
+- No new features. Only bug fixes.
+- If no CRITICAL/WARN findings exist, do nothing.
+- Each fix must be minimal — don't change more than needed.

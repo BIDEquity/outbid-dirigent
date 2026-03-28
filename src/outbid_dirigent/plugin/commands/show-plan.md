@@ -7,54 +7,16 @@ allowed-tools: Read
 
 Display the current execution plan from `.dirigent/PLAN.json`.
 
-## Steps
+Read the plan file and format it based on `--format` in $ARGUMENTS (default: console).
 
-1. Read `.dirigent/PLAN.json`
-2. Format and display based on --format argument
+### Console format
 
-## Output Format
+Structured display with phase headers, task details (name, model, effort, files), assumptions, out-of-scope, and risks.
 
-### Console (default)
+### Text format
 
-```
-═══════════════════════════════════════════════════
-  PLAN: {title}
-═══════════════════════════════════════════════════
+Compact one-line-per-task: `Phase ID: Name` → `  Task-ID: Task-Name [model]`
 
-  Summary: {summary}
-  Complexity: {estimated_complexity}
-  Phases: {count} | Tasks: {count}
-
-  ─── Phase 01: {name} ───
-  {description}
-
-    01-01  {task_name}                    [sonnet/medium]
-           {task_description}
-           Create: {files_to_create}
-           Modify: {files_to_modify}
-
-    01-02  {task_name}                    [haiku/low]
-           ...
-
-  ─── Phase 02: {name} ───
-  ...
-
-  Assumptions:
-    • {assumption_1}
-    • {assumption_2}
-
-  Out of Scope:
-    • {item_1}
-
-  Risks:
-    ⚠ {risk_1}
-═══════════════════════════════════════════════════
-```
-
-### Text (--format text)
-
-Compact one-line-per-task format suitable for logs.
-
-### JSON (--format json)
+### JSON format
 
 Raw PLAN.json content.

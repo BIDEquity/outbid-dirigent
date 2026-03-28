@@ -116,8 +116,10 @@ class Executor:
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
 
-        # Spec content
+        # Spec content — also write to .dirigent/SPEC.md so plugin skills can read it
         self.spec_content = self.spec_path.read_text(encoding="utf-8")
+        spec_cache = self.dirigent_dir / "SPEC.md"
+        spec_cache.write_text(self.spec_content, encoding="utf-8")
 
         # Compose modules
         self.runner = TaskRunner(
@@ -207,13 +209,6 @@ class Executor:
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 
-    def _load_skill(self, skill_name: str) -> str:
-        """Load a skill's SKILL.md content from the plugin directory."""
-        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
-        if skill_path.exists():
-            return skill_path.read_text(encoding="utf-8")
-        return ""
-
     def extract_business_rules(self) -> bool:
         """Extract business rules from the codebase (Legacy route)."""
         if self._legacy_logger:
@@ -222,8 +217,6 @@ class Executor:
         if self.use_proteus:
             return self._extract_with_proteus()
 
-        skill_content = self._load_skill("extract-business-rules")
-
         # Primary language from analysis
         analysis_file = self.dirigent_dir / "ANALYSIS.json"
         language = "unbekannt"
@@ -231,16 +224,8 @@ class Executor:
             with open(analysis_file, encoding="utf-8") as f:
                 language = json.load(f).get("primary_language", "unbekannt")
 
-        prompt = f"""<task>Analysiere diese {language} Codebase und extrahiere alle Business Rules.</task>
-
-<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<project-name>{self.repo_path.name}</project-name>
-
-Erstelle die Datei jetzt.
-"""
+        # Invoke the skill natively — it reads context from disk
+        prompt = f"Run /dirigent:extract-business-rules {language}"
 
         success, _, stderr = self.runner._run_claude(prompt, timeout=900)
         if not success:
@@ -311,19 +296,8 @@ Erstelle die Datei jetzt.
     def quick_scan(self) -> bool:
         """Quick scan of relevant files (Hybrid route)."""
         logger.info("Starting Quick Scan...")
-        skill_content = self._load_skill("quick-scan")
-        prompt = f"""<task>Analysiere diese Codebase um das folgende Feature zu implementieren.</task>
-
-<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<spec>
-{self.spec_content}
-</spec>
-
-Erstelle .dirigent/CONTEXT.md jetzt.
-"""
+        # Invoke the skill natively — it reads .dirigent/SPEC.md from disk
+        prompt = "Run /dirigent:quick-scan"
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
         if not success:
             logger.error(f"Quick Scan failed: {stderr}")

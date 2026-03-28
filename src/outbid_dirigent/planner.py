@@ -2,9 +2,8 @@
 Planner — creates execution plans via Claude Code.
 
 Extracted from the Executor god class. Handles:
-- Building the plan creation prompt (using the create-plan skill)
-- Running Claude Code to generate PLAN.json
-- Loading and validating the result
+- Invoking /dirigent:create-plan via Claude Code subprocess
+- Loading and validating the resulting PLAN.json
 """
 
 from pathlib import Path
@@ -14,7 +13,6 @@ from loguru import logger
 
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.task_runner import TaskRunner
-from outbid_dirigent.test_manifest import TestManifest
 
 
 class Planner:
@@ -26,89 +24,17 @@ class Planner:
         self.runner = runner
         self.dirigent_dir = repo_path / ".dirigent"
 
-    def _load_skill(self, skill_name: str) -> str:
-        """Load a skill's SKILL.md content from the plugin directory."""
-        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
-        if skill_path.exists():
-            return skill_path.read_text(encoding="utf-8")
-        return ""
-
     def create_plan(self) -> Optional[Plan]:
         """Generate PLAN.json via Claude Code. Returns Plan or None on failure."""
-        skill_content = self._load_skill("create-plan")
 
-        business_rules = self.runner._load_business_rules()
-        br_context = ""
-        if business_rules:
-            truncated = business_rules[:3000]
-            suffix = "\n... (truncated)" if len(business_rules) > 3000 else ""
-            br_context = f"<business-rules hint=\"muessen erhalten bleiben\">\n{truncated}{suffix}\n</business-rules>"
-
-        context_file = self.dirigent_dir / "CONTEXT.md"
-        repo_context = ""
-        if context_file.exists():
-            repo_context = f"<repo-context>\n{context_file.read_text(encoding='utf-8')}\n</repo-context>"
-
-        # Init report context (from init phase)
-        init_context = ""
-        init_report = self.dirigent_dir / "INIT_REPORT.md"
-        if init_report.exists():
-            init_context = f"<init-report>\n{init_report.read_text(encoding='utf-8')}\n</init-report>"
-
-        # Init env context (e2e framework, ports, services)
-        init_env_context = ""
-        init_env = self.dirigent_dir / "init-env.json"
-        if init_env.exists():
-            init_env_context = f"<init-environment>\n{init_env.read_text(encoding='utf-8')}\n</init-environment>"
-
-        # Test manifest context
-        manifest = TestManifest.load(self.repo_path)
-        manifest_context = ""
-        if manifest:
-            l1_cmds = ", ".join(f"`{c.run}`" for c in manifest.commands_for_level("l1"))
-            l2_cmds = ", ".join(f"`{c.run}`" for c in manifest.commands_for_level("l2"))
-            real_comps = [c for c in manifest.components if not c.is_mocked]
-            comp_names = ", ".join(c.name for c in real_comps)
-            mocked = manifest.mocked_components()
-            mocked_names = ", ".join(c.name for c in mocked) if mocked else "keine"
-            gaps = ", ".join(manifest.gap_strings()) if manifest.gaps else "keine"
-
-            manifest_context = f"""<test-manifest>
-<level name="L1">{l1_cmds or 'keine'}</level>
-<level name="L2" requires="{comp_names or 'nichts'}">{l2_cmds or 'keine'}</level>
-<auto-mocked>{mocked_names}</auto-mocked>
-<gaps>{gaps}</gaps>
-<planning-rules>
-<rule>Tasks die testen sollen: test_level auf "L1" oder "L2" setzen</rule>
-<rule>Tasks die NICHT testen koennen (Gap): test_level leer lassen</rule>
-<rule>Keine eigenen Test-Befehle erfinden — nur Manifest-Commands verwenden</rule>
-<rule>Am Ende laeuft ein zentraler TEST-Schritt ueber alle Aenderungen</rule>
-</planning-rules>
-</test-manifest>"""
-
-        prompt = f"""<task>Erstelle einen Ausfuehrungsplan fuer dieses Feature.</task>
-
-<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<spec>
-{self.spec_content}
-</spec>
-
-{br_context}
-{repo_context}
-{init_context}
-{init_env_context}
-{manifest_context}
-
-<output-format>
-Erstelle die Datei .dirigent/PLAN.json mit diesem Format:
-{Plan.json_template()}
-</output-format>
-
-Erstelle den Plan jetzt.
-"""
+        # The /dirigent:create-plan skill reads all context from .dirigent/ files:
+        #   - .dirigent/SPEC.md (written by Executor.__init__)
+        #   - .dirigent/BUSINESS_RULES.md (from extract step)
+        #   - .dirigent/CONTEXT.md (from quick-scan step)
+        #   - .dirigent/INIT_REPORT.md (from init step)
+        #   - .dirigent/init-env.json (from init step)
+        #   - outbid-test-manifest.yaml (from manifest step)
+        prompt = "Run /dirigent:create-plan"
 
         success, _, stderr = self.runner._run_claude(prompt, timeout=1800)
         if not success:

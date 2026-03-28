@@ -1,60 +1,54 @@
 ---
 name: create-contract
 description: Create acceptance criteria contract for a phase before execution begins
-arguments: none - phase and plan context provided via prompt
 ---
 
 # Create Phase Contract
 
-Create a contract (acceptance criteria) that both the executor and reviewer agree upon before a phase begins.
+## Step 1: Read Phase Details
 
-## Purpose
+Read `.dirigent/PLAN.json` and find the phase matching the provided phase ID. Understand all its tasks, their descriptions, and files they'll change.
 
-The contract defines what "done" means for a phase. It is:
-- Created BEFORE execution begins
-- Used by the executor to know what to achieve
-- Used by the reviewer to evaluate pass/fail
-- The single source of truth for phase completion
+Also read `.dirigent/SPEC.md` for the feature context.
 
-## Output
+## Step 2: Create the Contract
 
-Create `.dirigent/contracts/phase-{PHASE_ID}-CONTRACT.md`:
+Write `.dirigent/contracts/phase-{PHASE_ID}-CONTRACT.md`:
 
 ```markdown
 # Phase {PHASE_ID} Contract: {PHASE_NAME}
 
 ## Objective
-{One-sentence description of what this phase achieves}
+{One sentence: what this phase achieves}
 
 ## Acceptance Criteria
 
 1. **[AC-{PHASE_ID}-01]** {Specific, measurable criterion}
-   - Verification: {How to verify this criterion is met}
+   - Verification: {How to verify}
 2. **[AC-{PHASE_ID}-02]** {Specific, measurable criterion}
-   - Verification: {How to verify this criterion is met}
-...
+   - Verification: {How to verify}
 
 ## Quality Gates
 
 - [ ] All new/modified files compile without errors
 - [ ] No regressions in existing functionality
-- [ ] Code follows project conventions and patterns
-- [ ] All CRITICAL review findings from previous iterations are resolved
+- [ ] Code follows project conventions
+- [ ] All CRITICAL review findings from previous iterations resolved
 
 ## Out of Scope for This Phase
 
-- {What this phase explicitly does NOT cover}
+- {What this phase does NOT cover}
 
 ## Files Expected to Change
 
-- `path/to/file.ext` — {what changes}
+- `path/to/file` — {what changes}
 ```
 
 ## Rules
 
 1. Each criterion MUST be specific and measurable (not "code is clean")
 2. Each criterion MUST have a verification method
-3. Maximum 8 acceptance criteria per phase (keep it focused)
-4. Criteria must be derived from the task descriptions in this phase
-5. Include both functional criteria (what it does) and quality criteria (how well)
-6. If test manifest commands exist, reference them as verification methods
+3. Maximum 8 acceptance criteria per phase
+4. Derive criteria from the task descriptions
+5. Include both functional and quality criteria
+6. If `outbid-test-manifest.yaml` exists, reference its commands as verification methods

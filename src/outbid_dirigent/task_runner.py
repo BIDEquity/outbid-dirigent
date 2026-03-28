@@ -401,42 +401,19 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
     # ── Task execution ──
 
-    @staticmethod
-    def _load_skill_content(skill_name: str) -> str:
-        """Load a skill's SKILL.md content from the plugin directory."""
-        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
-        if skill_path.exists():
-            return skill_path.read_text(encoding="utf-8")
-        return ""
-
-    def _build_system_prompt(self, task_id: str, task_name: str) -> str:
-        """Build the system prompt from the execute-task skill."""
-        skill_content = self._load_skill_content("execute-task")
-
-        # Replace placeholders
-        skill_content = skill_content.replace("TASK_ID", task_id).replace("TASK_NAME", task_name)
-
-        project_key = "-" + str(self.repo_path).replace("/", "-").lstrip("-")
-
-        return f"""<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<project-key>{project_key}</project-key>
-
-<constraints>Keine Rueckfragen. Kein Warten. Durcharbeiten und committen.</constraints>"""
-
     def run_task(self, task: Task, plan: Plan, phase_num: int | str = 1) -> TaskResult:
         """Execute a single task with retries."""
         start_time = datetime.now()
-        prompt = self._build_prompt(task, plan)
+        context = self._build_prompt(task, plan)
+
+        # The prompt tells Claude to follow /dirigent:execute-task, then provides
+        # all the task context. The skill is loaded natively by the subprocess
+        # via the --plugin-dir flag.
+        prompt = f"/dirigent:execute-task\n\n{context}"
 
         # Per-task model/effort override
         task_model = task.model or self.default_model
         task_effort = task.effort or self.default_effort
-
-        # Build system prompt from execute-task skill
-        sys_prompt = self._build_system_prompt(task.id, task.name)
 
         for attempt in range(1, self.MAX_RETRIES + 1):
             if attempt > 1:
@@ -444,7 +421,6 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
             success, stdout, stderr = self._run_claude(
                 prompt, model=task_model, effort=task_effort,
-                system_prompt=sys_prompt,
             )
 
             if success:

@@ -1,46 +1,45 @@
 ---
 name: extract-business-rules
 description: Extract all business rules from a legacy codebase
-arguments: none - language context provided via prompt
 ---
 
 # Extract Business Rules
 
-Analysiere die Codebase systematisch und extrahiere alle Business Rules.
+Systematically analyze the codebase and extract all business rules.
 
 ## Output
 
-Erstelle `.dirigent/BUSINESS_RULES.md` mit folgendem Format:
+Create `.dirigent/BUSINESS_RULES.md`:
 
 ```markdown
-# Business Rules – {PROJECT_NAME}
+# Business Rules — {PROJECT_NAME}
 
-## Kern-Entitaeten
-(Alle Domain-Objekte und ihre Felder)
+## Core Entities
+(All domain objects and their fields)
 
-## Geschaeftsregeln
-(Validierungen, Berechnungen, Constraints)
+## Business Rules
+(Validations, calculations, constraints)
 
 ## Domain Events
-(Was passiert wann? User erstellt X → Y wird ausgeloest)
+(What happens when? User creates X → Y is triggered)
 
 ## API Endpoints
-(Alle Routes mit Parametern und Response-Format)
+(All routes with parameters and response format)
 
-## Datenbank
-(Schema, Relationen, Constraints)
+## Database
+(Schema, relations, constraints)
 
-## Externe Abhaengigkeiten
-(APIs, Services, Integrations)
+## External Dependencies
+(APIs, services, integrations)
 
 ## Edge Cases
-(Bekannte Sonderfaelle und wie sie behandelt werden)
+(Known special cases and how they're handled)
 ```
 
 ## Rules
 
-1. Sei praezise. Keine Annahmen. Nur was du im Code siehst.
-2. Dokumentiere numerische Werte exakt (Limits, Timeouts, etc.)
-3. Bei Unsicherheit, markiere es mit [UNKLAR]
-4. Analysiere alle relevanten Dateien systematisch
-5. Vergiss keine Validierungsregeln, Constraints oder Business-Logik
+1. Be precise. No assumptions. Only what you see in code.
+2. Document numeric values exactly (limits, timeouts, etc.)
+3. Mark uncertainty with [UNCLEAR]
+4. Analyze all relevant files systematically
+5. Don't miss validation rules, constraints, or business logic
