@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from outbid_dirigent.contract_schema import Contract, Review, Verdict
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.router import load_state, load_route
 
@@ -48,20 +49,16 @@ class ProgressRenderer:
         return plan, state, route
 
     def _get_contract_status(self, phase_id: str) -> str:
-        """Check contract status for a phase."""
-        review_file = self.dirigent_dir / "reviews" / f"phase-{phase_id}-REVIEW.md"
-        if not review_file.exists():
-            contract_file = self.dirigent_dir / "contracts" / f"phase-{phase_id}-CONTRACT.md"
-            if contract_file.exists():
-                return "pending"
-            return "none"
+        """Check contract status for a phase using structured JSON."""
+        review = Review.load(self.dirigent_dir / "reviews" / f"phase-{phase_id}.json")
+        if review:
+            return review.verdict.value  # "pass" or "fail"
 
-        content = review_file.read_text(encoding="utf-8")
-        if "Verdict: PASS" in content or "verdict: pass" in content.lower():
-            return "pass"
-        elif "Verdict: FAIL" in content or "verdict: fail" in content.lower():
-            return "fail"
-        return "pending"
+        contract = Contract.load(self.dirigent_dir / "contracts" / f"phase-{phase_id}.json")
+        if contract:
+            return "pending"
+
+        return "none"
 
     def _count_deviations(self) -> int:
         """Count total deviations from summaries."""
@@ -75,17 +72,18 @@ class ProgressRenderer:
         return count
 
     def _count_reviews(self) -> tuple[int, int]:
-        """Count pass/fail reviews."""
+        """Count pass/fail reviews from structured JSON."""
         reviews_dir = self.dirigent_dir / "reviews"
         if not reviews_dir.exists():
             return 0, 0
         passes = fails = 0
-        for f in reviews_dir.glob("phase-*-REVIEW.md"):
-            content = f.read_text(encoding="utf-8").lower()
-            if "verdict: pass" in content:
-                passes += 1
-            elif "verdict: fail" in content:
-                fails += 1
+        for f in reviews_dir.glob("phase-*.json"):
+            review = Review.load(f)
+            if review:
+                if review.verdict == Verdict.PASS:
+                    passes += 1
+                else:
+                    fails += 1
         return passes, fails
 
     def _duration_str(self, state: dict) -> str:

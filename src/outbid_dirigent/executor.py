@@ -488,14 +488,16 @@ class Executor:
         self.log_progress("text")
 
         if passed:
-            review_file = self.dirigent_dir / "reviews" / f"phase-{phase.id}-REVIEW.md"
-            if review_file.exists():
-                content = review_file.read_text(encoding="utf-8")
-                critical_count = content.lower().count("critical")
-                warn_count = content.lower().count("warn")
-                logger.info(f"Phase {phase.id} review: {critical_count} critical, {warn_count} warnings")
+            from outbid_dirigent.contract_schema import Review
+            review = Review.load(self.dirigent_dir / "reviews" / f"phase-{phase.id}.json")
+            if review:
+                logger.info(
+                    f"Phase {phase.id} review: {review.verdict.value.upper()} "
+                    f"({review.critical_count} critical, {review.warn_count} warnings, "
+                    f"{len(review.criteria_results)} criteria evaluated)"
+                )
             else:
-                logger.info(f"Phase {phase.id} review: no review file created")
+                logger.info(f"Phase {phase.id} review: no structured review created")
         else:
             logger.warning(f"Phase {phase.id} review did not pass (non-blocking)")
 

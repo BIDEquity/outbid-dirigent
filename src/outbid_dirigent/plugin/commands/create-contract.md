@@ -7,10 +7,6 @@ allowed-tools: Bash, Read, Write, Glob, Grep
 
 Create an acceptance criteria contract for Phase $ARGUMENTS.
 
-## Context files to read
+Read `.dirigent/PLAN.json` to find the phase, `.dirigent/SPEC.md` for context, and `outbid-test-manifest.yaml` if it exists.
 
-1. `.dirigent/PLAN.json` — read the phase matching ID "$ARGUMENTS" to understand its tasks
-2. `.dirigent/SPEC.md` — the feature spec for context
-3. `outbid-test-manifest.yaml` — test commands available for verification (if exists)
-
-Follow the SKILL.md instructions to create `.dirigent/contracts/phase-$ARGUMENTS-CONTRACT.md`.
+Follow the SKILL.md instructions to write `.dirigent/contracts/phase-$ARGUMENTS.json` — valid JSON only, no markdown.
