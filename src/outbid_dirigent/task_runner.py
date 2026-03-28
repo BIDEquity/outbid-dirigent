@@ -364,21 +364,15 @@ LIMIT 30;
 {recall}
 </session-recall>""")
 
-        # Init environment context (e2e framework, services, ports)
-        init_env_file = self.dirigent_dir / "init-env.json"
-        if init_env_file.exists():
-            try:
-                import json
-                init_env = json.loads(init_env_file.read_text(encoding="utf-8"))
-                if init_env.get("e2e_framework"):
-                    sections.append(f"""<e2e-environment>
-<framework>{init_env['e2e_framework']}</framework>
-<config-file>{init_env.get('e2e_config_file', 'unknown')}</config-file>
-<auth-setup>{'yes' if init_env.get('e2e_has_auth') else 'no'}</auth-setup>
-<ports>{', '.join(str(p) for p in init_env.get('ports_listening', []))}</ports>
-</e2e-environment>""")
-            except Exception:
-                pass
+        # Test harness context (e2e environment, auth, verification commands)
+        from outbid_dirigent.test_harness_schema import TestHarness
+        harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
+        if harness:
+            sections.append(
+                f"<test-harness hint=\"running e2e environment — use for verification\">\n"
+                f"{harness.summary_for_reviewer()}\n"
+                f"</test-harness>"
+            )
 
         # Contract context (acceptance criteria for current phase)
         phase_pos = plan.task_position(task.id)

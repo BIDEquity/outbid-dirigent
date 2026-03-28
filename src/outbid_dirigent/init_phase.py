@@ -1,24 +1,34 @@
 """
 Init phase — bootstraps dev environment before planning.
 
-Discovers and runs init scripts that:
-1. Start required services (databases, APIs, etc.)
-2. Seed development data
-3. Configure credentials for Playwright/Puppeteer e2e testing
-4. Validate the environment is ready
+The init phase has two jobs:
+1. Run .outbid/init.sh or init.sh to start services, seed data, set up auth
+2. Produce .dirigent/test-harness.json — a structured specification that tells
+   the reviewer exactly how to verify features end-to-end
 
-Init script discovery order:
-1. .outbid/init.sh — Outbid-specific init
-2. init.sh — Generic init in repo root
+The init script is expected to:
+- Start required services (databases, queues, etc.)
+- Start the dev server (or leave instructions for starting it)
+- Seed test data (users, sample records)
+- Set up e2e auth (create storageState, export tokens, etc.)
+- Write .dirigent/test-harness.json OR print enough info for the
+  /dirigent:run-init skill to construct it
+
+If no init script exists, the skill still inspects the repo to build
+a best-effort test harness from config files and package.json.
 """
 
 import json
+import os
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from loguru import logger
+
+from outbid_dirigent.test_harness_schema import TestHarness
 
 
 class InitPhase:
@@ -29,20 +39,9 @@ class InitPhase:
         ".outbid/init.sh",
         "init.sh",
     ]
-
-    # Environment variable patterns relevant to e2e testing
-    E2E_ENV_PATTERNS = [
-        "PLAYWRIGHT", "PUPPETEER", "BROWSER", "E2E", "TEST_URL",
-        "BASE_URL", "COOKIE", "TOKEN", "SESSION", "AUTH",
-        "CREDENTIAL", "HEADLESS", "CYPRESS",
-    ]
+    READINESS_TIMEOUT = 60  # seconds to wait for services after init script
 
     def __init__(self, repo_path: Path, runner=None):
-        """
-        Args:
-            repo_path: Path to the target repository
-            runner: Optional TaskRunner for Claude Code invocations
-        """
         self.repo_path = repo_path
         self.runner = runner
         self.dirigent_dir = repo_path / ".dirigent"
@@ -55,72 +54,17 @@ class InitPhase:
             if script.exists():
                 logger.info(f"Found init script: {script}")
                 return script
-        logger.info("No init script found (.outbid/init.sh or init.sh)")
         return None
 
-    def detect_e2e_framework(self) -> dict:
-        """Detect which e2e testing framework is configured in the repo.
-
-        Checks for:
-        - Playwright (playwright.config.ts/js, @playwright/test in package.json)
-        - Puppeteer (puppeteer in package.json)
-        - Cypress (cypress.config.ts/js, cypress in package.json)
-
-        Returns dict with framework info.
-        """
-        result = {
-            "framework": None,
-            "config_file": None,
-            "has_auth_setup": False,
-            "storage_state_path": None,
-        }
-
-        # Check Playwright
-        for config in ["playwright.config.ts", "playwright.config.js", "playwright.config.mjs"]:
-            config_path = self.repo_path / config
-            if config_path.exists():
-                result["framework"] = "playwright"
-                result["config_file"] = config
-                content = config_path.read_text(encoding="utf-8", errors="ignore")
-                if "storageState" in content:
-                    result["has_auth_setup"] = True
-                    # Try to extract storage state path
-                    import re
-                    match = re.search(r"storageState['\"]?\s*[:=]\s*['\"]([^'\"]+)['\"]", content)
-                    if match:
-                        result["storage_state_path"] = match.group(1)
-                break
-
-        # Check Cypress
-        if not result["framework"]:
-            for config in ["cypress.config.ts", "cypress.config.js", "cypress.config.mjs"]:
-                if (self.repo_path / config).exists():
-                    result["framework"] = "cypress"
-                    result["config_file"] = config
-                    break
-
-        # Check Puppeteer in package.json
-        if not result["framework"]:
-            pkg_json = self.repo_path / "package.json"
-            if pkg_json.exists():
-                try:
-                    pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
-                    all_deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
-                    if "puppeteer" in all_deps:
-                        result["framework"] = "puppeteer"
-                    elif "@playwright/test" in all_deps or "playwright" in all_deps:
-                        result["framework"] = "playwright"
-                    elif "cypress" in all_deps:
-                        result["framework"] = "cypress"
-                except (json.JSONDecodeError, KeyError):
-                    pass
-
-        return result
-
     def run_init_script(self, script_path: Path) -> dict:
-        """Execute the init script and capture results.
+        """Execute the init script and return results.
 
-        Returns dict with execution results.
+        The script runs in a NEW shell that inherits the current environment.
+        If the script writes .dirigent/test-harness.json, we use that directly.
+        Otherwise we capture stdout/stderr for the skill to analyze.
+
+        The script is NOT run with capture_output — it runs attached so that
+        background processes (dev servers) survive the script exiting.
         """
         result = {
             "script": str(script_path.relative_to(self.repo_path)),
@@ -128,28 +72,32 @@ class InitPhase:
             "output": "",
             "error": "",
             "duration_seconds": 0,
-            "env_vars": [],
-            "ports_listening": [],
-            "services": [],
+            "produced_harness": False,
         }
 
         start = datetime.now()
 
         try:
-            # Make executable
             script_path.chmod(0o755)
 
+            # Run the init script. Use a subshell that sources the script
+            # so exported env vars are captured in a sidecar file.
+            env_capture = self.dirigent_dir / "init-exports.env"
+            wrapper = (
+                f'set -e; source "{script_path}" 2>&1; '
+                f'env > "{env_capture}"'
+            )
+
             proc = subprocess.run(
-                ["bash", str(script_path)],
+                ["bash", "-c", wrapper],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
                 timeout=self.INIT_TIMEOUT,
-                env=None,  # inherit full environment
             )
 
-            result["output"] = proc.stdout[:5000]
-            result["error"] = proc.stderr[:2000]
+            result["output"] = proc.stdout[:10000]
+            result["error"] = proc.stderr[:5000]
             result["success"] = proc.returncode == 0
 
             if proc.returncode != 0:
@@ -164,184 +112,99 @@ class InitPhase:
 
         result["duration_seconds"] = (datetime.now() - start).total_seconds()
 
-        # Capture environment state after init
-        result["env_vars"] = self._capture_e2e_env_vars()
-        result["ports_listening"] = self._check_listening_ports()
-        result["services"] = self._check_docker_services()
+        # Check if the script produced the harness itself
+        harness_path = self.dirigent_dir / "test-harness.json"
+        if harness_path.exists():
+            harness = TestHarness.load(harness_path)
+            if harness:
+                result["produced_harness"] = True
+                logger.info("Init script produced test-harness.json directly")
 
-        # Save output log
+        # Save raw output for the skill to analyze if needed
         log_file = self.dirigent_dir / "init-output.log"
         log_file.write_text(
             f"=== Init Script: {script_path} ===\n"
-            f"=== Exit Code: {proc.returncode if 'proc' in dir() else 'N/A'} ===\n\n"
+            f"=== Exit Code: {proc.returncode if result['success'] or result['error'] else 'N/A'} ===\n\n"
             f"--- STDOUT ---\n{result['output']}\n\n"
             f"--- STDERR ---\n{result['error']}\n",
             encoding="utf-8",
         )
 
+        # Save exported environment (from the init script's perspective)
+        if env_capture.exists():
+            self._extract_env_diff(env_capture)
+
         return result
 
-    def _capture_e2e_env_vars(self) -> list[str]:
-        """Capture environment variable names (not values!) relevant to e2e testing."""
+    def _extract_env_diff(self, env_file: Path):
+        """Compare init script's exported env with current env.
+
+        Saves new/changed vars to .dirigent/init-new-env.json.
+        Only saves var NAMES for security — never values (except for
+        non-sensitive ones like URLs and ports).
+        """
         try:
-            proc = subprocess.run(
-                ["env"], capture_output=True, text=True, timeout=5,
-            )
-            vars_found = []
-            for line in proc.stdout.splitlines():
-                name = line.split("=", 1)[0] if "=" in line else ""
-                if any(pattern in name.upper() for pattern in self.E2E_ENV_PATTERNS):
-                    vars_found.append(name)
-            return vars_found
-        except Exception:
-            return []
+            current_env = dict(os.environ)
+            init_env = {}
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                if "=" in line:
+                    key, val = line.split("=", 1)
+                    init_env[key] = val
 
-    def _check_listening_ports(self) -> list[int]:
-        """Check which common dev ports are listening."""
-        common_ports = [3000, 3001, 4000, 5000, 5173, 5432, 6379, 8000, 8080, 9090, 27017]
-        listening = []
-        try:
-            proc = subprocess.run(
-                ["ss", "-tlnp"], capture_output=True, text=True, timeout=5,
-            )
-            for port in common_ports:
-                if f":{port} " in proc.stdout or f":{port}\t" in proc.stdout:
-                    listening.append(port)
-        except Exception:
-            pass
-        return listening
+            # Find vars that are new or changed
+            safe_value_patterns = ["URL", "PORT", "HOST", "BASE", "ADDR"]
+            new_vars = {}
+            for key, val in init_env.items():
+                if key not in current_env or current_env[key] != val:
+                    # Only expose values for URL/PORT-like vars, redact the rest
+                    if any(p in key.upper() for p in safe_value_patterns):
+                        new_vars[key] = val
+                    else:
+                        new_vars[key] = "(set by init)"
 
-    def _check_docker_services(self) -> list[dict]:
-        """Check running Docker containers."""
-        try:
-            proc = subprocess.run(
-                ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
-                capture_output=True, text=True, timeout=10,
-            )
-            services = []
-            for line in proc.stdout.strip().splitlines():
-                parts = line.split("\t")
-                if len(parts) >= 2:
-                    services.append({
-                        "name": parts[0],
-                        "status": parts[1],
-                        "ports": parts[2] if len(parts) > 2 else "",
-                    })
-            return services
-        except Exception:
-            return []
+            if new_vars:
+                out = self.dirigent_dir / "init-new-env.json"
+                out.write_text(json.dumps(new_vars, indent=2), encoding="utf-8")
+                logger.info(f"Init script exported {len(new_vars)} new/changed env vars")
 
-    def write_init_report(self, init_result: dict, e2e_info: dict) -> Path:
-        """Write the init report to .dirigent/INIT_REPORT.md."""
-        report_path = self.dirigent_dir / "INIT_REPORT.md"
+        except Exception as e:
+            logger.debug(f"Failed to extract env diff: {e}")
 
-        # Determine overall status
-        if init_result["success"]:
-            status = "READY"
-        elif init_result["output"]:
-            status = "PARTIAL"
-        else:
-            status = "FAILED"
+    def wait_for_readiness(self, harness: TestHarness) -> bool:
+        """Wait for health checks in the test harness to pass."""
+        if not harness.health_checks:
+            return True
 
-        # Build report
-        lines = [
-            "# Init Report\n",
-            f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-            "## Script Used",
-            f"`{init_result['script']}`\n",
-        ]
+        logger.info(f"Waiting for {len(harness.health_checks)} health checks...")
+        all_passed = True
 
-        # Services
-        if init_result["services"]:
-            lines.append("## Services Running")
-            for svc in init_result["services"]:
-                lines.append(f"- **{svc['name']}**: {svc['status']} ({svc['ports']})")
-            lines.append("")
+        for check in harness.health_checks:
+            timeout = min(check.timeout_seconds, self.READINESS_TIMEOUT)
+            deadline = time.time() + timeout
+            passed = False
 
-        # Ports
-        if init_result["ports_listening"]:
-            lines.append("## Ports Listening")
-            for port in init_result["ports_listening"]:
-                lines.append(f"- Port {port}")
-            lines.append("")
+            while time.time() < deadline:
+                try:
+                    proc = subprocess.run(
+                        ["bash", "-c", check.command],
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if proc.returncode == 0:
+                        logger.info(f"  Health check passed: {check.name}")
+                        passed = True
+                        break
+                except (subprocess.TimeoutExpired, Exception):
+                    pass
+                time.sleep(2)
 
-        # E2E config
-        lines.append("## E2E Test Configuration")
-        if e2e_info["framework"]:
-            lines.append(f"- **Framework:** {e2e_info['framework']}")
-            if e2e_info["config_file"]:
-                lines.append(f"- **Config:** `{e2e_info['config_file']}`")
-            if e2e_info["has_auth_setup"]:
-                lines.append("- **Auth Setup:** Yes (storageState configured)")
-                if e2e_info["storage_state_path"]:
-                    lines.append(f"- **Storage State:** `{e2e_info['storage_state_path']}`")
-            else:
-                lines.append("- **Auth Setup:** Not configured")
-        else:
-            lines.append("- No e2e framework detected")
-        lines.append("")
+            if not passed:
+                logger.warning(f"  Health check failed: {check.name} (timeout {timeout}s)")
+                all_passed = False
 
-        # Environment variables (names only, never values)
-        if init_result["env_vars"]:
-            lines.append("## Environment Variables (e2e-relevant)")
-            for var in init_result["env_vars"]:
-                lines.append(f"- `{var}` (set)")
-            lines.append("")
-
-        # Execution details
-        lines.append("## Execution Details")
-        lines.append(f"- **Duration:** {init_result['duration_seconds']:.1f}s")
-        lines.append(f"- **Exit Status:** {'Success' if init_result['success'] else 'Failed'}")
-        if init_result["error"]:
-            lines.append(f"- **Errors:** {init_result['error'][:300]}")
-        lines.append("")
-
-        lines.append(f"## Status: {status}")
-        lines.append("")
-
-        report_path.write_text("\n".join(lines), encoding="utf-8")
-        logger.info(f"Init report written to {report_path}")
-        return report_path
-
-    def write_no_init_report(self, e2e_info: dict) -> Path:
-        """Write a minimal init report when no init script exists."""
-        report_path = self.dirigent_dir / "INIT_REPORT.md"
-
-        lines = [
-            "# Init Report\n",
-            f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
-            "## Script Used",
-            "No init script found (checked `.outbid/init.sh` and `init.sh`).\n",
-        ]
-
-        # Still report e2e framework info
-        lines.append("## E2E Test Configuration")
-        if e2e_info["framework"]:
-            lines.append(f"- **Framework:** {e2e_info['framework']}")
-            if e2e_info["config_file"]:
-                lines.append(f"- **Config:** `{e2e_info['config_file']}`")
-            if e2e_info["has_auth_setup"]:
-                lines.append("- **Auth Setup:** Yes (storageState configured)")
-            else:
-                lines.append("- **Auth Setup:** Not configured — may need manual setup")
-        else:
-            lines.append("- No e2e framework detected")
-        lines.append("")
-
-        # Check ports anyway
-        ports = self._check_listening_ports()
-        if ports:
-            lines.append("## Ports Already Listening")
-            for port in ports:
-                lines.append(f"- Port {port}")
-            lines.append("")
-
-        lines.append("## Status: SKIPPED")
-        lines.append("No init script to run. E2e tests may require manual environment setup.\n")
-
-        report_path.write_text("\n".join(lines), encoding="utf-8")
-        logger.info(f"Init report written (no init script): {report_path}")
-        return report_path
+        return all_passed
 
     # ══════════════════════════════════════════
     # MAIN ENTRY POINT
@@ -350,47 +213,59 @@ class InitPhase:
     def run(self) -> bool:
         """Run the complete init phase.
 
-        Returns True if init completed (or was skipped) successfully.
+        Flow:
+        1. Discover and run init script (if exists)
+        2. If init script produced test-harness.json → validate and use it
+        3. If not → invoke /dirigent:run-init skill to inspect the repo
+           and build a best-effort harness
+        4. Wait for health checks in the harness to pass
+        5. Harness is available for planner, executor, and reviewer
+
+        Returns True always (non-blocking — best effort).
         """
         logger.info("Starting init phase...")
 
-        # Detect e2e framework regardless of init script
-        e2e_info = self.detect_e2e_framework()
-        if e2e_info["framework"]:
-            logger.info(f"Detected e2e framework: {e2e_info['framework']}")
-
-        # Discover init script
         script = self.discover_init_script()
+        harness_path = self.dirigent_dir / "test-harness.json"
 
-        if script is None:
-            self.write_no_init_report(e2e_info)
-            logger.info("Init phase: no init script, skipping")
+        # Step 1: Run init script if it exists
+        if script:
+            logger.info(f"Running init script: {script}")
+            init_result = self.run_init_script(script)
+
+            if not init_result["success"]:
+                logger.warning("Init script failed (continuing — non-blocking)")
+        else:
+            logger.info("No init script found (.outbid/init.sh or init.sh)")
+
+        # Step 2: Check if the script produced the harness
+        harness = TestHarness.load(harness_path)
+
+        # Step 3: If no harness yet, have the skill build one
+        if harness is None and self.runner:
+            logger.info("No test-harness.json — invoking /dirigent:run-init to build one")
+            success, _, stderr = self.runner._run_claude(
+                "Run /dirigent:run-init", timeout=300,
+            )
+            if success:
+                harness = TestHarness.load(harness_path)
+
+        if harness is None:
+            logger.warning("No test harness produced — reviewer will only do static analysis")
             return True
 
-        # Run init script
-        logger.info(f"Running init script: {script}")
-        init_result = self.run_init_script(script)
+        # Step 4: Wait for health checks
+        logger.info(f"Test harness: {harness.base_url}, auth={harness.auth.method.value}, "
+                    f"{len(harness.verification_commands)} verification commands")
 
-        # Write report
-        self.write_init_report(init_result, e2e_info)
+        if harness.health_checks:
+            ready = self.wait_for_readiness(harness)
+            if ready:
+                logger.info("All health checks passed — environment is ready")
+            else:
+                harness.status = "partial"
+                harness.notes = "Some health checks failed"
+                harness.save(harness_path)
+                logger.warning("Some health checks failed — harness marked as partial")
 
-        if init_result["success"]:
-            logger.info("Init phase completed successfully")
-        else:
-            logger.warning("Init phase completed with errors (non-blocking)")
-
-        # Save init env for later use by tasks
-        env_file = self.dirigent_dir / "init-env.json"
-        env_data = {
-            "e2e_framework": e2e_info["framework"],
-            "e2e_config_file": e2e_info["config_file"],
-            "e2e_has_auth": e2e_info["has_auth_setup"],
-            "e2e_storage_state": e2e_info["storage_state_path"],
-            "ports_listening": init_result["ports_listening"],
-            "services": init_result["services"],
-            "env_vars": init_result["env_vars"],
-            "status": "ready" if init_result["success"] else "partial",
-        }
-        env_file.write_text(json.dumps(env_data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-        return True  # Always non-blocking
+        return True
