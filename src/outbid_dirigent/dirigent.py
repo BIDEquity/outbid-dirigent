@@ -229,6 +229,20 @@ def run_execution(
             if reporter:
                 reporter.stage_complete("quick_scan", "Quick Scan abgeschlossen" if success else "Fehler bei Quick Scan")
 
+        elif step.step_type == StepType.INCREASE_TESTABILITY:
+            if reporter:
+                reporter.stage_start("testability", "Analyse und Verbesserung der Testbarkeit")
+            success = executor.increase_testability()
+            if reporter:
+                reporter.stage_complete("testability", "Testability-Analyse abgeschlossen" if success else "Testability-Analyse fehlgeschlagen")
+
+        elif step.step_type == StepType.ADD_TRACKING:
+            if reporter:
+                reporter.stage_start("tracking", "PostHog Setup und Event-Identifikation")
+            success = executor.add_tracking()
+            if reporter:
+                reporter.stage_complete("tracking", "Tracking Setup abgeschlossen" if success else "Tracking Setup fehlgeschlagen")
+
         elif step.step_type == StepType.PLANNING:
             # Skip planning if PLAN.json already exists (e.g. from --plan-only)
             plan_file = repo_path / ".dirigent" / "PLAN.json"
@@ -332,33 +346,21 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
         return False
 
     # Route basierend auf gespeichertem Typ
-    if route_type == RouteType.GREENFIELD:
-        route = Route(
-            route_type=route_type,
-            reason=route_data["reason"],
-            steps=router.GREENFIELD_STEPS.copy(),
-            estimated_tasks=route_data["estimated_tasks"],
-            oracle_needed=route_data["oracle_needed"],
-            repo_context_needed=route_data["repo_context_needed"],
-        )
-    elif route_type == RouteType.LEGACY:
-        route = Route(
-            route_type=route_type,
-            reason=route_data["reason"],
-            steps=router.LEGACY_STEPS.copy(),
-            estimated_tasks=route_data["estimated_tasks"],
-            oracle_needed=route_data["oracle_needed"],
-            repo_context_needed=route_data["repo_context_needed"],
-        )
-    else:
-        route = Route(
-            route_type=route_type,
-            reason=route_data["reason"],
-            steps=router.HYBRID_STEPS.copy(),
-            estimated_tasks=route_data["estimated_tasks"],
-            oracle_needed=route_data["oracle_needed"],
-            repo_context_needed=route_data["repo_context_needed"],
-        )
+    steps_map = {
+        RouteType.GREENFIELD: router.GREENFIELD_STEPS,
+        RouteType.LEGACY: router.LEGACY_STEPS,
+        RouteType.HYBRID: router.HYBRID_STEPS,
+        RouteType.TESTABILITY: router.TESTABILITY_STEPS,
+        RouteType.TRACKING: router.TRACKING_STEPS,
+    }
+    route = Route(
+        route_type=route_type,
+        reason=route_data["reason"],
+        steps=steps_map.get(route_type, router.HYBRID_STEPS).copy(),
+        estimated_tasks=route_data["estimated_tasks"],
+        oracle_needed=route_data["oracle_needed"],
+        repo_context_needed=route_data["repo_context_needed"],
+    )
 
     state = load_state(str(repo_path))
     if state and state.get("completed_tasks"):

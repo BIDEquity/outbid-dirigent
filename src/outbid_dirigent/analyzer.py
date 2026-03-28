@@ -44,8 +44,12 @@ class SpecAnalysis:
     title: str
     has_legacy_keywords: bool
     has_greenfield_keywords: bool
+    has_testability_keywords: bool
+    has_tracking_keywords: bool
     legacy_keywords_found: List[str]
     greenfield_keywords_found: List[str]
+    testability_keywords_found: List[str]
+    tracking_keywords_found: List[str]
     target_language: Optional[str]
     complexity: Optional[str]
     estimated_scope: str  # small, medium, large
@@ -190,6 +194,23 @@ GREENFIELD_KEYWORDS = [
     "develop", "design", "introduce", "setup", "initialize",
     "hinzufügen", "erstellen", "bauen", "implementieren", "entwickeln",
     "feature", "neu", "anlegen",
+]
+
+TESTABILITY_KEYWORDS = [
+    "testability", "testbarkeit", "test coverage", "testabdeckung",
+    "e2e test", "end-to-end test", "testing infrastructure",
+    "test setup", "test harness", "increase testability",
+    "improve testing", "add tests", "tests hinzufügen",
+    "test framework", "playwright setup", "cypress setup",
+    "seed data", "test fixtures", "test environment",
+]
+
+TRACKING_KEYWORDS = [
+    "tracking", "analytics", "posthog", "feature tracking",
+    "event tracking", "user tracking", "product analytics",
+    "telemetry", "instrumentation", "feature flags",
+    "ab test", "a/b test", "conversion tracking",
+    "nutzer tracking", "analyse", "feature usage",
 ]
 
 # Sprachen die auf Target-Language hinweisen können
@@ -775,6 +796,18 @@ class Analyzer:
             if keyword.lower() in content_lower:
                 greenfield_found.append(keyword)
 
+        # Testability-Keywords suchen
+        testability_found = []
+        for keyword in TESTABILITY_KEYWORDS:
+            if keyword.lower() in content_lower:
+                testability_found.append(keyword)
+
+        # Tracking-Keywords suchen
+        tracking_found = []
+        for keyword in TRACKING_KEYWORDS:
+            if keyword.lower() in content_lower:
+                tracking_found.append(keyword)
+
         # Target-Language erkennen
         target_language = None
         for keyword, lang in LANGUAGE_KEYWORDS.items():
@@ -802,8 +835,12 @@ class Analyzer:
             title=title,
             has_legacy_keywords=len(legacy_found) > 0,
             has_greenfield_keywords=len(greenfield_found) > 0,
+            has_testability_keywords=len(testability_found) > 0,
+            has_tracking_keywords=len(tracking_found) > 0,
             legacy_keywords_found=legacy_found,
             greenfield_keywords_found=greenfield_found,
+            testability_keywords_found=testability_found,
+            tracking_keywords_found=tracking_found,
             target_language=target_language,
             complexity=complexity,
             estimated_scope=scope,
@@ -811,6 +848,21 @@ class Analyzer:
 
     def _determine_route(self, repo: RepoAnalysis, spec: SpecAnalysis) -> Tuple[str, str, str, int, int]:
         """Bestimmt die optimale Route basierend auf der Analyse."""
+
+        # ── Specialized routes (take priority over general routes) ──
+
+        # Testability route: triggered when spec focuses on improving test infrastructure
+        if spec.has_testability_keywords and len(spec.testability_keywords_found) >= 2:
+            reason = f"Testability-Keywords: {', '.join(spec.testability_keywords_found[:3])}"
+            return "testability", reason, "high", 0, 0
+
+        # Tracking route: triggered when spec focuses on adding analytics/PostHog
+        if spec.has_tracking_keywords and len(spec.tracking_keywords_found) >= 2:
+            reason = f"Tracking-Keywords: {', '.join(spec.tracking_keywords_found[:3])}"
+            return "tracking", reason, "high", 0, 0
+
+        # ── General routes ──
+
         legacy_signals = 0
         greenfield_signals = 0
         reasons = []
