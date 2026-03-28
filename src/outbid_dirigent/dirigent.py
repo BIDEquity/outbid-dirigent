@@ -208,7 +208,14 @@ def run_execution(
 
         success = False
 
-        if step.step_type == StepType.BUSINESS_RULE_EXTRACTION:
+        if step.step_type == StepType.INIT:
+            if reporter:
+                reporter.stage_start("init", "Bootstrap dev environment and configure e2e credentials")
+            success = executor.run_init()
+            if reporter:
+                reporter.stage_complete("init", "Init phase complete" if success else "Init phase failed")
+
+        elif step.step_type == StepType.BUSINESS_RULE_EXTRACTION:
             if reporter:
                 reporter.stage_start("business_rules", "Extrahiere Business Rules aus der Codebase")
             success = executor.extract_business_rules()
@@ -677,6 +684,10 @@ Beispiele:
                 )
                 if not success:
                     sys.exit(1)
+
+                # Log final progress
+                from outbid_dirigent.progress import print_progress
+                logger.info("\n" + print_progress(str(repo_path), "console"))
 
                 # Summary generieren nach erfolgreicher Execution
                 executor = create_executor(
