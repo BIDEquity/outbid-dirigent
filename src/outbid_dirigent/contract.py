@@ -5,17 +5,18 @@ Before a phase begins:
 1. A contract is created (acceptance criteria both executor and reviewer agree on)
 2. The executor works through the tasks
 3. The reviewer checks against the contract and gives PASS/FAIL
-4. On FAIL, the executor fixes issues
+4. On FAIL, the executor fixes issues (reviewer never fixes directly)
 5. Iterate until PASS or max iterations reached
 
-All prompts use /dirigent: slash commands that the subprocess Claude Code
-resolves natively via the bundled plugin.
+Contracts and reviews are structured JSON files validated by Pydantic.
+All prompts use /dirigent: slash commands resolved natively by the subprocess.
 """
 
 from pathlib import Path
 
 from loguru import logger
 
+from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity
 from outbid_dirigent.plan_schema import Plan, Phase
 
 
@@ -25,11 +26,6 @@ class ContractManager:
     MAX_REVIEW_ITERATIONS = 3
 
     def __init__(self, repo_path: Path, runner):
-        """
-        Args:
-            repo_path: Path to the target repository
-            runner: TaskRunner instance for invoking Claude Code
-        """
         self.repo_path = repo_path
         self.runner = runner
         self.dirigent_dir = repo_path / ".dirigent"
@@ -38,30 +34,50 @@ class ContractManager:
         self.contracts_dir.mkdir(parents=True, exist_ok=True)
         self.reviews_dir.mkdir(parents=True, exist_ok=True)
 
+    def _contract_path(self, phase_id: str) -> Path:
+        return self.contracts_dir / f"phase-{phase_id}.json"
+
+    def _review_path(self, phase_id: str) -> Path:
+        return self.reviews_dir / f"phase-{phase_id}.json"
+
     # ══════════════════════════════════════════
     # CONTRACT CREATION
     # ══════════════════════════════════════════
 
     def create_contract(self, phase: Phase, plan: Plan, spec_content: str) -> bool:
         """Create acceptance criteria contract for a phase before execution."""
-        contract_file = self.contracts_dir / f"phase-{phase.id}-CONTRACT.md"
+        contract_path = self._contract_path(phase.id)
 
-        if contract_file.exists():
-            logger.info(f"Contract for phase {phase.id} already exists")
-            return True
+        if contract_path.exists():
+            contract = Contract.load(contract_path)
+            if contract:
+                logger.info(f"Contract for phase {phase.id} already exists "
+                           f"({len(contract.acceptance_criteria)} criteria)")
+                return True
 
-        # Invoke /dirigent:create-contract with phase ID as argument.
-        # The skill reads .dirigent/PLAN.json and .dirigent/SPEC.md from disk.
         prompt = f"Run /dirigent:create-contract {phase.id}"
-
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
 
-        if success and contract_file.exists():
-            logger.info(f"Contract created for phase {phase.id}")
-            return True
+        if not success:
+            logger.error(f"Contract creation failed for phase {phase.id}: {stderr[:200]}")
+            return False
 
-        logger.error(f"Contract creation failed for phase {phase.id}: {stderr[:200]}")
-        return False
+        # Validate the output
+        contract = Contract.load(contract_path)
+        if contract is None:
+            logger.error(f"Contract for phase {phase.id} was not created or is invalid JSON")
+            return False
+
+        logger.info(
+            f"Contract created for phase {phase.id}: "
+            f"{len(contract.acceptance_criteria)} criteria, "
+            f"{len(contract.expected_files)} expected files"
+        )
+        return True
+
+    def load_contract(self, phase_id: str) -> Contract | None:
+        """Load and validate a phase contract."""
+        return Contract.load(self._contract_path(phase_id))
 
     # ══════════════════════════════════════════
     # REVIEW (reviewer role)
@@ -73,68 +89,65 @@ class ContractManager:
         Returns: "pass", "fail", or "error"
         """
         commit_count = len(phase.tasks)
-        review_file = self.reviews_dir / f"phase-{phase.id}-REVIEW.md"
+        review_path = self._review_path(phase.id)
 
-        # Invoke /dirigent:review-phase with phase ID, commit count, and iteration.
-        # The skill reads the contract and runs git diff itself.
-        prompt = f"Run /dirigent:review-phase {phase.id} --commits {commit_count} --iteration {iteration}"
-
-        sys_prompt = (
-            "You are a code reviewer. You check changes against the contract. "
-            "You are ONLY the reviewer — do NOT change any code. "
-            "Your verdict must be clearly PASS or FAIL."
+        prompt = (
+            f"Run /dirigent:review-phase {phase.id} "
+            f"--commits {commit_count} --iteration {iteration}"
         )
 
-        success, _, stderr = self.runner._run_claude(
-            prompt, timeout=600, system_prompt=sys_prompt,
-        )
+        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         if not success:
-            logger.warning(f"Phase {phase.id} review failed: {stderr[:200]}")
+            logger.warning(f"Phase {phase.id} review subprocess failed: {stderr[:200]}")
             return "error"
 
-        if review_file.exists():
-            content = review_file.read_text(encoding="utf-8")
-            if "verdict: pass" in content.lower():
-                logger.info(f"Phase {phase.id} review: PASS")
-                return "pass"
-            elif "verdict: fail" in content.lower():
-                critical = content.lower().count("critical")
-                warn = content.lower().count("warn")
-                logger.info(f"Phase {phase.id} review: FAIL ({critical} critical, {warn} warnings)")
-                return "fail"
+        # Parse structured review
+        review = Review.load(review_path)
+        if review is None:
+            logger.warning(f"Phase {phase.id} review: output missing or invalid JSON")
+            return "error"
 
-        logger.info(f"Phase {phase.id} review: no clear verdict found, treating as pass")
-        return "pass"
+        # Log structured results
+        failed = review.failed_criteria
+        critical = review.critical_count
+        warn = review.warn_count
+
+        if review.verdict == Verdict.PASS:
+            logger.info(
+                f"Phase {phase.id} review: PASS "
+                f"({len(review.passed_criteria)}/{len(review.criteria_results)} criteria passed, "
+                f"{warn} warnings)"
+            )
+            return "pass"
+        else:
+            logger.info(
+                f"Phase {phase.id} review: FAIL "
+                f"({len(failed)} criteria failed, "
+                f"{critical} critical, {warn} warnings)"
+            )
+            for cr in failed:
+                logger.info(f"  FAIL [{cr.ac_id}]: {cr.notes[:100]}")
+            return "fail"
 
     # ══════════════════════════════════════════
     # FIX (executor role)
     # ══════════════════════════════════════════
 
     def fix_review_findings(self, phase: Phase, iteration: int = 1) -> bool:
-        """Fix issues found during review (executor role).
+        """Fix issues found during review (executor role)."""
+        review = Review.load(self._review_path(phase.id))
 
-        Returns True if fixes were applied successfully.
-        """
-        review_file = self.reviews_dir / f"phase-{phase.id}-REVIEW.md"
-
-        if not review_file.exists():
-            logger.info(f"No review file for phase {phase.id}, nothing to fix")
+        if review is None:
+            logger.info(f"No review for phase {phase.id}, nothing to fix")
             return True
-
-        review_text = review_file.read_text(encoding="utf-8")
 
         # Skip if no actionable findings
-        has_critical = "critical" in review_text.lower()
-        has_warn = "warn" in review_text.lower()
-        if not has_critical and not has_warn:
-            logger.info(f"Phase {phase.id}: no CRITICAL/WARN findings, skipping fix")
+        if review.critical_count == 0 and review.warn_count == 0 and not review.failed_criteria:
+            logger.info(f"Phase {phase.id}: no actionable findings, skipping fix")
             return True
 
-        # Invoke /dirigent:fix-review with phase ID and iteration.
-        # The skill reads the review file from disk.
         prompt = f"Run /dirigent:fix-review {phase.id} --iteration {iteration}"
-
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         if success:
@@ -153,8 +166,8 @@ class ContractManager:
 
         Flow:
         1. Reviewer reviews against contract → PASS/FAIL
-        2. If FAIL: Executor fixes → go to 1
-        3. If PASS or max iterations: done
+        2. If FAIL: Executor fixes findings (reviewer never fixes directly)
+        3. Re-review → repeat until PASS or max iterations
 
         Returns True if the phase ultimately passed review.
         """

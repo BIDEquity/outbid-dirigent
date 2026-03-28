@@ -3,52 +3,58 @@ name: create-contract
 description: Create acceptance criteria contract for a phase before execution begins
 ---
 
-# Create Phase Contract
+<role>Du erstellst formale Acceptance Criteria Contracts fuer Phasen. Jedes Kriterium muss spezifisch und messbar sein.</role>
 
-## Step 1: Read Phase Details
+<instructions>
+<step id="1">Read `.dirigent/PLAN.json` and find the phase matching the provided phase ID. Understand all its tasks, descriptions, and files they change.</step>
+<step id="2">Read `.dirigent/SPEC.md` for the feature context.</step>
+<step id="3">If `outbid-test-manifest.yaml` exists, read it for available test commands to use as verification methods.</step>
+<step id="4">Create the contract JSON file at `.dirigent/contracts/phase-{PHASE_ID}.json` using the exact schema below.</step>
+</instructions>
 
-Read `.dirigent/PLAN.json` and find the phase matching the provided phase ID. Understand all its tasks, their descriptions, and files they'll change.
+<output file=".dirigent/contracts/phase-{PHASE_ID}.json">
+{
+  "phase_id": "01",
+  "phase_name": "Phase Name",
+  "objective": "One sentence: what this phase achieves",
+  "acceptance_criteria": [
+    {
+      "id": "AC-01-01",
+      "description": "Specific, measurable criterion",
+      "verification": "How to verify (e.g. run command, check file exists, grep for pattern)",
+      "category": "functional"
+    },
+    {
+      "id": "AC-01-02",
+      "description": "Another criterion",
+      "verification": "How to verify",
+      "category": "quality"
+    }
+  ],
+  "quality_gates": [
+    "All new/modified files compile without errors",
+    "No regressions in existing functionality",
+    "Code follows project conventions"
+  ],
+  "out_of_scope": ["What this phase does NOT cover"],
+  "expected_files": [
+    {"path": "src/foo.py", "change": "Add new class"}
+  ]
+}
+</output>
 
-Also read `.dirigent/SPEC.md` for the feature context.
+<rules>
+<rule>Each criterion MUST be specific and measurable — not "code is clean" but "function X returns Y when given Z"</rule>
+<rule>Each criterion MUST have a concrete verification method — a command to run, a file to check, a pattern to grep</rule>
+<rule>Maximum 8 acceptance criteria per phase</rule>
+<rule>Derive criteria from the task descriptions in the phase</rule>
+<rule>Include both functional criteria (category "functional") and quality criteria (category "quality")</rule>
+<rule>If test manifest commands exist, reference them as verification methods</rule>
+<rule>The "id" field MUST follow the pattern AC-{PHASE_ID}-{NN} (e.g. AC-01-01, AC-01-02)</rule>
+<rule>The output MUST be valid JSON matching the schema exactly</rule>
+</rules>
 
-## Step 2: Create the Contract
-
-Write `.dirigent/contracts/phase-{PHASE_ID}-CONTRACT.md`:
-
-```markdown
-# Phase {PHASE_ID} Contract: {PHASE_NAME}
-
-## Objective
-{One sentence: what this phase achieves}
-
-## Acceptance Criteria
-
-1. **[AC-{PHASE_ID}-01]** {Specific, measurable criterion}
-   - Verification: {How to verify}
-2. **[AC-{PHASE_ID}-02]** {Specific, measurable criterion}
-   - Verification: {How to verify}
-
-## Quality Gates
-
-- [ ] All new/modified files compile without errors
-- [ ] No regressions in existing functionality
-- [ ] Code follows project conventions
-- [ ] All CRITICAL review findings from previous iterations resolved
-
-## Out of Scope for This Phase
-
-- {What this phase does NOT cover}
-
-## Files Expected to Change
-
-- `path/to/file` — {what changes}
-```
-
-## Rules
-
-1. Each criterion MUST be specific and measurable (not "code is clean")
-2. Each criterion MUST have a verification method
-3. Maximum 8 acceptance criteria per phase
-4. Derive criteria from the task descriptions
-5. Include both functional and quality criteria
-6. If `outbid-test-manifest.yaml` exists, reference its commands as verification methods
+<constraints>
+<constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
+<constraint>The file path MUST be .dirigent/contracts/phase-{PHASE_ID}.json</constraint>
+</constraints>

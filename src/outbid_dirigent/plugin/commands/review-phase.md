@@ -7,13 +7,8 @@ allowed-tools: Bash, Read, Write, Glob, Grep
 
 Review Phase $ARGUMENTS against its contract.
 
-## Context files to read
+Parse the phase-id (first word), `--commits` (for `git diff HEAD~N`), and `--iteration` from $ARGUMENTS.
 
-1. `.dirigent/contracts/phase-{PHASE_ID}-CONTRACT.md` — the acceptance criteria to check against
-2. `.dirigent/PLAN.json` — phase and task details
+Read the contract from `.dirigent/contracts/phase-{PHASE_ID}.json`. Follow the SKILL.md instructions to write `.dirigent/reviews/phase-{PHASE_ID}.json` — valid JSON only, no markdown.
 
-Parse the phase-id from $ARGUMENTS (first word). Use `--commits` value for `git diff HEAD~N`.
-
-Follow the SKILL.md instructions. Write your review to `.dirigent/reviews/phase-{PHASE_ID}-REVIEW.md`. The review MUST contain a clear `## Contract Verdict: PASS` or `## Contract Verdict: FAIL` line.
-
-**CRITICAL: You are the REVIEWER. Do NOT modify any code. Only read and review.**
+**You are the REVIEWER. Do NOT modify any code. Only read and evaluate.**

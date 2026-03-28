@@ -5,14 +5,10 @@ argument-hint: <phase-id> [--iteration <n>]
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 
-Fix all CRITICAL and WARN findings from the review of Phase $ARGUMENTS.
+Fix all critical and warn findings from the review of Phase $ARGUMENTS.
 
-## Context files to read
+Parse the phase-id (first word) and `--iteration` from $ARGUMENTS.
 
-1. `.dirigent/reviews/phase-{PHASE_ID}-REVIEW.md` — the review findings to fix
+Read the review from `.dirigent/reviews/phase-{PHASE_ID}.json` and the contract from `.dirigent/contracts/phase-{PHASE_ID}.json`. Follow the SKILL.md instructions.
 
-Parse the phase-id from $ARGUMENTS (first word). Parse `--iteration` if present.
-
-Follow the SKILL.md instructions. After fixing, commit with `git add -A && git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"` and write `.dirigent/reviews/phase-{PHASE_ID}-FIXES.md`.
-
-If no CRITICAL/WARN findings exist in the review, do nothing.
+If no critical or warn findings exist, do nothing.

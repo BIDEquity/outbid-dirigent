@@ -383,10 +383,16 @@ LIMIT 30;
         # Contract context (acceptance criteria for current phase)
         phase_pos = plan.task_position(task.id)
         if phase_pos:
-            contract_file = self.dirigent_dir / "contracts" / f"phase-{phase_pos['phase_id']}-CONTRACT.md"
-            if contract_file.exists():
-                contract_text = contract_file.read_text(encoding="utf-8")[:2000]
-                sections.append(f"<phase-contract hint=\"dein Task muss zu diesen Kriterien beitragen\">\n{contract_text}\n</phase-contract>")
+            from outbid_dirigent.contract_schema import Contract
+            contract = Contract.load(
+                self.dirigent_dir / "contracts" / f"phase-{phase_pos['phase_id']}.json"
+            )
+            if contract:
+                sections.append(
+                    f"<phase-contract hint=\"dein Task muss zu diesen Kriterien beitragen\">\n"
+                    f"{contract.summary_for_prompt()}\n"
+                    f"</phase-contract>"
+                )
 
         # Summary format hint (deviation rules are in system prompt)
         sections.append(f"""<output-instructions>

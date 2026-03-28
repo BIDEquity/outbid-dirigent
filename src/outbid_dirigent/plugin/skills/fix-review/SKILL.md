@@ -3,57 +3,25 @@ name: fix-review
 description: Fix issues found during phase review (executor role)
 ---
 
-# Fix Review Findings
+<role>Du bist der EXECUTOR. Der Reviewer hat Findings in `.dirigent/reviews/phase-{PHASE_ID}.json` dokumentiert. Deine Aufgabe: alle critical und warn Findings fixen.</role>
 
-You are the EXECUTOR. The reviewer identified issues. Your job is to fix them.
+<instructions>
+<step id="1">Read `.dirigent/reviews/phase-{PHASE_ID}.json` to get the structured review with findings.</step>
+<step id="2">Read `.dirigent/contracts/phase-{PHASE_ID}.json` to understand which acceptance criteria failed.</step>
+<step id="3">Fix all findings with severity "critical" first, then "warn". Skip "info" unless trivial.</step>
+<step id="4">For each failed acceptance criterion (verdict "fail" in criteria_results), address the root cause noted in the "notes" field.</step>
+<step id="5">Commit: `git add -A &amp;&amp; git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"`</step>
+</instructions>
 
-## Process
+<rules>
+<rule>Fix findings in priority order: critical first, then warn</rule>
+<rule>Each fix must be minimal and focused — do not change more than needed</rule>
+<rule>No new features — only fix what the reviewer found</rule>
+<rule>If no critical or warn findings exist, do nothing</rule>
+<rule>Reference the ac_id when fixing a criterion-related issue</rule>
+</rules>
 
-### Step 1: Read the Review
-
-Read `.dirigent/reviews/phase-{PHASE_ID}-REVIEW.md` for all findings.
-
-### Step 2: Prioritize
-
-1. Fix all **CRITICAL** findings first
-2. Fix all **WARN** findings
-3. **INFO** findings are optional — only fix if trivial
-
-### Step 3: Fix Each Finding
-
-For each finding:
-1. Navigate to the file and line
-2. Understand the issue
-3. Apply a minimal, focused fix
-4. Verify the fix doesn't break anything
-
-### Step 4: Commit
-
-```bash
-git add -A && git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"
-```
-
-### Step 5: Report
-
-Write `.dirigent/reviews/phase-{PHASE_ID}-FIXES.md`:
-
-```markdown
-# Phase {PHASE_ID} Fixes
-
-## Fixed Findings
-
-| # | Original Finding | Fix Applied |
-|---|-----------------|-------------|
-| 1 | ... | ... |
-
-## Skipped Findings
-
-| # | Finding | Reason |
-|---|---------|--------|
-```
-
-## Constraints
-
-- No new features. Only bug fixes.
-- If no CRITICAL/WARN findings exist, do nothing.
-- Each fix must be minimal — don't change more than needed.
+<constraints>
+<constraint>Keine neuen Features einfuehren — nur Fixes</constraint>
+<constraint>Jeder Fix muss direkt auf ein Finding oder failed Criterion zurueckfuehrbar sein</constraint>
+</constraints>
