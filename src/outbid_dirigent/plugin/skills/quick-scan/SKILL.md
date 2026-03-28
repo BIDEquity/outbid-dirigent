@@ -1,36 +1,42 @@
 ---
 name: quick-scan
 description: Quick scan of relevant files for a feature (Hybrid route)
-arguments: none - spec content provided via prompt
 ---
 
 # Quick Scan
 
-Analysiere die Codebase um das Feature zu implementieren. Fokussiere dich NUR auf die relevanten Teile.
+Analyze the codebase to implement the feature described in `.dirigent/SPEC.md`.
 
-## Output
+## Step 1
 
-Erstelle `.dirigent/CONTEXT.md` mit:
+Read `.dirigent/SPEC.md` to understand the feature.
+
+## Step 2
+
+Scan the repo for files relevant to this feature. Focus ONLY on the relevant parts — no full codebase analysis needed.
+
+## Step 3
+
+Write `.dirigent/CONTEXT.md`:
 
 ```markdown
-# Relevante Dateien fuer Feature
+# Relevant Files for Feature
 
-## Hauptdateien
-(Die Dateien die direkt modifiziert werden muessen)
+## Main Files
+(Files that must be directly modified)
 
-## Abhaengigkeiten
-(Dateien die verstanden werden muessen aber nicht geaendert werden)
+## Dependencies
+(Files that must be understood but not changed)
 
 ## Patterns
-(Coding-Patterns die im Projekt verwendet werden)
+(Coding patterns used in the project)
 
 ## Integration Points
-(Wo das neue Feature sich einfuegen muss)
+(Where the new feature fits in)
 ```
 
 ## Constraints
 
-- Fokussiere dich NUR auf die fuer dieses Feature relevanten Teile
-- Keine vollstaendige Codebase-Analyse noetig
-- Identifiziere die minimale Menge an Dateien die verstanden werden muessen
-- Dokumentiere existierende Patterns die das neue Feature befolgen sollte
+- Focus ONLY on feature-relevant parts
+- Identify the minimal set of files that need to be understood
+- Document existing patterns the new feature should follow

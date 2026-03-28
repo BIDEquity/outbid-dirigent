@@ -1,33 +1,39 @@
 ---
 name: create-plan
-description: Create a phased execution plan (PLAN.json) from a spec and repo context
-arguments: none - reads spec from prompt context
+description: Create a phased execution plan (PLAN.json) from spec and repo context
 ---
 
 # Create Execution Plan
 
-Generate a structured execution plan from a feature spec.
+## Step 1: Read Context
 
-## Task
+Read all available context files:
 
-Erstelle einen Ausfuehrungsplan fuer dieses Feature basierend auf der Spec und dem Repo-Kontext.
+1. **Required:** `.dirigent/SPEC.md` — the feature specification
+2. **Optional:** `.dirigent/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
+3. **Optional:** `.dirigent/CONTEXT.md` — relevant file analysis (Hybrid route)
+4. **Optional:** `.dirigent/INIT_REPORT.md` — dev environment bootstrap results
+5. **Optional:** `.dirigent/init-env.json` — e2e framework, ports, services
+6. **Optional:** `outbid-test-manifest.yaml` — test infrastructure and commands
 
-## Output Format
+## Step 2: Analyze the Repo
 
-Erstelle die Datei `.dirigent/PLAN.json` mit diesem Format:
+Explore the repository structure relevant to the feature. Understand:
+- Project language and framework
+- Existing patterns and conventions
+- File organization
+- Available test infrastructure
+
+## Step 3: Create the Plan
+
+Write `.dirigent/PLAN.json` with this exact format:
 
 ```json
 {
   "title": "Feature-Titel",
   "summary": "Kurze Beschreibung was implementiert wird",
-  "assumptions": [
-    "Annahmen die du ueber die Codebase/das Feature machst",
-    "z.B. 'Tests laufen mit pytest', 'API ist REST-basiert'"
-  ],
-  "out_of_scope": [
-    "Was NICHT Teil dieses Plans ist",
-    "z.B. 'Deployment/CI-Pipeline', 'Performance-Optimierung'"
-  ],
+  "assumptions": ["Annahmen ueber die Codebase"],
+  "out_of_scope": ["Was NICHT gemacht wird"],
   "phases": [
     {
       "id": "01",
@@ -38,41 +44,30 @@ Erstelle die Datei `.dirigent/PLAN.json` mit diesem Format:
           "id": "01-01",
           "name": "Task-Name",
           "description": "Detaillierte Beschreibung was zu tun ist",
-          "files_to_create": ["liste/von/neuen/dateien.ext"],
-          "files_to_modify": ["liste/von/existierenden/dateien.ext"],
+          "files_to_create": ["neue/dateien.ext"],
+          "files_to_modify": ["existierende/dateien.ext"],
           "depends_on": [],
-          "model": "sonnet|haiku|opus",
-          "effort": "low|medium|high",
-          "test_level": "L1|L2|"
+          "model": "sonnet",
+          "effort": "medium",
+          "test_level": "L1"
         }
       ]
     }
   ],
-  "estimated_complexity": "low|medium|high",
-  "risks": ["Liste von potentiellen Risiken"]
+  "estimated_complexity": "medium",
+  "risks": ["Potentielle Risiken"]
 }
 ```
 
 ## Rules
 
-1. Maximal 4 Phasen
-2. Maximal 4 Tasks pro Phase
-3. Jeder Task ist atomar (macht genau eine Sache)
-4. Keine Abhaengigkeiten zwischen Tasks innerhalb einer Phase
-5. Tasks muessen konkret und ausfuehrbar sein
-6. Bei Legacy-Migration: Alle Business Rules muessen erhalten bleiben
-7. **model**: Verwende "haiku" fuer einfache Tasks (delete files, add imports, kleine Aenderungen), "sonnet" fuer Standard-Tasks (neue Methoden, Tests, Refactoring), "opus" nur fuer sehr komplexe Architektur-Tasks
-8. **effort**: "low" fuer mechanische Tasks, "medium" fuer Standard, "high" fuer komplexe Logik
-9. **test_level**: "L1" wenn der Task mit Unit Tests/Lint verifiziert werden soll, "L2" wenn Integration Tests noetig sind, leer wenn kein Testing noetig
-10. **assumptions**: Liste alle Annahmen ueber die Codebase auf
-11. **out_of_scope**: Liste explizit auf was NICHT gemacht werden soll
-
-## Process
-
-1. Read and understand the spec thoroughly
-2. Analyze the repo structure relevant to the feature
-3. If business rules context is provided, ensure all rules are covered
-4. If repo context (quick scan) is provided, use it for file targeting
-5. If test manifest is provided, align test_level with available test commands
-6. Create the plan with phases ordered by dependency (foundations first)
-7. Write `.dirigent/PLAN.json`
+1. **Max 4 phases, max 4 tasks per phase**
+2. Each task is atomic (does exactly one thing)
+3. No dependencies between tasks within a phase
+4. Tasks must be concrete and executable
+5. If `BUSINESS_RULES.md` exists: all rules must be preserved
+6. **model**: "haiku" for simple tasks, "sonnet" for standard, "opus" for complex architecture
+7. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic
+8. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed
+9. If `outbid-test-manifest.yaml` exists: only use test commands defined there
+10. If `init-env.json` shows e2e framework: plan e2e test tasks using that framework

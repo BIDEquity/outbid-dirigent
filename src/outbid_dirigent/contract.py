@@ -7,10 +7,12 @@ Before a phase begins:
 3. The reviewer checks against the contract and gives PASS/FAIL
 4. On FAIL, the executor fixes issues
 5. Iterate until PASS or max iterations reached
+
+All prompts use /dirigent: slash commands that the subprocess Claude Code
+resolves natively via the bundled plugin.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 
@@ -36,13 +38,6 @@ class ContractManager:
         self.contracts_dir.mkdir(parents=True, exist_ok=True)
         self.reviews_dir.mkdir(parents=True, exist_ok=True)
 
-    def _load_skill(self, skill_name: str) -> str:
-        """Load a skill's SKILL.md content from the plugin directory."""
-        skill_path = Path(__file__).parent / "plugin" / "skills" / skill_name / "SKILL.md"
-        if skill_path.exists():
-            return skill_path.read_text(encoding="utf-8")
-        return ""
-
     # ══════════════════════════════════════════
     # CONTRACT CREATION
     # ══════════════════════════════════════════
@@ -51,54 +46,15 @@ class ContractManager:
         """Create acceptance criteria contract for a phase before execution."""
         contract_file = self.contracts_dir / f"phase-{phase.id}-CONTRACT.md"
 
-        # Skip if contract already exists
         if contract_file.exists():
             logger.info(f"Contract for phase {phase.id} already exists")
             return True
 
-        skill_content = self._load_skill("create-contract")
+        # Invoke /dirigent:create-contract with phase ID as argument.
+        # The skill reads .dirigent/PLAN.json and .dirigent/SPEC.md from disk.
+        prompt = f"Run /dirigent:create-contract {phase.id}"
 
-        # Build task list for context
-        task_list = "\n".join(
-            f"- **{t.id}**: {t.name} — {t.description}\n"
-            f"  Files to create: {', '.join(t.files_to_create) or 'none'}\n"
-            f"  Files to modify: {', '.join(t.files_to_modify) or 'none'}"
-            for t in phase.tasks
-        )
-
-        prompt = f"""<task>Create an acceptance criteria contract for Phase {phase.id} ("{phase.name}").</task>
-
-<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<phase>
-<id>{phase.id}</id>
-<name>{phase.name}</name>
-<description>{phase.description}</description>
-<tasks>
-{task_list}
-</tasks>
-</phase>
-
-<spec>
-{spec_content[:3000]}
-</spec>
-
-<plan-context>
-Title: {plan.title}
-Total phases: {len(plan.phases)}
-Assumptions: {', '.join(plan.assumptions) if plan.assumptions else 'none'}
-</plan-context>
-
-Create the contract file now at `.dirigent/contracts/phase-{phase.id}-CONTRACT.md`.
-"""
-
-        sys_prompt = "<role>Du erstellst Acceptance Criteria Contracts fuer Phasen. Sei praezise und messbar.</role>"
-
-        success, _, stderr = self.runner._run_claude(
-            prompt, timeout=300, system_prompt=sys_prompt,
-        )
+        success, _, stderr = self.runner._run_claude(prompt, timeout=300)
 
         if success and contract_file.exists():
             logger.info(f"Contract created for phase {phase.id}")
@@ -116,60 +72,18 @@ Create the contract file now at `.dirigent/contracts/phase-{phase.id}-CONTRACT.m
 
         Returns: "pass", "fail", or "error"
         """
-        skill_content = self._load_skill("review-phase")
-        contract_file = self.contracts_dir / f"phase-{phase.id}-CONTRACT.md"
-
-        contract_text = ""
-        if contract_file.exists():
-            contract_text = contract_file.read_text(encoding="utf-8")
-
-        # Count commits for diff range
         commit_count = len(phase.tasks)
-
-        # File list
-        files_modified = []
-        files_created = []
-        for task in phase.tasks:
-            files_modified.extend(task.files_to_modify)
-            files_created.extend(task.files_to_create)
-        all_files = sorted(set(files_modified + files_created))
-        files_list = "\n".join(f"- {f}" for f in all_files) if all_files else "(see git diff)"
-
         review_file = self.reviews_dir / f"phase-{phase.id}-REVIEW.md"
 
-        prompt = f"""<task>Review Phase {phase.id} ("{phase.name}") — Iteration {iteration}/{self.MAX_REVIEW_ITERATIONS}.</task>
+        # Invoke /dirigent:review-phase with phase ID, commit count, and iteration.
+        # The skill reads the contract and runs git diff itself.
+        prompt = f"Run /dirigent:review-phase {phase.id} --commits {commit_count} --iteration {iteration}"
 
-<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<contract>
-{contract_text if contract_text else "No contract found — review based on task descriptions."}
-</contract>
-
-<review-scope>
-<diff-command>git diff HEAD~{commit_count} --stat</diff-command>
-<changed-files>
-{files_list}
-</changed-files>
-</review-scope>
-
-<phase-context>
-Phase {phase.id}: {phase.name}
-Description: {phase.description}
-Tasks: {', '.join(t.name for t in phase.tasks)}
-</phase-context>
-
-Write your review to `.dirigent/reviews/phase-{phase.id}-REVIEW.md`.
-The review MUST contain a clear "## Contract Verdict: PASS" or "## Contract Verdict: FAIL" line.
-"""
-
-        sys_prompt = """<role>Du bist ein Code-Reviewer. Du pruefst Aenderungen gegen den Contract.</role>
-<constraints>
-<constraint>Du bist NUR Reviewer. Aendere KEINEN Code.</constraint>
-<constraint>Dein Verdict muss eindeutig PASS oder FAIL sein.</constraint>
-<constraint>FAIL wenn auch nur ein Acceptance Criterion nicht erfuellt ist.</constraint>
-</constraints>"""
+        sys_prompt = (
+            "You are a code reviewer. You check changes against the contract. "
+            "You are ONLY the reviewer — do NOT change any code. "
+            "Your verdict must be clearly PASS or FAIL."
+        )
 
         success, _, stderr = self.runner._run_claude(
             prompt, timeout=600, system_prompt=sys_prompt,
@@ -202,7 +116,6 @@ The review MUST contain a clear "## Contract Verdict: PASS" or "## Contract Verd
 
         Returns True if fixes were applied successfully.
         """
-        skill_content = self._load_skill("fix-review")
         review_file = self.reviews_dir / f"phase-{phase.id}-REVIEW.md"
 
         if not review_file.exists():
@@ -218,33 +131,11 @@ The review MUST contain a clear "## Contract Verdict: PASS" or "## Contract Verd
             logger.info(f"Phase {phase.id}: no CRITICAL/WARN findings, skipping fix")
             return True
 
-        prompt = f"""<task>Fix review findings for Phase {phase.id} — Iteration {iteration}/{self.MAX_REVIEW_ITERATIONS}.</task>
+        # Invoke /dirigent:fix-review with phase ID and iteration.
+        # The skill reads the review file from disk.
+        prompt = f"Run /dirigent:fix-review {phase.id} --iteration {iteration}"
 
-<skill-instructions>
-{skill_content}
-</skill-instructions>
-
-<review>
-{review_text}
-</review>
-
-<instructions>
-1. Read the review carefully
-2. Fix all CRITICAL findings first, then WARN findings
-3. Commit with: git add -A && git commit -m "fix(phase-{phase.id}): review fixes iteration {iteration}"
-4. Write fixes report to .dirigent/reviews/phase-{phase.id}-FIXES.md
-</instructions>
-"""
-
-        sys_prompt = f"""<role>Du bist der Executor. Fixe die Review-Findings.</role>
-<constraints>
-<constraint>Keine neuen Features — nur Fixes.</constraint>
-<constraint>Jeder Fix muss minimal und fokussiert sein.</constraint>
-</constraints>"""
-
-        success, _, stderr = self.runner._run_claude(
-            prompt, timeout=600, system_prompt=sys_prompt,
-        )
+        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         if success:
             logger.info(f"Phase {phase.id} fixes applied (iteration {iteration})")
@@ -278,7 +169,7 @@ The review MUST contain a clear "## Contract Verdict: PASS" or "## Contract Verd
 
             if verdict == "error":
                 logger.warning(f"Phase {phase.id} review error on iteration {iteration}, continuing")
-                return True  # Non-blocking: don't fail the whole run
+                return True  # Non-blocking
 
             # verdict == "fail"
             if iteration >= self.MAX_REVIEW_ITERATIONS:
@@ -286,12 +177,10 @@ The review MUST contain a clear "## Contract Verdict: PASS" or "## Contract Verd
                     f"Phase {phase.id} failed review after {self.MAX_REVIEW_ITERATIONS} iterations, "
                     f"continuing anyway (non-blocking)"
                 )
-                return True  # Non-blocking but logged
+                return True
 
-            # Executor fixes
             fix_success = self.fix_review_findings(phase, iteration)
             if not fix_success:
                 logger.warning(f"Phase {phase.id} fix failed on iteration {iteration}")
-                # Continue to next review iteration anyway
 
         return True

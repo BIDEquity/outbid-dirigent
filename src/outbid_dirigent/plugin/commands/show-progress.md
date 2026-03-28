@@ -7,60 +7,31 @@ allowed-tools: Bash, Read, Glob
 
 Show the current execution progress of the dirigent run.
 
-## Steps
+## Files to read
 
-1. Read `.dirigent/STATE.json` for progress state
-2. Read `.dirigent/PLAN.json` for the full plan
-3. Read `.dirigent/ROUTE.json` for route info
-4. Check `.dirigent/contracts/` for contract status
-5. Check `.dirigent/reviews/` for review status
+1. `.dirigent/STATE.json` — progress state (completed tasks/phases)
+2. `.dirigent/PLAN.json` — the full plan
+3. `.dirigent/ROUTE.json` — route info
+4. `.dirigent/contracts/` — contract status per phase
+5. `.dirigent/reviews/` — review verdicts per phase
 
-## Output Format
+## Output
 
-### Console (default, or --format console)
+Default format is `console` unless `--format` is specified in $ARGUMENTS.
 
-```
-═══════════════════════════════════════════════════
-  OUTBID DIRIGENT — Progress Report
-═══════════════════════════════════════════════════
+### Console format
 
-  Route: hybrid (3 steps remaining)
-  Plan:  "Feature Title" (3 phases, 9 tasks)
+Use a visual display with progress bars and status icons:
+- Done tasks: checkmark
+- Current task: hammer icon
+- Pending: hourglass
+- Include contract verdict per phase
+- Show summary line: progress percentage, deviations, review results, duration
 
-  Phase 01: Setup Foundation          ████████████ DONE
-    ✅ 01-01  Create base models
-    ✅ 01-02  Setup API routes
-    ✅ 01-03  Add database migration
-    📋 Contract: PASS (3/3 criteria met)
+### Text format
 
-  Phase 02: Implement Logic           ██████░░░░░░ IN PROGRESS
-    ✅ 02-01  Add validation rules
-    🔨 02-02  Implement business logic    ← current
-    ⏳ 02-03  Add error handling
-    📋 Contract: PENDING
+Single-line compact: `Progress: X/Y tasks (Z%), N/M phases | Current: Phase P "name" — Task T "name" | Route: type | Duration: Xm Ys`
 
-  Phase 03: Testing & Polish          ░░░░░░░░░░░░ PENDING
-    ⏳ 03-01  Write unit tests
-    ⏳ 03-02  Add integration tests
-    ⏳ 03-03  Final cleanup
+### JSON format
 
-  ─────────────────────────────────────────────────
-  Progress: 4/9 tasks (44%) | 1/3 phases done
-  Deviations: 2 | Reviews: 1 pass, 0 fail
-  Duration: 12m 34s
-═══════════════════════════════════════════════════
-```
-
-### Text (--format text)
-
-Plain text summary suitable for logs:
-
-```
-Progress: 4/9 tasks (44%), 1/3 phases complete
-Current: Phase 02 "Implement Logic" — Task 02-02 "Implement business logic"
-Route: hybrid | Duration: 12m 34s | Deviations: 2
-```
-
-### JSON (--format json)
-
-Output as structured JSON for programmatic consumption.
+Structured JSON with phases, tasks, statuses, contract verdicts.

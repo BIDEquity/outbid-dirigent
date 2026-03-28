@@ -1,7 +1,7 @@
 {
   "name": "dirigent",
-  "description": "Session recall, data exploration, manifest generation, and orchestration skills for Dirigent subprocesses. Includes plan creation, phase contracts, review/fix cycles, progress reporting, init bootstrapping, and session recall.",
-  "version": "0.3.0",
+  "description": "Orchestration skills for Dirigent subprocesses: plan creation, phase contracts, review/fix cycles, init bootstrapping, progress reporting, and session recall.",
+  "version": "0.4.0",
   "hooks": "./hooks/hooks.json",
   "commands": [
     "./commands/build-manifest.md",
@@ -14,6 +14,8 @@
     "./commands/create-contract.md",
     "./commands/review-phase.md",
     "./commands/fix-review.md",
+    "./commands/extract-business-rules.md",
+    "./commands/quick-scan.md",
     "./commands/run-init.md",
     "./commands/show-progress.md",
     "./commands/show-plan.md"
