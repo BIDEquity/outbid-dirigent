@@ -435,7 +435,7 @@ class Executor:
                     continue
 
                 if self._legacy_logger:
-                    self._legacy_logger.task_start(task.id, task.name, phase=phase.id)
+                    self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id))
 
                 result = self.runner.run_task(task, plan, phase_num=phase.id)
 
@@ -449,8 +449,8 @@ class Executor:
 
                     if self._legacy_logger:
                         for dev in result.deviations:
-                            self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=phase.id)
-                        self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=phase.id)
+                            self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=int(phase.id))
+                        self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=int(phase.id))
                 else:
                     state.setdefault("failed_tasks", []).append({
                         "task_id": task.id,
@@ -1080,7 +1080,7 @@ class Executor:
                 execution_id = questioner.execution_id
                 reporter_token = questioner.reporter_token
 
-        if not portal_url or not execution_id:
+        if not portal_url or not execution_id or not reporter_token:
             logger.debug("No portal credentials available, skipping summary upload")
             return
 
