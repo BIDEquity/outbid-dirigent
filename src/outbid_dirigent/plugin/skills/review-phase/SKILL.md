@@ -8,19 +8,19 @@ description: Review code changes from a completed phase against the contract (re
 <instructions>
 <step id="1">Read the contract from `.dirigent/contracts/phase-{PHASE_ID}.json` to understand the acceptance criteria.</step>
 <step id="2">Run `git diff HEAD~{COMMITS}` to see all changes made during this phase. Examine each changed file.</step>
-<step id="3">For each acceptance criterion in the contract, determine if it is met (pass), not met (fail), or partially met (warn).</step>
+<step id="3">For each acceptance criterion, EXECUTE the verification method described in the criterion. Do NOT judge pass/fail by reading code alone — you MUST run the actual command and record the output as evidence.</step>
 <step id="4">Check for code quality issues: bugs, broken API compatibility, incomplete work, logic errors.</step>
-<step id="5">If `.dirigent/test-harness.json` exists, run the e2e verification steps described below.</step>
-<step id="6">Determine the overall verdict: FAIL if ANY criterion is "fail" OR ANY finding has severity "critical". Otherwise PASS.</step>
+<step id="5">If `.dirigent/test-harness.json` exists, run the MANDATORY e2e verification steps described below. This is NOT optional.</step>
+<step id="6">Determine the overall verdict using the strict rules below.</step>
 <step id="7">Write the review JSON to `.dirigent/reviews/phase-{PHASE_ID}.json` using the exact schema below.</step>
 </instructions>
 
-<e2e-verification hint="Only if .dirigent/test-harness.json exists">
+<e2e-verification hint="MANDATORY when .dirigent/test-harness.json exists">
 <step id="5a">Read `.dirigent/test-harness.json` to get the test harness.</step>
 <step id="5b">Run each health_check command to confirm the environment is alive. If a health check fails, note it as a finding but do not FAIL the review for infrastructure issues.</step>
 <step id="5c">If auth.login_command is set, run it to obtain a token/session. Use it for subsequent requests.</step>
-<step id="5d">Run each verification_command. Check if the result matches the "expected" field. If a verification command fails and it relates to an acceptance criterion, mark that criterion as "fail".</step>
-<step id="5e">If e2e_framework.run_command is set and the framework is configured, run the e2e test suite. Report failures as findings.</step>
+<step id="5d">Run each verification_command. Check if the result matches the "expected" field. If a verification command fails and it relates to an acceptance criterion, mark that criterion as "fail" and include the command output in evidence.</step>
+<step id="5e">If e2e_framework.run_command is set and the framework is configured, run the e2e test suite. Report failures as findings with severity "critical".</step>
 </e2e-verification>
 
 <output file=".dirigent/reviews/phase-{PHASE_ID}.json">
@@ -32,12 +32,28 @@ description: Review code changes from a completed phase against the contract (re
     {
       "ac_id": "AC-01-01",
       "verdict": "pass",
-      "notes": "Criterion met because X"
+      "notes": "Criterion met because X",
+      "evidence": [
+        {
+          "command": "curl -sf http://localhost:3000/api/health",
+          "exit_code": 0,
+          "stdout_snippet": "{\"status\":\"ok\"}",
+          "stderr_snippet": ""
+        }
+      ]
     },
     {
       "ac_id": "AC-01-02",
       "verdict": "fail",
-      "notes": "Not met: expected Y but found Z"
+      "notes": "Not met: expected Y but found Z",
+      "evidence": [
+        {
+          "command": "npx playwright test --grep 'feature'",
+          "exit_code": 1,
+          "stdout_snippet": "1 failed\n  Error: expected 'Dashboard' but got 'Login'",
+          "stderr_snippet": ""
+        }
+      ]
     }
   ],
   "findings": [
@@ -57,11 +73,15 @@ description: Review code changes from a completed phase against the contract (re
 <rule>The "verdict" field MUST be exactly "pass" or "fail" (lowercase)</rule>
 <rule>Verdict is "fail" if ANY criteria_results entry has verdict "fail"</rule>
 <rule>Verdict is "fail" if ANY finding has severity "critical"</rule>
+<rule>Verdict is "fail" if ANY functional criterion has verdict "pass" but EMPTY evidence — you cannot declare pass without proof</rule>
 <rule>Every criteria_results entry MUST reference an ac_id from the contract</rule>
+<rule>Every criteria_results entry MUST include at least one evidence entry with the actual command run and its output — NO exceptions for functional criteria</rule>
 <rule>Every finding MUST reference a specific file and line number</rule>
 <rule>The "iteration" field must match the --iteration argument</rule>
 <rule>The output MUST be valid JSON matching the schema exactly</rule>
-<rule>If e2e verification commands fail, include the command output in the finding notes</rule>
+<rule>If e2e verification commands fail, include the command output in the finding notes AND in the criterion evidence</rule>
+<rule>Unit tests passing alone is NOT sufficient to mark a criterion as "pass" — the verification method in the contract must be executed</rule>
+<rule>If the contract criterion says "Run: <command>" you MUST run that exact command and record the result</rule>
 </rules>
 
 <quality-checklist>
@@ -69,7 +89,7 @@ description: Review code changes from a completed phase against the contract (re
 <check category="API-Kompatibilitaet">Werden bestehende Funktionssignaturen gebrochen?</check>
 <check category="Unvollstaendige-Arbeit">TODOs, auskommentierter Code, fehlende Imports</check>
 <check category="Logik-Fehler">Off-by-one, falsche Vergleiche, fehlende Edge Cases</check>
-<check category="E2e-Verifikation">Verification commands aus test-harness.json ausfuehren und Ergebnisse pruefen</check>
+<check category="E2e-Verifikation">ALLE verification_commands aus test-harness.json ausfuehren — Ergebnisse als evidence aufnehmen</check>
 </quality-checklist>
 
 <constraints>
@@ -77,4 +97,5 @@ description: Review code changes from a completed phase against the contract (re
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
 <constraint>The file path MUST be .dirigent/reviews/phase-{PHASE_ID}.json</constraint>
 <constraint>Infrastructure failures (health check down) are INFO findings, not CRITICAL — don't fail a review because a service is temporarily unavailable</constraint>
+<constraint>A "pass" verdict without evidence for every functional criterion is INVALID — the orchestrator will reject it</constraint>
 </constraints>

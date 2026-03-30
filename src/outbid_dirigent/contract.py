@@ -16,7 +16,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity
+from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict
 from outbid_dirigent.plan_schema import Plan, Phase
 
 
@@ -108,6 +108,18 @@ class ContractManager:
             logger.warning(f"Phase {phase.id} review: output missing or invalid JSON")
             return "error"
 
+        # Reject pass verdicts where functional criteria lack evidence
+        unproven = review.criteria_without_evidence
+        if review.verdict == Verdict.PASS and unproven:
+            logger.warning(
+                f"Phase {phase.id} review claimed PASS but {len(unproven)} criteria "
+                f"lack verification evidence — overriding to FAIL"
+            )
+            for cr in unproven:
+                logger.warning(f"  No evidence: [{cr.ac_id}] {cr.notes[:100]}")
+            review.verdict = Verdict.FAIL
+            review.save(review_path)
+
         # Log structured results
         failed = review.failed_criteria
         critical = review.critical_count
@@ -169,8 +181,11 @@ class ContractManager:
         2. If FAIL: Executor fixes findings (reviewer never fixes directly)
         3. Re-review → repeat until PASS or max iterations
 
-        Returns True if the phase ultimately passed review.
+        Returns True only if the phase actually passed review.
+        Returns False if review failed after all iterations or errored repeatedly.
         """
+        consecutive_errors = 0
+
         for iteration in range(1, self.MAX_REVIEW_ITERATIONS + 1):
             logger.info(f"Phase {phase.id} review iteration {iteration}/{self.MAX_REVIEW_ITERATIONS}")
 
@@ -181,19 +196,29 @@ class ContractManager:
                 return True
 
             if verdict == "error":
-                logger.warning(f"Phase {phase.id} review error on iteration {iteration}, continuing")
-                return True  # Non-blocking
+                consecutive_errors += 1
+                logger.warning(f"Phase {phase.id} review error on iteration {iteration}")
+                if consecutive_errors >= 2:
+                    logger.error(
+                        f"Phase {phase.id} review errored {consecutive_errors} times consecutively — "
+                        f"treating as failure (review infrastructure unreliable)"
+                    )
+                    return False
+                # Single error: retry on next iteration
+                continue
 
-            # verdict == "fail"
+            # verdict == "fail" — reset error counter since review worked
+            consecutive_errors = 0
+
             if iteration >= self.MAX_REVIEW_ITERATIONS:
-                logger.warning(
-                    f"Phase {phase.id} failed review after {self.MAX_REVIEW_ITERATIONS} iterations, "
-                    f"continuing anyway (non-blocking)"
+                logger.error(
+                    f"Phase {phase.id} FAILED review after {self.MAX_REVIEW_ITERATIONS} iterations — "
+                    f"blocking further execution"
                 )
-                return True
+                return False
 
             fix_success = self.fix_review_findings(phase, iteration)
             if not fix_success:
                 logger.warning(f"Phase {phase.id} fix failed on iteration {iteration}")
 
-        return True
+        return False

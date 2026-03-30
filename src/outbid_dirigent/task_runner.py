@@ -393,6 +393,17 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
         return "\n".join(sections)
 
+    # ── System prompt for coding agent ──
+
+    AGENT_SYSTEM_PROMPT = (
+        "You are the long-term maintainer of this codebase. "
+        "Every line you write, you will read again. Every shortcut you take, you will debug later. "
+        "Write scalable, maintainable code: clear interfaces, separation of concerns, "
+        "dependency injection, no implicit state, test-friendly by construction. "
+        "The reviewer will execute real verification commands against your code — "
+        "it must actually work end-to-end, not just compile."
+    )
+
     # ── Task execution ──
 
     def run_task(self, task: Task, plan: Plan, phase_num: int | str = 1) -> TaskResult:
@@ -415,6 +426,7 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
             success, stdout, stderr = self._run_claude(
                 prompt, model=task_model, effort=task_effort,
+                system_prompt=self.AGENT_SYSTEM_PROMPT,
             )
 
             if success:
