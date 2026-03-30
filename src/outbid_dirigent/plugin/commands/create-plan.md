@@ -1,17 +1,10 @@
 ---
 name: create-plan
 description: Create a phased execution plan (PLAN.json) from spec and repo context
-argument-hint: (no arguments needed)
-allowed-tools: Bash, Read, Write, Glob, Grep
+argument-hint: [<description>] [--yolo]
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
 ---
 
-Create an execution plan for the feature described in `.dirigent/SPEC.md`.
+Create an execution plan. If `.dirigent/SPEC.md` exists, use it. Otherwise, use `$ARGUMENTS` as the feature description and generate a short spec first (asking max 2-3 clarifying questions, or zero with `--yolo`).
 
-## Context files to read
-
-1. `.dirigent/SPEC.md` — the feature spec (REQUIRED)
-2. `.dirigent/BUSINESS_RULES.md` — business rules to preserve (if exists, Legacy route)
-3. `.dirigent/CONTEXT.md` — relevant repo context (if exists, Hybrid route)
-4. `.dirigent/test-harness.json` — e2e test harness (if exists)
-
-Read all available context files first, then follow the SKILL.md instructions to create `.dirigent/PLAN.json`.
+Follow the SKILL.md instructions.
