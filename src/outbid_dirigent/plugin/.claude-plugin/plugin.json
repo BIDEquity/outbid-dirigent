@@ -22,6 +22,7 @@
     "./commands/build-manifest.md",
     "./commands/validate-manifest.md",
     "./commands/entropy-minimization.md",
-    "./commands/generate-architecture.md"
+    "./commands/generate-architecture.md",
+    "./commands/generate-spec.md"
   ]
 }
