@@ -68,3 +68,5 @@ Write `.dirigent/PLAN.json` with this exact format:
 7. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic
 8. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed
 9. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command. The reviewer will use these to verify features end-to-end.
+10. **Plan for maintainability** — the agent executing these tasks is the long-term maintainer of the codebase. Task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies. Do not plan throwaway code.
+11. **Plan for real verification** — each phase will be reviewed with executable verification commands. Do not plan tasks that "work" only in the sense that they compile. The reviewer will hit real endpoints and run real test suites.

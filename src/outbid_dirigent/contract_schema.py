@@ -139,11 +139,23 @@ class Contract(BaseModel):
 # REVIEW SCHEMA
 # ══════════════════════════════════════════
 
+class VerificationEvidence(BaseModel):
+    """Proof that a verification command was actually executed."""
+    command: str = Field(..., description="The command that was run")
+    exit_code: int = Field(..., description="Exit code of the command")
+    stdout_snippet: str = Field("", description="First 500 chars of stdout")
+    stderr_snippet: str = Field("", description="First 500 chars of stderr")
+
+
 class CriterionResult(BaseModel):
     """Evaluation of a single acceptance criterion."""
     ac_id: str = Field(..., description="References AcceptanceCriterion.id")
     verdict: CriterionVerdict
     notes: str = ""
+    evidence: list[VerificationEvidence] = Field(
+        default_factory=list,
+        description="Commands run to verify this criterion. Required for functional criteria.",
+    )
 
 
 class Finding(BaseModel):
@@ -179,6 +191,14 @@ class Review(BaseModel):
     @property
     def passed_criteria(self) -> list[CriterionResult]:
         return [r for r in self.criteria_results if r.verdict == CriterionVerdict.PASS]
+
+    @property
+    def criteria_without_evidence(self) -> list[CriterionResult]:
+        """Criteria marked as pass but with no verification evidence."""
+        return [
+            r for r in self.criteria_results
+            if r.verdict == CriterionVerdict.PASS and not r.evidence
+        ]
 
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)

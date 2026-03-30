@@ -465,8 +465,22 @@ class Executor:
                         self._legacy_logger.run_complete(success=False)
                     return False
 
-            # Phase review — code review + fix cycle
-            self._review_phase(phase, plan)
+            # Phase review — code review + fix cycle (blocks on failure)
+            review_passed = self._review_phase(phase, plan)
+            if not review_passed:
+                state.setdefault("failed_phases", []).append({
+                    "phase_id": phase.id,
+                    "reason": "review_failed",
+                })
+                save_state(str(self.repo_path), state)
+                logger.error(
+                    f"Phase {phase.id} review failed — halting execution. "
+                    f"Fix issues and --resume to retry."
+                )
+                if self._legacy_logger:
+                    self._legacy_logger.stop(f"Phase {phase.id} review failed")
+                    self._legacy_logger.run_complete(success=False)
+                return False
 
             # Phase complete
             state.setdefault("completed_phases", []).append(phase.id)
@@ -503,17 +517,19 @@ class Executor:
         """Create acceptance criteria contract before a phase begins."""
         return self.contract_manager.create_contract(phase, plan, self.spec_content)
 
-    def _review_phase(self, phase, plan: Plan):
+    def _review_phase(self, phase, plan: Plan) -> bool:
         """Run the contract-based review/fix iteration loop.
 
         Flow:
         1. Reviewer reviews changes against the phase contract → PASS/FAIL
         2. If FAIL: Executor fixes the findings (reviewer never fixes directly)
         3. Re-review until PASS or max iterations reached
+
+        Returns True if passed, False if failed. Failure blocks execution.
         """
         commit_count = len(phase.tasks)
         if commit_count == 0:
-            return
+            return True
 
         logger.info(f"Phase {phase.id} review: contract-based review/fix loop")
         passed = self.contract_manager.review_fix_loop(phase, plan)
@@ -521,19 +537,24 @@ class Executor:
         # Log progress after review
         self.log_progress("text")
 
-        if passed:
-            from outbid_dirigent.contract_schema import Review
-            review = Review.load(self.dirigent_dir / "reviews" / f"phase-{phase.id}.json")
-            if review:
-                logger.info(
-                    f"Phase {phase.id} review: {review.verdict.value.upper()} "
-                    f"({review.critical_count} critical, {review.warn_count} warnings, "
-                    f"{len(review.criteria_results)} criteria evaluated)"
-                )
-            else:
-                logger.info(f"Phase {phase.id} review: no structured review created")
+        from outbid_dirigent.contract_schema import Review
+        review = Review.load(self.dirigent_dir / "reviews" / f"phase-{phase.id}.json")
+
+        if passed and review:
+            logger.info(
+                f"Phase {phase.id} review: {review.verdict.value.upper()} "
+                f"({review.critical_count} critical, {review.warn_count} warnings, "
+                f"{len(review.criteria_results)} criteria evaluated)"
+            )
+        elif passed:
+            logger.info(f"Phase {phase.id} review: no structured review created")
         else:
-            logger.warning(f"Phase {phase.id} review did not pass (non-blocking)")
+            logger.error(f"Phase {phase.id} review FAILED — blocking execution")
+            if review:
+                for cr in review.failed_criteria:
+                    logger.error(f"  FAIL [{cr.ac_id}]: {cr.notes[:200]}")
+
+        return passed
 
     # ══════════════════════════════════════════
     # TEST STEP
