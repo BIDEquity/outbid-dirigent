@@ -73,9 +73,9 @@ description: Review code changes from a completed phase against the contract (re
 <rule>The "verdict" field MUST be exactly "pass" or "fail" (lowercase)</rule>
 <rule>Verdict is "fail" if ANY criteria_results entry has verdict "fail"</rule>
 <rule>Verdict is "fail" if ANY finding has severity "critical"</rule>
-<rule>Verdict is "fail" if ANY functional criterion has verdict "pass" but EMPTY evidence — you cannot declare pass without proof</rule>
+<rule>Verdict is "fail" if ANY behavioral or boundary criterion has verdict "pass" but EMPTY evidence — you cannot declare pass without proof</rule>
 <rule>Every criteria_results entry MUST reference an ac_id from the contract</rule>
-<rule>Every criteria_results entry MUST include at least one evidence entry with the actual command run and its output — NO exceptions for functional criteria</rule>
+<rule>Every behavioral/boundary criteria_results entry MUST include at least one evidence entry with the actual command run and its output — structural criteria may pass without evidence</rule>
 <rule>Every finding MUST reference a specific file and line number</rule>
 <rule>The "iteration" field must match the --iteration argument</rule>
 <rule>The output MUST be valid JSON matching the schema exactly</rule>
@@ -97,5 +97,5 @@ description: Review code changes from a completed phase against the contract (re
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
 <constraint>The file path MUST be .dirigent/reviews/phase-{PHASE_ID}.json</constraint>
 <constraint>Infrastructure failures (health check down) are INFO findings, not CRITICAL — don't fail a review because a service is temporarily unavailable</constraint>
-<constraint>A "pass" verdict without evidence for every functional criterion is INVALID — the orchestrator will reject it</constraint>
+<constraint>A "pass" verdict without evidence for behavioral/boundary criteria is INVALID — the orchestrator will reject it. Structural criteria may pass based on build/lint results alone.</constraint>
 </constraints>

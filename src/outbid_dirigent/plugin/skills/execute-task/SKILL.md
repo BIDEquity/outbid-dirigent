@@ -53,11 +53,20 @@ Use these only when genuinely blocked, not routinely:
    - Deviations (if any)
    - Next steps (if relevant)
 
+## Contract Awareness
+
+Before starting implementation, read `.dirigent/contracts/phase-{PHASE_ID}.json` if it exists. Each acceptance criterion has:
+- `layer`: structural, behavioral, or boundary
+- `verification`: the exact command the REVIEWER will run to check your work
+
+**Your code must pass these verification commands.** The reviewer will execute them literally — `curl` endpoints, check HTTP status codes, verify response bodies. If a behavioral criterion says "GET /api/users returns users with id and email fields", your endpoint must actually return that.
+
+If any criterion seems unverifiable or contradicts the task description, note it in your summary as `DEVIATION: Contract-Concern — [explanation]`.
+
 ## Constraints
 
 - No questions. No waiting. Work through it and commit.
 - Stick to the task description. Do not add unrelated features.
 - Respect files_to_create and files_to_modify lists.
-- If a phase contract exists at `.dirigent/contracts/phase-{PHASE_ID}.json`, your work must contribute to meeting those acceptance criteria. The reviewer will execute the verification commands — your code must actually pass them.
 - If business rules exist at `.dirigent/BUSINESS_RULES.md`, they MUST be preserved.
 - Do not write throwaway code. Every function you write will be called by the next task. Every pattern you establish will be followed by the next developer. Build it right.
