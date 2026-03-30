@@ -21,6 +21,7 @@
     "./commands/add-posthog.md",
     "./commands/build-manifest.md",
     "./commands/validate-manifest.md",
-    "./commands/entropy-minimization.md"
+    "./commands/entropy-minimization.md",
+    "./commands/generate-architecture.md"
   ]
 }

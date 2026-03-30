@@ -252,6 +252,16 @@ class InitPhase:
 
         if harness is None:
             logger.warning("No test harness produced — reviewer will only do static analysis")
+
+        # Step 3b: Generate ARCHITECTURE.md if it doesn't exist
+        arch_path = self.repo_path / "ARCHITECTURE.md"
+        if not arch_path.exists() and self.runner:
+            logger.info("No ARCHITECTURE.md found — generating one")
+            self.runner._run_claude("Run /dirigent:generate-architecture", timeout=600)
+        elif arch_path.exists():
+            logger.info("ARCHITECTURE.md exists — skipping generation")
+
+        if harness is None:
             return True
 
         # Step 4: Wait for health checks
