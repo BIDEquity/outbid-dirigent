@@ -240,6 +240,36 @@ class Executor:
         return False
 
     # ══════════════════════════════════════════
+    # ENTROPY MINIMIZATION (All Routes)
+    # ══════════════════════════════════════════
+
+    def entropy_minimization(self) -> bool:
+        """Run entropy minimization to align docs, remove dead code, resolve contradictions."""
+        logger.info("Running entropy minimization...")
+        prompt = "Run /dirigent:entropy-minimization"
+        success, stdout, stderr = self.runner._run_claude(prompt, timeout=900)
+
+        if not success:
+            logger.error(f"Entropy minimization failed: {stderr[:200]}")
+            return False
+
+        report_file = self.dirigent_dir / "entropy-report.json"
+        if report_file.exists():
+            import json as _json
+            try:
+                report = _json.loads(report_file.read_text(encoding="utf-8"))
+                fixed = report.get("issues_fixed", 0)
+                remaining = report.get("issues_remaining", 0)
+                logger.info(f"Entropy minimization: {fixed} issues fixed, {remaining} remaining")
+            except Exception:
+                pass
+            return True
+
+        # No report file is OK — the agent may have found nothing to fix
+        logger.info("Entropy minimization complete (no report generated — repo may be clean)")
+        return True
+
+    # ══════════════════════════════════════════
     # BUSINESS RULE EXTRACTION (Legacy Route)
     # ══════════════════════════════════════════
 

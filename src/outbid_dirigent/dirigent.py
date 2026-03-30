@@ -297,6 +297,13 @@ def run_execution(
             if reporter:
                 reporter.stage_complete("execution", "Ausführung abgeschlossen" if success else "Ausführung fehlgeschlagen")
 
+        elif step.step_type == StepType.ENTROPY_MINIMIZATION:
+            if reporter:
+                reporter.stage_start("entropy_minimization", "Align docs, remove dead code, resolve contradictions")
+            success = executor.entropy_minimization()
+            if reporter:
+                reporter.stage_complete("entropy_minimization", "Entropy minimization abgeschlossen" if success else "Entropy minimization fehlgeschlagen")
+
         elif step.step_type == StepType.TEST:
             if reporter:
                 reporter.stage_start("testing", "Führe Test-Suite aus")
