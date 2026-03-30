@@ -1,0 +1,15 @@
+Add a step to the dirigent. After finishing. Called "Entropy minimization". Its purpose is to align code and docs. As it stands today, agents write barely acceptable code and do nothing to reduce the entropy in your repository. What happens is that they change function X to have behavior B instead of behavior A, but all documentation still references behavior A. Your agent is not going to fix that for you.
+Repeat this 100 times and you end up with an unmaintainable repository where your agent is constantly confused and making poor decisions.
+The best way to overcome this is to allocate tokens for an agent with a fresh context, after every long-running session, to clean up state, resolve contradictions, handle merge conflicts, remove dead code and stale documentation, and so on.
+
+---
+
+lets do it the following way: you try to run this step yourself and see what you learn from that to design the agent. So: 1. do entropy minimization. 2. write the entropy minimization agent.
+
+---
+
+go on
+
+---
+
+does the entropy min step also commit? like the other steps?
