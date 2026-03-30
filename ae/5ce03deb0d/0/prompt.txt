@@ -3,3 +3,7 @@ allow input for the skills that would normally expect the SPEC.md . SEPC.md shou
 ---
 
 allow input for the skills that would normally expect the SPEC.md . SEPC.md should have Vorrang but if it is not present let the user describe what he wants and then let the skill write a short SPEC.md asking max 2-3 questions. add a --yolo flag to skip questions and let claude use best estimate for the spec while still looking for well-known files for context (ARCHITECTURE.md for example). DO NOT add dirigent feature flags, add the argumewnt to the plan skill frontmatter and adapt the skill to create the spec. this should not impact dirignt cli workflow!
+
+---
+
+bump version
