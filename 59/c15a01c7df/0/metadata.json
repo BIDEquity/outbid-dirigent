@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "59c15a01c7df",
+  "session_id": "84022ca8-f90c-42c0-9c5c-538ddd82343c",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-30T08:22:13.548173Z",
+  "branch": "claude/dirigent-refactor-AwjPf",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/commands/generate-architecture.md",
+    "src/outbid_dirigent/plugin/skills/generate-architecture/SKILL.md",
+    "src/outbid_dirigent/plugin/.claude-plugin/plugin.json",
+    "src/outbid_dirigent/init_phase.py",
+    "ARCHITECTURE.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "4250f0bf5ecc",
+  "checkpoint_transcript_start": 290,
+  "transcript_lines_at_start": 290,
+  "token_usage": {
+    "input_tokens": 17,
+    "cache_creation_tokens": 10916,
+    "cache_read_tokens": 1984260,
+    "output_tokens": 5262,
+    "api_call_count": 17
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-30T08:22:13.136313Z",
+    "agent_lines": 269,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 269,
+    "agent_percentage": 100
+  }
+}
