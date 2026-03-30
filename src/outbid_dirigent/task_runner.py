@@ -115,9 +115,12 @@ class TaskRunner:
         if system_prompt:
             cmd.extend(["--append-system-prompt", system_prompt])
 
-        # Inject bundled plugin for session recall skills
+        # Inject bundled plugin — but only if not already installed via marketplace.
+        # Claude Code errors on duplicate plugins when both --plugin-dir and a
+        # marketplace-installed copy of the same plugin are present.
         plugin_dir = Path(__file__).parent / "plugin"
-        if plugin_dir.exists():
+        marketplace_cache = Path.home() / ".claude" / "plugins" / "cache" / "outbid-dirigent"
+        if plugin_dir.exists() and not marketplace_cache.exists():
             cmd.extend(["--plugin-dir", str(plugin_dir)])
 
         cmd.extend(["-p", prompt])
