@@ -55,6 +55,8 @@ sequenceDiagram
         alt INIT
             Executor->>CC: run init.sh / seed data
             CC-->>Executor: test-harness.json
+            Executor->>CC: /dirigent:generate-architecture
+            CC-->>Executor: ARCHITECTURE.md
         else PLANNING
             Executor->>Planner: create_plan()
             Planner->>CC: /dirigent:create-plan
@@ -334,7 +336,7 @@ stateDiagram-v2
 | **Proteus** | Deep domain extraction (5-phase) | Optional |
 | **Docker** | Service orchestration for tests | Optional |
 
-## Plugin Skills (19 skills, 18 commands)
+## Plugin Skills (20 skills, 19 commands)
 
 The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during execution:
 
@@ -358,6 +360,7 @@ The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during
 | `/dirigent:find-errors` | Recovery | Surface errors from sessions |
 | `/dirigent:search-memories` | Research | Search previous session logs |
 | `/dirigent:query-data` | Research | Run DuckDB queries on data files |
+| `/dirigent:generate-architecture` | InitPhase | Generate ARCHITECTURE.md for the target repo |
 | `/dirigent:entropy-minimization` | Executor (all routes) | Align docs, remove dead code, resolve contradictions |
 
 ## Key Design Decisions
