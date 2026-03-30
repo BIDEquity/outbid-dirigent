@@ -18,9 +18,10 @@ from pydantic import BaseModel, Field
 # ENUMS
 # ══════════════════════════════════════════
 
-class CriterionCategory(str, Enum):
-    FUNCTIONAL = "functional"
-    QUALITY = "quality"
+class CriterionLayer(str, Enum):
+    STRUCTURAL = "structural"   # File exists, compiles, router registered
+    BEHAVIORAL = "behavioral"   # Feature works: HTTP calls, auth, data persistence
+    BOUNDARY = "boundary"       # Edge cases: error paths, malformed input, duplicates
 
 
 class CriterionVerdict(str, Enum):
@@ -48,8 +49,8 @@ class AcceptanceCriterion(BaseModel):
     """A single measurable acceptance criterion."""
     id: str = Field(..., description="Unique ID like AC-01-01")
     description: str = Field(..., description="What must be true")
-    verification: str = Field(..., description="How to verify this criterion is met")
-    category: CriterionCategory = CriterionCategory.FUNCTIONAL
+    verification: str = Field(..., description="Executable command to verify (Run: ...)")
+    layer: CriterionLayer = CriterionLayer.BEHAVIORAL
 
 
 class ExpectedFileChange(BaseModel):
@@ -89,7 +90,16 @@ class Contract(BaseModel):
         if not path.exists():
             return None
         try:
-            return cls.model_validate_json(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            # Backward compat: map old category field to new layer field
+            for criterion in raw.get("acceptance_criteria", []):
+                if "category" in criterion and "layer" not in criterion:
+                    category = criterion.pop("category")
+                    criterion["layer"] = {
+                        "functional": "behavioral",
+                        "quality": "structural",
+                    }.get(category, "behavioral")
+            return cls.model_validate(raw)
         except Exception:
             return None
 
@@ -102,15 +112,21 @@ class Contract(BaseModel):
   "acceptance_criteria": [
     {
       "id": "AC-01-01",
-      "description": "Specific, measurable criterion",
-      "verification": "How to verify (e.g. run command, check file exists)",
-      "category": "functional"
+      "description": "Project compiles without errors",
+      "verification": "Run: npm run build",
+      "layer": "structural"
     },
     {
       "id": "AC-01-02",
-      "description": "Another criterion",
-      "verification": "How to verify",
-      "category": "quality"
+      "description": "GET /api/users returns list of users with correct schema",
+      "verification": "Run: curl -sf http://localhost:3000/api/users -H 'Authorization: Bearer $TOKEN' | jq '.[] | keys'",
+      "layer": "behavioral"
+    },
+    {
+      "id": "AC-01-03",
+      "description": "Unauthorized request returns 403",
+      "verification": "Run: curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/users",
+      "layer": "boundary"
     }
   ],
   "quality_gates": [
@@ -125,9 +141,11 @@ class Contract(BaseModel):
 }"""
 
     def summary_for_prompt(self) -> str:
-        """Compact summary for injection into task prompts."""
+        """Compact summary for injection into task prompts — includes verification commands."""
         criteria = "\n".join(
-            f"  - [{c.id}] {c.description}" for c in self.acceptance_criteria
+            f"  - [{c.id}] ({c.layer.value}) {c.description}\n"
+            f"    Verify: {c.verification}"
+            for c in self.acceptance_criteria
         )
         return (
             f"Phase {self.phase_id} Contract: {self.objective}\n"

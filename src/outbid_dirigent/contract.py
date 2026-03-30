@@ -16,7 +16,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict
+import re
+
+from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict, CriterionLayer
 from outbid_dirigent.plan_schema import Plan, Phase
 
 
@@ -68,6 +70,9 @@ class ContractManager:
             logger.error(f"Contract for phase {phase.id} was not created or is invalid JSON")
             return False
 
+        # Soft validation: warn about weak contracts
+        self._validate_contract_quality(contract)
+
         logger.info(
             f"Contract created for phase {phase.id}: "
             f"{len(contract.acceptance_criteria)} criteria, "
@@ -78,6 +83,48 @@ class ContractManager:
     def load_contract(self, phase_id: str) -> Contract | None:
         """Load and validate a phase contract."""
         return Contract.load(self._contract_path(phase_id))
+
+    # Patterns that indicate structural checks masquerading as behavioral criteria
+    _GREP_PATTERNS = re.compile(
+        r"\b(grep|rg|ag|ack)\b|"          # source code search
+        r"\b(cat|head|tail)\s+\S+\.(py|ts|js|tsx|jsx|go|rs|java)\b|"  # reading source files
+        r"\btest\s+-[fed]\b|"              # file existence checks
+        r"\[\s*-[fed]\s+",                 # [ -f file ] checks
+    )
+
+    def _validate_contract_quality(self, contract: Contract):
+        """Soft validation: warn about weak contract patterns. Never blocks."""
+        criteria = contract.acceptance_criteria
+        behavioral = [c for c in criteria if c.layer == CriterionLayer.BEHAVIORAL]
+        boundary = [c for c in criteria if c.layer == CriterionLayer.BOUNDARY]
+
+        total = len(criteria)
+        behavioral_ratio = len(behavioral) / total if total else 0
+
+        if not behavioral:
+            logger.warning(
+                f"Contract {contract.phase_id}: NO behavioral criteria — "
+                f"contract tests structure, not user-facing behavior"
+            )
+        elif behavioral_ratio < 0.5:
+            logger.warning(
+                f"Contract {contract.phase_id}: only {len(behavioral)}/{total} criteria "
+                f"are behavioral ({behavioral_ratio:.0%}) — should be >= 50%"
+            )
+
+        if not boundary:
+            logger.warning(
+                f"Contract {contract.phase_id}: no boundary criteria — "
+                f"error paths and edge cases are untested"
+            )
+
+        # Check for grep-based verification in behavioral/boundary criteria
+        for c in behavioral + boundary:
+            if self._GREP_PATTERNS.search(c.verification):
+                logger.warning(
+                    f"Contract {contract.phase_id} [{c.id}]: behavioral/boundary criterion "
+                    f"uses structural verification pattern: {c.verification[:80]}..."
+                )
 
     # ══════════════════════════════════════════
     # REVIEW (reviewer role)
