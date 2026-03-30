@@ -61,17 +61,23 @@
 ## Quick Start
 
 ```bash
-# Full autonomous run
+# Full autonomous run with existing spec
 dirigent --spec .planning/SPEC.md --repo /path/to/repo
+
+# Inline description — generates SPEC.md, asks 2-3 questions
+dirigent --repo . "Add a dark mode toggle to the settings page"
+
+# YOLO mode — no questions, best-effort spec from description + context
+dirigent --repo . --yolo "Add a dark mode toggle"
+
+# Auto-detect spec (searches .planning/SPEC.md, SPEC.md, .dirigent/SPEC.md)
+dirigent --repo /path/to/repo
 
 # With deep domain extraction (recommended for legacy migrations)
 dirigent --spec .planning/SPEC.md --repo /path/to/repo --use-proteus
 
 # Resume after interruption
 dirigent --spec .planning/SPEC.md --repo /path/to/repo --resume
-
-# Dry run (no changes)
-dirigent --spec .planning/SPEC.md --repo /path/to/repo --dry-run
 ```
 
 ## Installation
@@ -345,8 +351,10 @@ dirigent --spec <path> --repo <path> [options]
 
 | Flag | Description |
 |---|---|
-| `--spec` | Path to the SPEC.md file (required) |
+| `description` | Inline spec description (positional, alternative to `--spec`) |
+| `--spec` | Path to SPEC.md (auto-detected if omitted) |
 | `--repo` | Path to the target repository (required) |
+| `--yolo` | Skip questions — generate spec from description + repo context |
 | `--phase` | Run specific phase: `analyze`, `execute`, `ship`, or `all` (default: `all`) |
 | `--use-proteus` | Enable Proteus deep domain extraction |
 | `--resume` | Resume interrupted execution |

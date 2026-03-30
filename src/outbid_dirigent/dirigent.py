@@ -12,8 +12,10 @@ Kein Mensch in der Loop. Kein interaktives Terminal. Kein Warten auf Input.
 """
 
 import argparse
+import json
 import sys
 import os
+import tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -85,6 +87,143 @@ def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
         return False
 
     return True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPEC RESOLUTION — Priority: file > inline description > interactive > yolo
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _gather_repo_context(repo_path: Path) -> str:
+    """Collect well-known context files from the repo for spec generation."""
+    context_parts = []
+    context_files = [
+        ("ARCHITECTURE.md", "Architecture"),
+        ("README.md", "README"),
+        ("CLAUDE.md", "CLAUDE.md"),
+        (".claude/CLAUDE.md", "CLAUDE.md (project)"),
+    ]
+    for filename, label in context_files:
+        filepath = repo_path / filename
+        if filepath.exists():
+            content = filepath.read_text(encoding="utf-8")[:5000]
+            context_parts.append(f"### {label}\n\n{content}")
+
+    return "\n\n---\n\n".join(context_parts) if context_parts else ""
+
+
+def _write_spec_from_description(repo_path: Path, description: str, context: str) -> Path:
+    """Write a minimal SPEC.md from a user description + repo context."""
+    dirigent_dir = repo_path / ".dirigent"
+    dirigent_dir.mkdir(parents=True, exist_ok=True)
+    spec_path = dirigent_dir / "SPEC.md"
+
+    spec_content = f"# Spec\n\n{description}\n"
+    if context:
+        spec_content += f"\n---\n\n## Repo Context (auto-gathered)\n\n{context}\n"
+
+    spec_path.write_text(spec_content, encoding="utf-8")
+    return spec_path
+
+
+def _generate_spec_interactive(repo_path: Path, description: str) -> Path:
+    """Use Claude Code subprocess to generate a spec interactively (max 2-3 questions)."""
+    from outbid_dirigent.task_runner import TaskRunner
+
+    dirigent_dir = repo_path / ".dirigent"
+    dirigent_dir.mkdir(parents=True, exist_ok=True)
+
+    context = _gather_repo_context(repo_path)
+
+    # Write a seed file with what we know so the skill can read it
+    seed = {
+        "user_description": description,
+        "repo_context": context[:8000],
+    }
+    seed_path = dirigent_dir / "spec-seed.json"
+    seed_path.write_text(json.dumps(seed, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    runner = TaskRunner(str(repo_path), str(dirigent_dir / "SPEC.md"))
+    success, _, stderr = runner._run_claude(
+        "Run /dirigent:generate-spec",
+        timeout=300,
+    )
+
+    spec_path = dirigent_dir / "SPEC.md"
+    if spec_path.exists() and spec_path.stat().st_size > 0:
+        return spec_path
+
+    # Fallback: write a minimal spec from the description
+    print("⚠️  Spec generation via Claude failed — using description as-is", file=sys.stderr)
+    return _write_spec_from_description(repo_path, description, context)
+
+
+def _generate_spec_yolo(repo_path: Path, description: str) -> Path:
+    """Generate a spec without any questions — best-effort from description + context."""
+    context = _gather_repo_context(repo_path)
+    return _write_spec_from_description(repo_path, description, context)
+
+
+def resolve_spec(args, repo_path: Path) -> Path:
+    """Resolve the spec from multiple sources.
+
+    Priority:
+    1. --spec flag pointing to an existing file
+    2. Inline description (positional args)
+    3. stdin (--spec - or --spec .)
+    4. Well-known locations (.planning/SPEC.md, SPEC.md)
+
+    If no spec file is found, either generate interactively or yolo.
+    """
+    # 1. Explicit --spec file
+    if args.spec and args.spec not in ("-", "."):
+        spec_path = Path(args.spec).resolve()
+        if spec_path.exists():
+            return spec_path
+        print(f"❌ SPEC nicht gefunden: {spec_path}", file=sys.stderr)
+        sys.exit(1)
+
+    # 2. stdin
+    if args.spec in ("-", "."):
+        stdin_content = sys.stdin.read()
+        if not stdin_content.strip():
+            print("❌ Keine Spec-Daten auf stdin empfangen", file=sys.stderr)
+            sys.exit(1)
+        dirigent_dir = repo_path / ".dirigent"
+        dirigent_dir.mkdir(parents=True, exist_ok=True)
+        spec_tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", prefix="spec-", dir=dirigent_dir,
+            delete=False, encoding="utf-8",
+        )
+        spec_tmp.write(stdin_content)
+        spec_tmp.close()
+        return Path(spec_tmp.name)
+
+    # 3. Inline description from positional args
+    description = " ".join(args.description) if args.description else ""
+
+    # 4. Well-known spec locations (only if no inline description)
+    if not description:
+        for candidate in [".planning/SPEC.md", "SPEC.md", ".dirigent/SPEC.md"]:
+            candidate_path = repo_path / candidate
+            if candidate_path.exists():
+                print(f"📄 Spec gefunden: {candidate_path}", file=sys.stderr)
+                return candidate_path
+
+    # 5. No spec found and no description — error
+    if not description:
+        print("❌ Kein Spec gefunden. Entweder:", file=sys.stderr)
+        print("   dirigent --repo . --spec path/to/SPEC.md", file=sys.stderr)
+        print("   dirigent --repo . \"Add a dark mode toggle\"", file=sys.stderr)
+        print("   dirigent --repo . --yolo \"Add a dark mode toggle\"", file=sys.stderr)
+        sys.exit(1)
+
+    # 6. Have a description — generate spec
+    if args.yolo:
+        print(f"🎲 YOLO mode — generating spec from: {description}", file=sys.stderr)
+        return _generate_spec_yolo(repo_path, description)
+    else:
+        print(f"📝 Generating spec from: {description}", file=sys.stderr)
+        return _generate_spec_interactive(repo_path, description)
 
 
 def run_analysis(repo_path: Path, spec_path: Path, force: bool = False):
@@ -384,29 +523,44 @@ def main():
         epilog="""
 Beispiele:
   # Kompletter Durchlauf
-  python3 dirigent.py --spec .planning/SPEC.md --repo /path/to/repo
+  dirigent --spec .planning/SPEC.md --repo /path/to/repo
 
-  # Nur Analyse
-  python3 dirigent.py --spec SPEC.md --repo /path/to/repo --phase analyze
+  # Inline description (generates SPEC.md, asks 2-3 questions)
+  dirigent --repo . "Add a dark mode toggle to the settings page"
+
+  # YOLO mode (no questions, best-effort spec from description + context)
+  dirigent --repo . --yolo "Add a dark mode toggle"
 
   # Fortsetzen nach Unterbrechung
-  python3 dirigent.py --spec SPEC.md --repo /path/to/repo --resume
+  dirigent --spec SPEC.md --repo /path/to/repo --resume
 
   # Dry-Run (keine Änderungen)
-  python3 dirigent.py --spec SPEC.md --repo /path/to/repo --dry-run
+  dirigent --spec SPEC.md --repo /path/to/repo --dry-run
         """,
     )
 
     parser.add_argument(
+        "description",
+        nargs="*",
+        help="Inline spec description (alternative to --spec). Generates SPEC.md from your description.",
+    )
+
+    parser.add_argument(
         "--spec",
-        required=True,
-        help="Pfad zur SPEC.md Datei (oder '-' / '.' fuer stdin)",
+        default=None,
+        help="Pfad zur SPEC.md Datei (oder '-' / '.' fuer stdin). If omitted, searches well-known locations or uses inline description.",
     )
 
     parser.add_argument(
         "--repo",
         required=True,
         help="Pfad zum Ziel-Repository",
+    )
+
+    parser.add_argument(
+        "--yolo",
+        action="store_true",
+        help="Skip questions — generate spec from description + repo context using best estimates",
     )
 
     parser.add_argument(
@@ -539,25 +693,10 @@ Beispiele:
     # Pfade auflösen
     repo_path = Path(args.repo).resolve()
 
-    # Spec von stdin lesen wenn "-" oder "." als Argument
-    if args.spec in ("-", "."):
-        import tempfile
-        stdin_content = sys.stdin.read()
-        if not stdin_content.strip():
-            print("❌ Keine Spec-Daten auf stdin empfangen", file=sys.stderr)
-            sys.exit(1)
-        (repo_path / ".dirigent").mkdir(parents=True, exist_ok=True)
-        spec_tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", prefix="spec-", dir=repo_path / ".dirigent",
-            delete=False, encoding="utf-8",
-        )
-        spec_tmp.write(stdin_content)
-        spec_tmp.close()
-        spec_path = Path(spec_tmp.name)
-    else:
-        spec_path = Path(args.spec).resolve()
+    # Resolve spec from multiple sources (file, inline, stdin, well-known paths, generate)
+    spec_path = resolve_spec(args, repo_path)
 
-    # Validierung
+    # Validierung (spec is guaranteed to exist after resolve_spec)
     if not validate_inputs(spec_path, repo_path):
         sys.exit(1)
 
