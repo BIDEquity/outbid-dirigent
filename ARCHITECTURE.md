@@ -66,6 +66,9 @@ sequenceDiagram
                 CC-->>TaskRunner: TaskResult (commit, deviations)
                 TaskRunner->>Portal: task_result
             end
+        else ENTROPY_MINIMIZATION
+            Executor->>CC: /dirigent:entropy-minimization
+            CC-->>Executor: entropy-report.json
         else SHIP
             Executor->>Shipper: ship()
             Shipper->>GH: branch + push + PR
@@ -90,11 +93,11 @@ flowchart LR
     D -->|"test, coverage, testability"| T["TESTABILITY"]
     D -->|"analytics, tracking, events"| K["TRACKING"]
 
-    G --> G1["Init → Plan → Execute → Test → Ship"]
-    L --> L1["Init → Extract Rules → Plan → Execute → Test → Ship"]
-    H --> H1["Init → Quick Scan → Plan → Execute → Test → Ship"]
-    T --> T1["Analyze → Plan → Execute → Ship"]
-    K --> K1["Analyze → Plan → Execute → Ship"]
+    G --> G1["Init → Plan → Execute → Entropy Min → Test → Ship"]
+    L --> L1["Init → Extract Rules → Plan → Execute → Entropy Min → Test → Ship"]
+    H --> H1["Init → Quick Scan → Plan → Execute → Entropy Min → Test → Ship"]
+    T --> T1["Init → Testability Analysis → Plan → Execute → Entropy Min → Test → Ship"]
+    K --> K1["Init → Quick Scan → PostHog Setup → Plan → Execute → Entropy Min → Test → Ship"]
 ```
 
 ## Module Architecture
@@ -278,6 +281,7 @@ All orchestration state lives in `.dirigent/`:
 ├── test-harness.json      # Endpoint/auth/seed config
 ├── BUSINESS_RULES.md      # Extracted rules (Legacy route)
 ├── CONTEXT.md             # Relevant files (Hybrid route)
+├── entropy-report.json    # Entropy minimization results
 ├── summaries/             # Per-task execution summaries
 │   └── {task_id}-SUMMARY.md
 ├── contracts/             # Phase acceptance criteria
@@ -330,7 +334,7 @@ stateDiagram-v2
 | **Proteus** | Deep domain extraction (5-phase) | Optional |
 | **Docker** | Service orchestration for tests | Optional |
 
-## Plugin Skills (15 commands)
+## Plugin Skills (19 skills, 18 commands)
 
 The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during execution:
 
@@ -341,16 +345,20 @@ The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during
 | `/dirigent:review-phase` | Contract system | Evaluate phase against contract |
 | `/dirigent:fix-review` | Contract system | Fix review findings |
 | `/dirigent:extract-business-rules` | Executor (Legacy) | Extract business rules from codebase |
-| `/dirigent:quick-scan` | Executor (Hybrid) | Scan relevant files for context |
+| `/dirigent:quick-scan` | Executor (Hybrid/Tracking) | Scan relevant files for context |
 | `/dirigent:run-init` | InitPhase | Bootstrap environment + test harness |
 | `/dirigent:execute-task` | TaskRunner | Behavioral rules for task execution |
 | `/dirigent:increase-testability` | Testability route | Improve test coverage score |
 | `/dirigent:add-posthog` | Tracking route | Add PostHog analytics events |
-| `/dirigent:show-plan` | Progress | Render plan for user |
-| `/dirigent:show-progress` | Progress | Render execution progress |
-| `/dirigent:find-edits` | Validation | Find file changes from sessions |
+| `/dirigent:build-manifest` | Testability route | Generate outbid-test-manifest.yaml |
+| `/dirigent:validate-manifest` | Testability route | Validate manifest against schema |
+| `/dirigent:show-plan` | User (CLI) | Render plan for user |
+| `/dirigent:show-progress` | User (CLI) | Render execution progress |
+| `/dirigent:find-edits` | Research | Find file changes from sessions |
 | `/dirigent:find-errors` | Recovery | Surface errors from sessions |
 | `/dirigent:search-memories` | Research | Search previous session logs |
+| `/dirigent:query-data` | Research | Run DuckDB queries on data files |
+| `/dirigent:entropy-minimization` | Executor (all routes) | Align docs, remove dead code, resolve contradictions |
 
 ## Key Design Decisions
 

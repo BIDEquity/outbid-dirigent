@@ -10,7 +10,7 @@ description: Fix issues found during phase review (executor role)
 <step id="2">Read `.dirigent/contracts/phase-{PHASE_ID}.json` to understand which acceptance criteria failed.</step>
 <step id="3">Fix all findings with severity "critical" first, then "warn". Skip "info" unless trivial.</step>
 <step id="4">For each failed acceptance criterion (verdict "fail" in criteria_results), address the root cause noted in the "notes" field.</step>
-<step id="5">Commit: `git add -A &amp;&amp; git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"`</step>
+<step id="5">Commit: `git add -A && git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"`</step>
 </instructions>
 
 <rules>

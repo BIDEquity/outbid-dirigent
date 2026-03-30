@@ -17,12 +17,11 @@ Check if `$ARGUMENTS` contains `--interactive`.
 - **Default (autonomous)**: Analyze, generate, validate, done. No questions.
 - **Interactive (`--interactive`)**: After analyzing, walk the user through each manifest section before writing. See **Interactive Mode** at the end of this skill.
 
-## Schema & Example
+## Schema
 
-Read these files from the skill directory before generating:
+Read the Pydantic schema before generating:
 
-- **`schema.py`** — Pydantic models. Your output YAML must conform to these types.
-- **`example.yaml`** — Full example showing every field.
+- **`src/outbid_dirigent/test_manifest.py`** — Contains `TestManifest`, `Component`, `Gap`, `Prerequisites` models. Your output YAML must conform to these types.
 
 ### Key schema rules
 

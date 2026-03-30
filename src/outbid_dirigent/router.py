@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Outbid Dirigent – Router
-Definiert die Ausführungspfade (Greenfield, Legacy, Hybrid) und deren Schritte.
+Definiert die Ausführungspfade (Greenfield, Legacy, Hybrid, Testability, Tracking) und deren Schritte.
 """
 
 import json
@@ -31,6 +31,7 @@ class StepType(Enum):
     ADD_TRACKING = "add_tracking"
     PLANNING = "planning"
     EXECUTION = "execution"
+    ENTROPY_MINIMIZATION = "entropy_minimization"
     TEST = "test"
     SHIP = "ship"
 
@@ -77,6 +78,12 @@ class Router:
             description="Tasks werden sequentiell ausgeführt mit frischem Kontext pro Task",
         ),
         RouteStep(
+            step_type=StepType.ENTROPY_MINIMIZATION,
+            name="Entropy Minimization",
+            description="Align docs, remove dead code, resolve contradictions introduced during execution",
+            required=False,
+        ),
+        RouteStep(
             step_type=StepType.TEST,
             name="Test Suite",
             description="Volle Test-Suite aus Test-Manifest ausführen",
@@ -110,6 +117,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Ausführung mit Rule-Check",
             description="Tasks ausführen mit Business Rule Verification nach jedem Task",
+        ),
+        RouteStep(
+            step_type=StepType.ENTROPY_MINIMIZATION,
+            name="Entropy Minimization",
+            description="Align docs, remove dead code, resolve contradictions introduced during execution",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.TEST,
@@ -147,6 +160,12 @@ class Router:
             description="Tasks ausführen mit Repo-Kontext",
         ),
         RouteStep(
+            step_type=StepType.ENTROPY_MINIMIZATION,
+            name="Entropy Minimization",
+            description="Align docs, remove dead code, resolve contradictions introduced during execution",
+            required=False,
+        ),
+        RouteStep(
             step_type=StepType.TEST,
             name="Test Suite",
             description="Volle Test-Suite aus Test-Manifest ausführen",
@@ -180,6 +199,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Testability verbessern",
             description="Implement test infrastructure, seed data, health checks, e2e setup",
+        ),
+        RouteStep(
+            step_type=StepType.ENTROPY_MINIMIZATION,
+            name="Entropy Minimization",
+            description="Align docs, remove dead code, resolve contradictions introduced during execution",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.TEST,
@@ -220,6 +245,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Tracking implementieren",
             description="Add PostHog initialization, event tracking, feature flags, and user identification",
+        ),
+        RouteStep(
+            step_type=StepType.ENTROPY_MINIMIZATION,
+            name="Entropy Minimization",
+            description="Align docs, remove dead code, resolve contradictions introduced during execution",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.TEST,

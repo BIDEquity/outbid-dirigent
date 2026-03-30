@@ -111,8 +111,7 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
 <rule>If you can't determine something, use sensible defaults and note it in "notes"</rule>
 <rule>The login_command must be a complete curl command the reviewer can copy-paste</rule>
 <rule>If no auth is needed (public API), set method to "none"</rule>
-<rule>If .dirigent/init-output.log exists, read it for clues about what init.sh did</rule>
-<rule>If .dirigent/init-new-env.json exists, read it for env vars the init script exported</rule>
+<rule>If a prior test-harness.json exists, read it for context on previous init runs</rule>
 </rules>
 
 <constraints>

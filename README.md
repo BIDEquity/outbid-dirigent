@@ -29,21 +29,21 @@
                          +-----+-----+
                                |
                          +-----v-----+
-                         |   Route    |  Greenfield / Legacy / Hybrid
+                         |   Route    |  5 execution paths
                          +-----+-----+
                                |
-                    +----------+----------+
-                    |          |          |
-              +-----v--+ +----v---+ +---v----+
-              |Greenfield| |Legacy  | |Hybrid  |
-              +-----+--+ +----+---+ +---+----+
-                    |          |          |
-                    |    +-----v-----+   |
-                    |    | Proteus   |   |
-                    |    | Extraction|   |
-                    |    +-----+-----+   |
-                    |          |          |
-                    +----------+----------+
+              +-------+--------+--------+--------+-------+
+              |       |        |        |        |
+           +--v--+ +--v--+ +--v--+ +---v--+ +--v---+
+           |Green| |Legcy| |Hybrd| |Test  | |Track |
+           |field| |     | |     | |abilty| |ing   |
+           +--+--+ +--+--+ +--+--+ +--+---+ +--+---+
+              |       |        |        |        |
+              |    +--v---+    |        |        |
+              |    |Proteus|   |        |        |
+              |    +--+---+    |        |        |
+              |       |        |        |        |
+              +---+---+--------+--------+--------+
                                |
                          +-----v-----+
                          |   Plan     |  Phased execution plan
@@ -133,7 +133,7 @@ The repo ships with `.devcontainer/devcontainer.json` for VS Code / GitHub Codes
 
 ## Routing Engine
 
-The Dirigent automatically selects one of three execution paths based on repo analysis and spec content.
+The Dirigent automatically selects one of five execution paths based on repo analysis and spec content.
 
 ### Route A — Greenfield
 
@@ -143,7 +143,7 @@ The Dirigent automatically selects one of three execution paths based on repo an
 
 **Pipeline:**
 ```
-Plan  -->  Execute  -->  Ship
+Init (optional) --> Plan --> Execute --> Entropy Min (optional) --> Test (optional) --> Ship
 ```
 
 ### Route B — Legacy
@@ -154,7 +154,7 @@ Plan  -->  Execute  -->  Ship
 
 **Pipeline:**
 ```
-Business Rule Extraction  -->  Plan (with guardrails)  -->  Execute  -->  Ship
+Init (optional) --> Business Rule Extraction --> Plan (with guardrails) --> Execute --> Entropy Min (optional) --> Test (optional) --> Ship
 ```
 
 ### Route C — Hybrid
@@ -165,7 +165,29 @@ Business Rule Extraction  -->  Plan (with guardrails)  -->  Execute  -->  Ship
 
 **Pipeline:**
 ```
-Quick Scan  -->  Plan (with repo context)  -->  Execute  -->  Ship
+Init (optional) --> Quick Scan --> Plan (with repo context) --> Execute --> Entropy Min (optional) --> Test (optional) --> Ship
+```
+
+### Route D — Testability
+
+> Improve test coverage and test infrastructure.
+
+**Triggers:** Spec contains "test", "coverage", "testability", "e2e" — low testability score detected
+
+**Pipeline:**
+```
+Init --> Testability Analysis --> Plan --> Execute --> Entropy Min (optional) --> Test (optional) --> Ship
+```
+
+### Route E — Tracking
+
+> Add analytics and event tracking (PostHog).
+
+**Triggers:** Spec contains "analytics", "tracking", "events", "PostHog" — no existing analytics detected
+
+**Pipeline:**
+```
+Init (optional) --> Quick Scan --> PostHog Setup --> Plan --> Execute --> Entropy Min (optional) --> Test (optional) --> Ship
 ```
 
 ---
@@ -225,29 +247,49 @@ dirigent --spec .planning/SPEC.md --repo . --use-proteus --resume
 ```
 src/outbid_dirigent/
     ├─ dirigent.py              # Entry point + orchestration
-    ├─ analyzer.py              # Repo + spec analysis, path selection
-    ├─ router.py                # Routing logic (Greenfield / Legacy / Hybrid)
-    ├─ executor.py              # Claude Code invocations
-    ├─ oracle.py                # Architecture decisions (direct Claude API)
+    ├─ analyzer.py              # Repo + spec analysis
+    ├─ router.py                # Route selection (5 routes)
+    ├─ executor.py              # Master orchestrator
+    ├─ task_runner.py           # Individual task execution (subprocess per task)
+    ├─ planner.py               # Plan creation via Claude Code
+    ├─ contract.py              # Phase contracts + review/fix loop
+    ├─ contract_schema.py       # Contract/Review/Verdict data models
+    ├─ plan_schema.py           # Plan/Phase/Task data models
+    ├─ shipper.py               # Branch, push, PR creation
+    ├─ oracle.py                # Architecture decisions (Claude API)
+    ├─ init_phase.py            # Environment bootstrap
+    ├─ progress.py              # Progress reporting
     ├─ logger.py                # Structured logging to .dirigent/logs/
-    └─ proteus_integration.py   # Proteus domain extraction
+    ├─ portal_reporter.py       # Outbid Portal event reporting
+    ├─ questioner.py            # Interactive question handling
+    ├─ test_harness_schema.py   # Test harness data model
+    ├─ test_manifest.py         # Test manifest handling
+    ├─ proteus_integration.py   # Proteus domain extraction
+    └─ demo_runner.py           # Demo mode with simulated events
 ```
 
 ### Generated Files
 
 ```
 {repo}/.dirigent/
-├── ANALYSIS.json        # Repo analysis result
-├── ROUTE.json           # Chosen path + reasoning
-├── PLAN.json            # Execution plan (phases + tasks)
-├── STATE.json           # Current progress (resumable)
-├── DECISIONS.json       # Oracle decisions (cached)
-├── BUSINESS_RULES.md    # Extracted business rules (Legacy route)
-├── CONTEXT.md           # Relevant files (Hybrid route)
-├── summaries/           # Per-task summaries
-│   └── 01-01-SUMMARY.md
-└── logs/
-    └── run-{timestamp}.log
+├── ANALYSIS.json          # Repo analysis result
+├── ROUTE.json             # Selected route + steps
+├── PLAN.json              # Execution plan (phases → tasks)
+├── STATE.json             # Progress tracking (resumable)
+├── DECISIONS.json         # Oracle decision cache
+├── SPEC.md                # Copy of input spec
+├── test-harness.json      # Endpoint/auth/seed config
+├── BUSINESS_RULES.md      # Extracted rules (Legacy route)
+├── CONTEXT.md             # Relevant files (Hybrid route)
+├── contracts/             # Phase acceptance criteria
+│   └── phase-{id}.json
+├── reviews/               # Phase review verdicts
+│   └── phase-{id}.json
+├── summaries/             # Per-task execution summaries
+│   └── {task_id}-SUMMARY.md
+└── logs/                  # Structured execution logs
+    ├── run-*.log
+    └── run-*.jsonl
 ```
 
 ---
@@ -311,6 +353,19 @@ dirigent --spec <path> --repo <path> [options]
 | `--dry-run` | Analyze only, no changes |
 | `--force` | Re-run analysis (ignore cache) |
 | `--quiet` | Minimal output |
+| `--verbose` | Verbose output (default: true) |
+| `--output` | Output format: `json` for JSON Lines to stdout |
+| `--execution-mode` | `autonomous` (default), `plan_first`, or `interactive` |
+| `--plan-only` | Create plan then stop (no execution) |
+| `--question-timeout` | Timeout in minutes for interactive questions (default: 30) |
+| `--model` | Claude model for task execution (e.g. haiku, sonnet, opus) |
+| `--effort` | Thinking effort level: `low`, `medium`, `high`, `max` |
+| `--portal-url` | Outbid Portal URL (env: `PORTAL_URL`) |
+| `--execution-id` | Execution ID for Portal integration (env: `EXECUTION_ID`) |
+| `--reporter-token` | Reporter token for Portal integration (env: `REPORTER_TOKEN`) |
+| `--demo` | Demo mode: send simulated events without real execution |
+| `--demo-speed` | Demo mode speed multiplier (default: 1.0) |
+| `--interactive` | **DEPRECATED** — use `--execution-mode interactive` |
 
 ---
 
@@ -322,6 +377,7 @@ dirigent --spec <path> --repo <path> [options]
 - **Atomic commits** — One commit per task, never everything at once
 - **Fail fast** — 3 retries per task, then stop and log to STATE.json
 - **Resumable** — STATE.json tracks progress; pick up where you left off
+- **Entropy minimization** — After execution, a fresh agent aligns docs, removes dead code, and resolves contradictions
 
 ---
 
