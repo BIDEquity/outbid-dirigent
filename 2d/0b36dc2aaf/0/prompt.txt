@@ -70,3 +70,14 @@ The contract was designed around **what's easy to verify automatically** (grep) 
 ---
 
 bump version and plugin versino
+
+---
+
+1 error:                                                                                  
+    Failed to load hooks from                                                               
+    /home/dev/.claude/plugins/cache/outbid-dirigent/dirigent/0.2.0/hooks/hooks.json:        
+    Duplicate hooks file detected: ./hooks/hooks.json resolves to already-loaded file       
+    /home/dev/.claude/plugins/cache/outbid-dirigent/dirigent/0.2.0/hooks/hooks.json. The    
+    standard hooks/hooks.json is loaded automatically, so manifest.hooks should only        
+    reference additional hook files.                                                        
+    → Check hooks.json file syntax and structure
