@@ -66,3 +66,7 @@ Invite with duplicate email → 409
 ## The root problem
 
 The contract was designed around **what's easy to verify automatically** (grep) rather than **what matters to the user** (does the endpoint work). A good contract answers one question per criterion: "If this fails, would a user notice?" If the answer is no, it's testing implementation details, not behavior.
+
+---
+
+bump version and plugin versino
