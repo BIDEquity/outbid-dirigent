@@ -1,0 +1,91 @@
+allow input for the skills that would normally expect the SPEC.md . SEPC.md should have Vorrang but if it is not present let the user describe what he wants and then let the skill write a short SPEC.md asking max 2-3 questions. add a --yolo flag to skip questions and let claude use best estimate for the spec while still looking for well-known files for context (ARCHITECTURE.md for example)
+
+---
+
+allow input for the skills that would normally expect the SPEC.md . SEPC.md should have Vorrang but if it is not present let the user describe what he wants and then let the skill write a short SPEC.md asking max 2-3 questions. add a --yolo flag to skip questions and let claude use best estimate for the spec while still looking for well-known files for context (ARCHITECTURE.md for example). DO NOT add dirigent feature flags, add the argumewnt to the plan skill frontmatter and adapt the skill to create the spec. this should not impact dirignt cli workflow!
+
+---
+
+bump version
+
+---
+
+create pr. give me the uv command to install the pr version.
+
+---
+
+revamp the contract generation. it has two problems: 1. it is not agreed upon by executor and reviewer. 2. one run in the wild yielded useless grep-based criteria. acceptance criteria MUST BE USER BASED: 
+
+## What this contract actually tested
+
+**File-level structural checks** — "does this string exist in this file?" That's it. Every verification is a grep or file_exists. It's a slightly smarter linter.
+
+## What it missed entirely
+
+| Gap | Example |
+|-----|---------|
+| **Request/response correctness** | Does `GET /tenants/1/settings` return valid JSON with all 8 fields? |
+| **Auth enforcement** | Does a `viewer` actually get 403? Does a superuser actually get 200? |
+| **Data persistence** | Does PATCH actually write to the DB and GET return the updated value? |
+| **Error paths** | What happens with tenant_id=999999? Malformed JSON body? Empty PATCH? |
+| **Integration** | Does the frontend `useCurrentUser` hook actually parse the new `is_superuser` field from a real API response? |
+| **Regression safety** | Did we break any existing endpoints by registering the new router? |
+
+## What a useful contract should contain
+
+**Three layers, not one:**
+
+**1. Structural (what we have now — keep but minimize)**
+- File exists, router registered, no lint errors
+- ~20% of the contract — quick sanity check, not the substance
+
+**2. Behavioral — the core**
+```
+Given: authenticated user with is_superuser=false
+When:  GET /superuser/users
+Then:  HTTP 403 with body containing "Superuser access required"
+
+Given: authenticated admin of tenant 1
+When:  PATCH /tenants/1/settings {"default_currency": "USD"}
+Then:  HTTP 200, and subsequent GET returns default_currency="USD"
+
+Given: authenticated viewer of tenant 1
+When:  GET /tenants/1/settings
+Then:  HTTP 403
+```
+These run as actual HTTP calls against the app (pytest with test client or `just test`).
+
+**3. Boundary/edge cases**
+```
+PATCH with empty body {} → 200, no fields changed
+PATCH with unknown field {"s3_bucket_name": "hacked"} → field ignored
+GET for nonexistent tenant → 404
+Invite with duplicate email → 409
+```
+
+## The root problem
+
+The contract was designed around **what's easy to verify automatically** (grep) rather than **what matters to the user** (does the endpoint work). A good contract answers one question per criterion: "If this fails, would a user notice?" If the answer is no, it's testing implementation details, not behavior.
+
+---
+
+bump version and plugin versino
+
+---
+
+1 error:                                                                                  
+    Failed to load hooks from                                                               
+    /home/dev/.claude/plugins/cache/outbid-dirigent/dirigent/0.2.0/hooks/hooks.json:        
+    Duplicate hooks file detected: ./hooks/hooks.json resolves to already-loaded file       
+    /home/dev/.claude/plugins/cache/outbid-dirigent/dirigent/0.2.0/hooks/hooks.json. The    
+    standard hooks/hooks.json is loaded automatically, so manifest.hooks should only        
+    reference additional hook files.                                                        
+    → Check hooks.json file syntax and structure
+
+---
+
+push
+
+---
+
+debug why   Local plugins cannot be updated remotely. To update, modify the source at: ./src/outbid_dirigent/plugin

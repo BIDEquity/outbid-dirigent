@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "cb9a75ba599a",
+  "strategy": "manual-commit",
+  "branch": "claude/dirigent-refactor-AwjPf",
+  "checkpoints_count": 4,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/cb/9a75ba599a/0/metadata.json",
+      "transcript": "/cb/9a75ba599a/0/full.jsonl",
+      "content_hash": "/cb/9a75ba599a/0/content_hash.txt",
+      "prompt": "/cb/9a75ba599a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 246,
+    "cache_creation_tokens": 935415,
+    "cache_read_tokens": 25045991,
+    "output_tokens": 62347,
+    "api_call_count": 214
+  }
+}
