@@ -1,0 +1,9 @@
+build an architecture manifest (markdown) from this repository. add mermaid diagram(s) if appropriate. show the flow
+
+---
+
+I think the contract -> execute -> review is missing from the docs and needs refinement. Double check if it is implemented. Tighten the contract to contain real end-2-end tests. DO NOT let the agent declare success if some simple unit tests pass.
+
+---
+
+Instruct the agent writing code to build "scalable" solutions. Tell it, that he will have to maintain this codebase from now on.
