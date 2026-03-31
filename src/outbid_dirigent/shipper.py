@@ -14,6 +14,7 @@ from typing import Optional
 from loguru import logger
 
 from outbid_dirigent.plan_schema import Plan
+from outbid_dirigent.infra_schema import InfraContext
 
 
 def slugify(text: str, max_length: int = 50) -> str:
@@ -100,8 +101,32 @@ class Shipper:
             logger.error(f"Shipping failed: {e}")
             return False
 
+    def _build_verification_section(self) -> str:
+        """Build ## Verification section from InfraContext for PR body."""
+        ctx_path = self.repo_path / ".dirigent" / "infra-context.json"
+        ctx = InfraContext.load(ctx_path)
+        if ctx is None:
+            return ""
+
+        confidence_emoji = {"e2e": "✅", "integration": "✅", "unit": "✅", "mocked": "⚠️", "static": "⚠️", "none": "❌"}
+        emoji = confidence_emoji.get(ctx.confidence, "⚠️")
+
+        lines = [f"## Verification", f"{emoji} Tests passed — {ctx.confidence} confidence ({ctx.tier.value})"]
+        if ctx.tests_run > 0 or ctx.tests_skipped_infra > 0:
+            lines.append(f"   {ctx.tests_run} tests run, {ctx.tests_skipped_infra} skipped due to missing infra")
+        if ctx.caveat:
+            lines.append(f"   _{ctx.caveat}_")
+        if ctx.gaps:
+            lines.append("")
+            lines.append("**To verify at higher confidence:**")
+            for gap in ctx.gaps:
+                lines.append(f"- {gap.suggested_fix}")
+        return "\n".join(lines) + "\n\n"
+
     def _generate_pr_body(self) -> str:
+        verification = self._build_verification_section()
         parts = [
+            verification,
             "## Summary",
             self.plan.summary if self.plan else "Automatically created by Outbid Dirigent.",
             "",

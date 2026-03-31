@@ -35,6 +35,9 @@ class InfraContext(BaseModel):
     gaps: list[ServiceGap] = []
     seed: SeedInfo = SeedInfo()
     generated_files: list[str] = []
+    tests_run: int = 0
+    tests_skipped_infra: int = 0
+    caveat: Optional[str] = None
 
     @classmethod
     def load(cls, path: Path) -> Optional["InfraContext"]:
