@@ -7,19 +7,19 @@ Extracted from the Executor god class.
 import re
 import shutil
 import subprocess
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from loguru import logger
 
-from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.infra_schema import InfraContext
+from outbid_dirigent.plan_schema import Plan
 
 
 def slugify(text: str, max_length: int = 50) -> str:
     """Convert text to URL-safe slug for branch names."""
-    import unicodedata
     text = unicodedata.normalize('NFKD', text)
     text = text.encode('ascii', 'ignore').decode('ascii').lower()
     text = re.sub(r'[^a-z0-9\s-]', '', text)
@@ -103,15 +103,14 @@ class Shipper:
 
     def _build_verification_section(self) -> str:
         """Build ## Verification section from InfraContext for PR body."""
-        ctx_path = self.repo_path / ".dirigent" / "infra-context.json"
-        ctx = InfraContext.load(ctx_path)
+        ctx = InfraContext.load(self.repo_path / ".dirigent" / "infra-context.json")
         if ctx is None:
             return ""
 
         confidence_emoji = {"e2e": "✅", "integration": "✅", "unit": "✅", "mocked": "⚠️", "static": "⚠️", "none": "❌"}
         emoji = confidence_emoji.get(ctx.confidence, "⚠️")
 
-        lines = [f"## Verification", f"{emoji} Tests passed — {ctx.confidence} confidence ({ctx.tier.value})"]
+        lines = ["## Verification", f"{emoji} Tests passed — {ctx.confidence} confidence ({ctx.tier.value})"]
         if ctx.tests_run > 0 or ctx.tests_skipped_infra > 0:
             lines.append(f"   {ctx.tests_run} tests run, {ctx.tests_skipped_infra} skipped due to missing infra")
         if ctx.caveat:
@@ -132,7 +131,7 @@ class Shipper:
             "",
             "## Changes",
         ]
-        for f in sorted(self.summaries_dir.glob("*-SUMMARY.md")):
+        for f in sorted(self.summaries_dir.glob("*-SUMMARY.md")) if self.summaries_dir.exists() else []:
             content = f.read_text(encoding="utf-8")
             match = re.search(r"## Was wurde gemacht\n(.+?)(?=\n##|\Z)", content, re.DOTALL)
             if match:

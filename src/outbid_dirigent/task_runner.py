@@ -251,18 +251,25 @@ class TaskRunner:
                 if not any(search_path.parent.glob("*.jsonl")):
                     return ""
 
+            # Extract DEVIATION, LESSON, and WARNING markers from past sessions
             query = f"""
-SELECT DISTINCT
-  regexp_replace(
-    regexp_extract(message.content::VARCHAR, 'DEVIATION:\\s*(\\S+[-\\w]*)\\s*[-—]?\\s*([^\\n\"]+)', 0),
-    '^DEVIATION:\\s*', ''
-  ) AS deviation
-FROM read_ndjson('{search_path}', auto_detect=true, ignore_errors=true, filename=true)
-WHERE message.role = 'assistant'
-  AND message.content::VARCHAR LIKE '%DEVIATION:%'
-  AND length(regexp_extract(message.content::VARCHAR, 'DEVIATION:\\s*\\S+[-\\w]*\\s*[-—]?\\s*([^\\n\"]+)', 1)) > 5
-ORDER BY 1
-LIMIT 30;
+WITH raw AS (
+  SELECT
+    regexp_extract(message.content::VARCHAR, '(DEVIATION|LESSON|WARNING):\\s*(\\S+[-\\w]*)\\s*[-—]?\\s*([^\\n\"]+)', 0) AS marker,
+    regexp_extract(message.content::VARCHAR, '(DEVIATION|LESSON|WARNING):', 1) AS kind
+  FROM read_ndjson('{search_path}', auto_detect=true, ignore_errors=true, filename=true)
+  WHERE message.role = 'assistant'
+    AND (
+      message.content::VARCHAR LIKE '%DEVIATION:%'
+      OR message.content::VARCHAR LIKE '%LESSON:%'
+      OR message.content::VARCHAR LIKE '%WARNING:%'
+    )
+)
+SELECT DISTINCT kind, regexp_replace(marker, '^(DEVIATION|LESSON|WARNING):\\s*', '') AS entry
+FROM raw
+WHERE length(entry) > 5
+ORDER BY kind, entry
+LIMIT 45;
 """
             result = subprocess.run(
                 ["duckdb", ":memory:", "-csv", "-c", query],
@@ -271,29 +278,36 @@ LIMIT 30;
             if result.returncode != 0 or not result.stdout.strip():
                 return ""
 
+            tagged: dict[str, list[str]] = {"DEVIATION": [], "LESSON": [], "WARNING": []}
+            for row in result.stdout.strip().splitlines()[1:]:
+                parts = row.strip().split(",", 1)
+                if len(parts) != 2:
+                    continue
+                kind, entry = parts[0].strip().strip('"'), parts[1].strip().strip('"')
+                entry = entry.replace("\\n", " ").replace('\\"', '"')[:150].strip()
+                if len(entry) > 10 and kind in tagged:
+                    tagged[kind].append(entry)
+
+            # Deduplicate within each category using word-set overlap
+            def dedupe(entries: list[str]) -> list[str]:
+                seen_sets: list[set] = []
+                unique = []
+                for entry in entries:
+                    words = set(entry.lower().split())
+                    if not any(len(words & s) / max(len(words | s), 1) > 0.6 for s in seen_sets):
+                        seen_sets.append(words)
+                        unique.append(entry)
+                return unique
+
             lines = []
-            for l in result.stdout.strip().splitlines()[1:]:
-                l = l.strip().strip('"')
-                # Clean up escape sequences and truncate at first newline
-                l = l.replace("\\n", " ").replace('\\"', '"')
-                l = l.split("DEVIATION:")[0].strip() if "DEVIATION:" in l[20:] else l
-                l = l[:150].strip()
-                if len(l) > 10:
-                    lines.append(l)
+            for kind, prefix in [("LESSON", "lesson"), ("WARNING", "warning"), ("DEVIATION", "deviation")]:
+                for entry in dedupe(tagged[kind])[:8]:
+                    lines.append(f"[{prefix}] {entry}")
+
             if not lines:
                 return ""
 
-            # Deduplicate similar entries
-            seen = set()
-            unique = []
-            for line in lines:
-                key = line[:50].lower()
-                if key not in seen:
-                    seen.add(key)
-                    unique.append(line)
-
-            recall = "\n".join(f"- {l}" for l in unique[:15])
-            return recall[:max_chars]
+            return "\n".join(f"- {l}" for l in lines)[:max_chars]
         except Exception:
             return ""
 

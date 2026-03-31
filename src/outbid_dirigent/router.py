@@ -10,6 +10,7 @@ from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional
 from datetime import datetime
 from enum import Enum
+
 from pydantic import BaseModel, ValidationError
 
 from outbid_dirigent.analyzer import AnalysisResult
@@ -335,7 +336,6 @@ class Router:
             repo_context_needed=file_count > 10,
         )
 
-
     def _estimate_tasks(self, scope: str) -> int:
         """Schätzt die Anzahl der Tasks basierend auf dem Scope."""
         estimates = {
@@ -384,10 +384,9 @@ def load_route(repo_path: str) -> Optional[Dict]:
         return None
     try:
         raw = json.loads(route_file.read_text(encoding="utf-8"))
-        RouteRecord.model_validate(raw)  # validate schema; raise on corrupt data
+        RouteRecord.model_validate(raw)
         return raw
     except ValidationError as e:
-        from outbid_dirigent.logger import get_logger
         get_logger().error(f"ROUTE.json schema validation failed: {e}")
         return None
 
@@ -419,10 +418,9 @@ def load_state(repo_path: str) -> Optional[Dict]:
         return None
     try:
         raw = json.loads(state_file.read_text(encoding="utf-8"))
-        StateRecord.model_validate(raw)  # validate schema; raise on corrupt data
+        StateRecord.model_validate(raw)
         return raw
     except ValidationError as e:
-        from outbid_dirigent.logger import get_logger
         get_logger().error(f"STATE.json schema validation failed: {e}")
         return None
 

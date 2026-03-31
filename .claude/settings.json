@@ -16,6 +16,10 @@
           {
             "type": "command",
             "command": "entire hooks claude-code post-task"
+          },
+          {
+            "type": "command",
+            "command": "ruflo hooks post-task 2>/dev/null || true"
           }
         ]
       },
@@ -36,6 +40,10 @@
           {
             "type": "command",
             "command": "entire hooks claude-code pre-task"
+          },
+          {
+            "type": "command",
+            "command": "ruflo hooks pre-task 2>/dev/null || true"
           }
         ]
       }
@@ -47,6 +55,10 @@
           {
             "type": "command",
             "command": "entire hooks claude-code session-end"
+          },
+          {
+            "type": "command",
+            "command": "ruflo hooks session-end 2>/dev/null || true"
           }
         ]
       }
@@ -58,6 +70,10 @@
           {
             "type": "command",
             "command": "entire hooks claude-code session-start"
+          },
+          {
+            "type": "command",
+            "command": "ruflo hooks session-start 2>/dev/null || true"
           }
         ]
       }

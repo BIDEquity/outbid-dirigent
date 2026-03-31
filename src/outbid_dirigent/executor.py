@@ -18,17 +18,30 @@ from loguru import logger
 
 from outbid_dirigent.analyzer import load_analysis
 from outbid_dirigent.contract import ContractManager
-from outbid_dirigent.infra_schema import InfraContext
 from outbid_dirigent.init_phase import InitPhase
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.planner import Planner
 from outbid_dirigent.progress import ProgressRenderer
 from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
+from outbid_dirigent.contract_schema import Review
+from outbid_dirigent.infra_schema import InfraContext
 from outbid_dirigent.router import load_state, save_state, mark_step_complete
 from outbid_dirigent.shipper import Shipper
 from outbid_dirigent.task_runner import TaskRunner, TaskResult
-from outbid_dirigent.utils import extract_phase_number
+from outbid_dirigent.test_harness_schema import TestHarness
+
+
+class _NullLogger:
+    """Drop-in no-op for DirigentLogger when unavailable (avoids 22 None-guards)."""
+    _start_time = None
+    _total_commits = 0
+
+    def get_cost_totals(self) -> dict:
+        return {"total_cost_cents": 0, "total_input_tokens": 0, "total_output_tokens": 0}
+
+    def __getattr__(self, name: str):
+        return lambda *args, **kwargs: None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -157,7 +170,7 @@ class Executor:
             from outbid_dirigent.logger import get_logger
             self._legacy_logger = get_logger()
         except Exception:
-            self._legacy_logger = None
+            self._legacy_logger = _NullLogger()
 
     # ══════════════════════════════════════════
     # INIT PHASE
@@ -165,9 +178,7 @@ class Executor:
 
     def run_init(self) -> bool:
         """Run init phase: discover and execute init scripts, detect e2e framework."""
-        if self._legacy_logger:
-            self._legacy_logger.info("Init Phase: Bootstrapping development environment")
-
+        self._legacy_logger.info("Init Phase: Bootstrapping development environment")
         return self.init_phase.run()
 
     # ══════════════════════════════════════════
@@ -179,15 +190,11 @@ class Executor:
         if fmt == "console":
             output = self.progress.console()
         elif fmt == "json":
-            import json as _json
-            output = _json.dumps(self.progress.to_json(), indent=2)
+            output = json.dumps(self.progress.to_json(), indent=2)
         else:
             output = self.progress.text()
 
-        if self._legacy_logger:
-            self._legacy_logger.info(output)
-        else:
-            logger.info(output)
+        self._legacy_logger.info(output)
 
     # ══════════════════════════════════════════
     # INCREASE TESTABILITY (Testability Route)
@@ -205,9 +212,8 @@ class Executor:
 
         recs_file = self.dirigent_dir / "testability-recommendations.json"
         if recs_file.exists():
-            import json as _json
             try:
-                recs = _json.loads(recs_file.read_text(encoding="utf-8"))
+                recs = json.loads(recs_file.read_text(encoding="utf-8"))
                 current = recs.get("current_score", "?")
                 potential = recs.get("potential_score", "?")
                 count = len(recs.get("recommendations", []))
@@ -257,9 +263,8 @@ class Executor:
 
         report_file = self.dirigent_dir / "entropy-report.json"
         if report_file.exists():
-            import json as _json
             try:
-                report = _json.loads(report_file.read_text(encoding="utf-8"))
+                report = json.loads(report_file.read_text(encoding="utf-8"))
                 fixed = report.get("issues_fixed", 0)
                 remaining = report.get("issues_remaining", 0)
                 logger.info(f"Entropy minimization: {fixed} issues fixed, {remaining} remaining")
@@ -277,8 +282,7 @@ class Executor:
 
     def extract_business_rules(self) -> bool:
         """Extract business rules from the codebase (Legacy route)."""
-        if self._legacy_logger:
-            self._legacy_logger.extract_start()
+        self._legacy_logger.extract_start()
 
         if self.use_proteus:
             return self._extract_with_proteus()
@@ -302,8 +306,7 @@ class Executor:
         if rules_file.exists():
             content = rules_file.read_text(encoding="utf-8")
             rule_count = content.count("- ") + content.count("* ")
-            if self._legacy_logger:
-                self._legacy_logger.extract_done(rule_count)
+            self._legacy_logger.extract_done(rule_count)
             logger.info(f"Business Rules extracted ({rule_count} rules)")
             return True
 
@@ -377,33 +380,23 @@ class Executor:
 
     def create_plan(self) -> bool:
         """Create the execution plan via Claude Code."""
-        if self._legacy_logger:
-            self._legacy_logger.plan_start()
+        self._legacy_logger.plan_start()
 
         plan = self.planner.create_plan()
         if plan is None:
             return False
 
-        if self._legacy_logger:
-            # Include full task details for portal display
-            phase_details = [
-                {
-                    "phase": p.id,
-                    "name": p.name,
-                    "description": p.description,
-                    "taskCount": len(p.tasks),
-                    "tasks": [
-                        {
-                            "id": t.id,
-                            "name": t.name,
-                            "description": t.description,
-                        }
-                        for t in p.tasks
-                    ],
-                }
-                for p in plan.phases
-            ]
-            self._legacy_logger.plan_done(len(plan.phases), plan.total_tasks, phase_details)
+        phase_details = [
+            {
+                "phase": p.id,
+                "name": p.name,
+                "description": p.description,
+                "taskCount": len(p.tasks),
+                "tasks": [{"id": t.id, "name": t.name, "description": t.description} for t in p.tasks],
+            }
+            for p in plan.phases
+        ]
+        self._legacy_logger.plan_done(len(plan.phases), plan.total_tasks, phase_details)
         return True
 
     # ══════════════════════════════════════════
@@ -438,23 +431,20 @@ class Executor:
                 logger.info("Execution cancelled by user")
                 return False
         else:
-            if self._legacy_logger:
-                self._legacy_logger.info(f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
+            self._legacy_logger.info(f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
 
         for phase in plan.phases:
             if phase.id in state.get("completed_phases", []):
                 logger.info(f"Phase {phase.id} already completed, skipping")
                 continue
 
-            # Create contract (acceptance criteria) before phase execution
             contract_ok = self._create_phase_contract(phase, plan)
             if contract_ok:
                 logger.info(f"Phase {phase.id} contract created")
             else:
                 logger.warning(f"Phase {phase.id} contract creation failed (non-blocking)")
 
-            if self._legacy_logger:
-                self._legacy_logger.phase_start(phase.id, phase.name, len(phase.tasks))
+            self._legacy_logger.phase_start(phase.id, phase.name, len(phase.tasks))
 
             phase_deviation_count = 0
             phase_commit_count = 0
@@ -466,8 +456,7 @@ class Executor:
                     phase_tasks_completed += 1
                     continue
 
-                if self._legacy_logger:
-                    self._legacy_logger.task_start(task.id, task.name, phase=extract_phase_number(phase.id))
+                self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id))
 
                 result = self.runner.run_task(task, plan, phase_num=phase.id)
 
@@ -478,11 +467,9 @@ class Executor:
                     phase_deviation_count += len(result.deviations)
                     if result.commit_hash:
                         phase_commit_count += 1
-
-                    if self._legacy_logger:
-                        for dev in result.deviations:
-                            self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=extract_phase_number(phase.id))
-                        self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=extract_phase_number(phase.id))
+                    for dev in result.deviations:
+                        self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=int(phase.id))
+                    self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=int(phase.id))
                 else:
                     state.setdefault("failed_tasks", []).append({
                         "task_id": task.id,
@@ -490,41 +477,25 @@ class Executor:
                         "attempts": result.attempts,
                     })
                     save_state(str(self.repo_path), state)
-
                     logger.error(f"Task {task.id} failed after {result.attempts} attempts")
-                    if self._legacy_logger:
-                        self._legacy_logger.stop(f"Task {task.id} fehlgeschlagen nach {result.attempts} Versuchen")
-                        self._legacy_logger.run_complete(success=False)
+                    self._legacy_logger.stop(f"Task {task.id} fehlgeschlagen nach {result.attempts} Versuchen")
+                    self._legacy_logger.run_complete(success=False)
                     return False
 
-            # Phase review — code review + fix cycle (blocks on failure)
             review_passed = self._review_phase(phase, plan)
             if not review_passed:
-                state.setdefault("failed_phases", []).append({
-                    "phase_id": phase.id,
-                    "reason": "review_failed",
-                })
+                state.setdefault("failed_phases", []).append({"phase_id": phase.id, "reason": "review_failed"})
                 save_state(str(self.repo_path), state)
-                logger.error(
-                    f"Phase {phase.id} review failed — halting execution. "
-                    f"Fix issues and --resume to retry."
-                )
-                if self._legacy_logger:
-                    self._legacy_logger.stop(f"Phase {phase.id} review failed")
-                    self._legacy_logger.run_complete(success=False)
+                logger.error(f"Phase {phase.id} review failed — halting execution. Fix issues and --resume to retry.")
+                self._legacy_logger.stop(f"Phase {phase.id} review failed")
+                self._legacy_logger.run_complete(success=False)
                 return False
 
-            # Phase complete
             state.setdefault("completed_phases", []).append(phase.id)
             save_state(str(self.repo_path), state)
-            if self._legacy_logger:
-                self._legacy_logger.phase_complete(
-                    phase.id, phase.name, phase_tasks_completed,
-                    phase_deviation_count, phase_commit_count,
-                )
+            self._legacy_logger.phase_complete(phase.id, phase.name, phase_tasks_completed, phase_deviation_count, phase_commit_count)
 
-        if self._legacy_logger:
-            self._legacy_logger.run_complete(success=True)
+        self._legacy_logger.run_complete(success=True)
         return True
 
     def _load_or_init_state(self) -> dict:
@@ -569,7 +540,6 @@ class Executor:
         # Log progress after review
         self.log_progress("text")
 
-        from outbid_dirigent.contract_schema import Review
         review = Review.load(self.dirigent_dir / "reviews" / f"phase-{phase.id}.json")
 
         if passed and review:
@@ -594,71 +564,58 @@ class Executor:
 
     def run_tests(self) -> bool:
         """Run verification commands from the test harness. Returns True if passed or no harness."""
-        from outbid_dirigent.test_harness_schema import TestHarness
-
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
         if not harness or not harness.verification_commands:
             logger.info("No test harness or verification commands, skipping test step")
             return True
 
         logger.info(f"Running {len(harness.verification_commands)} verification commands...")
-        import subprocess as sp
         all_passed = True
 
         for cmd in harness.verification_commands:
-            try:
-                result = sp.run(
-                    ["bash", "-c", cmd.command],
-                    cwd=self.repo_path, capture_output=True, text=True, timeout=120,
-                )
-                if result.returncode == 0:
-                    logger.info(f"  PASS: {cmd.name}")
-                else:
-                    logger.error(f"  FAIL: {cmd.name} (exit {result.returncode})")
-                    if result.stderr:
-                        logger.error(f"    stderr: {result.stderr[:200]}")
-                    all_passed = False
-            except sp.TimeoutExpired:
-                logger.error(f"  TIMEOUT: {cmd.name}")
-                all_passed = False
-            except Exception as e:
-                logger.error(f"  ERROR: {cmd.name}: {e}")
+            if not self._run_verification_cmd(cmd.command, cmd.name, timeout=120):
                 all_passed = False
 
-        # Also run e2e framework suite if configured
         if harness.e2e_framework.run_command and harness.e2e_framework.framework != "none":
             logger.info(f"Running e2e suite: {harness.e2e_framework.run_command}")
-            try:
-                result = sp.run(
-                    ["bash", "-c", harness.e2e_framework.run_command],
-                    cwd=self.repo_path, capture_output=True, text=True, timeout=600,
-                )
-                if result.returncode == 0:
-                    logger.info("  E2e suite: PASS")
-                else:
-                    logger.error(f"  E2e suite: FAIL (exit {result.returncode})")
-                    all_passed = False
-            except Exception as e:
-                logger.error(f"  E2e suite error: {e}")
+            if not self._run_verification_cmd(harness.e2e_framework.run_command, "e2e suite", timeout=600):
                 all_passed = False
 
-        if all_passed:
-            logger.info("All verification commands passed")
-        else:
-            logger.error("Verification failed — blocking ship")
+        logger.info("All verification commands passed") if all_passed else logger.error("Verification failed — blocking ship")
 
-        # Attach infra context to test harness result
+        # Log infra confidence tier
         infra_ctx = InfraContext.load(self.dirigent_dir / "infra-context.json")
         if infra_ctx:
             logger.info(f"Test confidence: {infra_ctx.confidence} (tier: {infra_ctx.tier.value})")
 
-        # Wire testing_complete() to portal reporter
+        # Notify portal that testing is complete
         from outbid_dirigent.dirigent import get_portal_reporter
         reporter = get_portal_reporter()
         if reporter and hasattr(reporter, "testing_complete"):
             reporter.testing_complete(str(self.repo_path))
 
         return all_passed
+
+    def _run_verification_cmd(self, command: str, name: str, timeout: int = 120) -> bool:
+        """Run a single bash verification command. Returns True on success."""
+        try:
+            result = subprocess.run(
+                ["bash", "-c", command],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=timeout,
+            )
+            if result.returncode == 0:
+                logger.info(f"  PASS: {name}")
+                return True
+            logger.error(f"  FAIL: {name} (exit {result.returncode})")
+            if result.stderr:
+                logger.error(f"    stderr: {result.stderr[:200]}")
+            return False
+        except subprocess.TimeoutExpired:
+            logger.error(f"  TIMEOUT: {name}")
+            return False
+        except Exception as e:
+            logger.error(f"  ERROR: {name}: {e}")
+            return False
 
     # ══════════════════════════════════════════
     # SHIPPING
@@ -667,8 +624,7 @@ class Executor:
     def ship(self) -> bool:
         """Create branch, push, and open PR."""
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
-        if self._legacy_logger:
-            self._legacy_logger.ship_start("dirigent/...")
+        self._legacy_logger.ship_start("dirigent/...")
 
         shipper = Shipper(self.repo_path, plan, self.dry_run)
         success = shipper.ship()
@@ -676,32 +632,29 @@ class Executor:
         self.shipped_branch_name = shipper.branch_name
         self.shipped_pr_url = shipper.pr_url
 
-        if self._legacy_logger:
-            if shipper.pr_url:
-                self._legacy_logger.ship_done(shipper.pr_url)
-            elif shipper.branch_name:
-                self._legacy_logger.ship_pushed(shipper.branch_name)
+        if shipper.pr_url:
+            self._legacy_logger.ship_done(shipper.pr_url)
+        elif shipper.branch_name:
+            self._legacy_logger.ship_pushed(shipper.branch_name)
         return success
 
     # ══════════════════════════════════════════
     # SUMMARY GENERATION
     # ══════════════════════════════════════════
 
-    def generate_summary(self, branch_name: str = None, pr_url: str = None) -> dict:
+    def generate_summary(self, branch_name: Optional[str] = None, pr_url: Optional[str] = None) -> dict:
         """Generate the final execution report."""
         logger.info("Generating summary...")
 
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
         plan_title = plan.title if plan else "Feature"
 
-        summaries = [f.read_text(encoding="utf-8") for f in sorted(self.summaries_dir.glob("*-SUMMARY.md"))]
+        summaries = [f.read_text(encoding="utf-8") for f in sorted(self.summaries_dir.glob("*-SUMMARY.md"))] if self.summaries_dir.exists() else []
         decisions = self.oracle.get_all_decisions()
         files_changed = self._get_files_changed()
         deviations = self._collect_all_deviations(summaries)
 
-        cost_totals = self._legacy_logger.get_cost_totals() if self._legacy_logger else {
-            "total_cost_cents": 0, "total_input_tokens": 0, "total_output_tokens": 0,
-        }
+        cost_totals = self._legacy_logger.get_cost_totals()
 
         if not branch_name:
             branch_name = self.shipped_branch_name or self._get_current_branch()
@@ -1128,7 +1081,7 @@ class Executor:
         self, markdown: str, files_changed: list[dict],
         decisions: list[dict], deviations: list[dict],
         branch_name: Optional[str], pr_url: Optional[str],
-        test_instructions: list[str] = None, manual_hints: list[str] = None,
+        test_instructions: Optional[list[str]] = None, manual_hints: Optional[list[str]] = None,
     ):
         # Use direct credentials from Executor, fallback to questioner
         portal_url = self.portal_url
@@ -1156,7 +1109,7 @@ class Executor:
 
         # Calculate duration
         elapsed_ms = 0
-        if self._legacy_logger and hasattr(self._legacy_logger, '_start_time') and self._legacy_logger._start_time:
+        if self._legacy_logger._start_time:
             elapsed = datetime.now() - self._legacy_logger._start_time
             elapsed_ms = int(elapsed.total_seconds() * 1000)
 
@@ -1171,7 +1124,7 @@ class Executor:
             "deviations": deviations or [],
             "branchName": branch_name,
             "prUrl": pr_url,
-            "totalCommits": self._legacy_logger._total_commits if self._legacy_logger and hasattr(self._legacy_logger, '_total_commits') else 0,
+            "totalCommits": self._legacy_logger._total_commits,
             "durationMs": elapsed_ms,
             "testInstructions": test_instructions or [],
             "manualHints": manual_hints or [],
