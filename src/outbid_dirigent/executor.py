@@ -18,6 +18,7 @@ from loguru import logger
 
 from outbid_dirigent.analyzer import load_analysis
 from outbid_dirigent.contract import ContractManager
+from outbid_dirigent.infra_schema import InfraContext
 from outbid_dirigent.init_phase import InitPhase
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.plan_schema import Plan
@@ -645,6 +646,11 @@ class Executor:
             logger.info("All verification commands passed")
         else:
             logger.error("Verification failed — blocking ship")
+
+        # Attach infra context to test harness result
+        infra_ctx = InfraContext.load(self.dirigent_dir / "infra-context.json")
+        if infra_ctx:
+            logger.info(f"Test confidence: {infra_ctx.confidence} (tier: {infra_ctx.tier.value})")
 
         return all_passed
 
