@@ -16,6 +16,7 @@ from typing import Optional
 from loguru import logger
 
 from outbid_dirigent.portal_reporter import PortalReporter
+from outbid_dirigent.utils import extract_phase_number
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -395,7 +396,7 @@ class DemoRunner:
         self._sleep(0.5)
 
         for task in tasks:
-            self._run_task(task, int(phase_id))
+            self._run_task(task, extract_phase_number(phase_id))
 
         self.reporter.phase_complete(
             phase_id,
@@ -405,7 +406,7 @@ class DemoRunner:
         )
 
         # Send progress update
-        phases_done = int(phase_id)
+        phases_done = extract_phase_number(phase_id)
         self.reporter.progress(
             tasks_complete=self._tasks_completed,
             total_tasks=self._total_tasks,

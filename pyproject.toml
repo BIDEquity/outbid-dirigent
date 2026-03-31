@@ -19,6 +19,8 @@ dirigent = "outbid_dirigent.dirigent:main"
 [project.optional-dependencies]
 dev = [
     "bump-my-version>=0.28.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",  # Für Test-Coverage Reports
 ]
 
 [build-system]
@@ -44,3 +46,14 @@ serialize = ["{major}.{minor}.{patch}"]
 filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
+
+# ══════════════════════════════════════════
+# PYTEST CONFIGURATION
+# ══════════════════════════════════════════
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+# -v = verbose output (zeigt jeden Test einzeln)
+# --tb=short = kurze Tracebacks bei Fehlern
