@@ -48,3 +48,4 @@ uv.lock
 # Dirigent output (these are created in target repos, not here)
 # .dirigent/
 .firecrawl/
+.worktrees/
