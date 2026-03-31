@@ -652,6 +652,12 @@ class Executor:
         if infra_ctx:
             logger.info(f"Test confidence: {infra_ctx.confidence} (tier: {infra_ctx.tier.value})")
 
+        # Wire testing_complete() to portal reporter
+        from outbid_dirigent.dirigent import get_portal_reporter
+        reporter = get_portal_reporter()
+        if reporter and hasattr(reporter, "testing_complete"):
+            reporter.testing_complete(str(self.repo_path))
+
         return all_passed
 
     # ══════════════════════════════════════════

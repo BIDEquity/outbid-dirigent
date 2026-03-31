@@ -395,6 +395,7 @@ class InitPhase:
         }
 
         start = datetime.now()
+        proc = None
 
         try:
             script_path.chmod(0o755)
@@ -443,7 +444,7 @@ class InitPhase:
         log_file = self.dirigent_dir / "init-output.log"
         log_file.write_text(
             f"=== Init Script: {script_path} ===\n"
-            f"=== Exit Code: {proc.returncode if result['success'] or result['error'] else 'N/A'} ===\n\n"
+            f"=== Exit Code: {proc.returncode if proc else 'N/A'} ===\n\n"
             f"--- STDOUT ---\n{result['output']}\n\n"
             f"--- STDERR ---\n{result['error']}\n",
             encoding="utf-8",
