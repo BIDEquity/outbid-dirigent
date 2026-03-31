@@ -10,6 +10,7 @@ from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional
 from datetime import datetime
 from enum import Enum
+from pydantic import BaseModel, ValidationError
 
 from outbid_dirigent.analyzer import AnalysisResult
 from outbid_dirigent.logger import get_logger
@@ -54,6 +55,23 @@ class Route:
     estimated_tasks: int
     oracle_needed: bool
     repo_context_needed: bool
+
+
+class RouteRecord(BaseModel):
+    route: str
+    reason: str
+    steps: list[str]
+    step_details: list[dict]
+    estimated_tasks: int
+    oracle_needed: bool
+    repo_context_needed: bool
+    created_at: str
+
+
+class StateRecord(BaseModel):
+    completed_steps: list[str]
+    started_at: str
+    updated_at: str = ""
 
 
 class Router:
@@ -362,10 +380,16 @@ class Router:
 def load_route(repo_path: str) -> Optional[Dict]:
     """Lädt eine existierende Route."""
     route_file = Path(repo_path) / ".dirigent" / "ROUTE.json"
-    if route_file.exists():
-        with open(route_file, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    if not route_file.exists():
+        return None
+    try:
+        raw = json.loads(route_file.read_text(encoding="utf-8"))
+        RouteRecord.model_validate(raw)  # validate schema; raise on corrupt data
+        return raw
+    except ValidationError as e:
+        from outbid_dirigent.logger import get_logger
+        get_logger().error(f"ROUTE.json schema validation failed: {e}")
+        return None
 
 
 def get_next_step(repo_path: str) -> Optional[str]:
@@ -391,10 +415,16 @@ def get_next_step(repo_path: str) -> Optional[str]:
 def load_state(repo_path: str) -> Optional[Dict]:
     """Lädt den aktuellen State."""
     state_file = Path(repo_path) / ".dirigent" / "STATE.json"
-    if state_file.exists():
-        with open(state_file, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    if not state_file.exists():
+        return None
+    try:
+        raw = json.loads(state_file.read_text(encoding="utf-8"))
+        StateRecord.model_validate(raw)  # validate schema; raise on corrupt data
+        return raw
+    except ValidationError as e:
+        from outbid_dirigent.logger import get_logger
+        get_logger().error(f"STATE.json schema validation failed: {e}")
+        return None
 
 
 def save_state(repo_path: str, state: Dict):
