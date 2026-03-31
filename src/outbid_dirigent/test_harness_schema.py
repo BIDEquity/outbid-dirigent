@@ -140,6 +140,7 @@ class TestHarness(BaseModel):
     # Overall status
     status: str = Field("ready", description="ready, partial, failed")
     notes: str = ""
+    infra_tier: str = "7_none"  # InfraTier value set by InfraDetector
 
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
