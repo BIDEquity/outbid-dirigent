@@ -1,0 +1,466 @@
+move away from simple bugfixes to (using ruflo as helper) researching improvement possibilities to individual dirgent steps and/or the process as whole?
+
+---
+
+make use of the ruflo mcp server for your resaearch!
+
+---
+
+afraid of B
+
+---
+
+B/C and especially reliably closing the testing loop
+
+---
+
+tests canot be run because of wrong/missing infra. I am generally afraid of being behind other solutions
+
+---
+
+afraid that this will block too many runs and kill the vibe-coding vibe
+
+---
+
+yes
+
+---
+
+y
+
+---
+
+lets dive in here. lets make that test-harness smarter in the first place. i recently heard about devbox from jetify. My idea: use devbox as first-tier testing option. if it exists, use it. If not, create it. If not possible, comment. Then, as 2nd tier use docker-compose (more heavy), but if docker-compose in turn exists use that as first opion. so: use the first testing tier that is available, otherwise create the first one that is viable and if both is not possible, comment whats missing. questions: what are tiers 3-n? does my approach make sense? what about test data`?
+
+---
+
+can you spawn a ruflo research agent for this?
+
+---
+
+<task-notification>
+<task-id>a7095b22cbd27be54</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-dev-projects-outbid-dirigent/eccda9d0-da73-4a2c-b5de-526d0fae1a45/tasks/a7095b22cbd27be54.output</output-file>
+<status>completed</status>
+<summary>Agent "Research devbox + tiered test infra" completed</summary>
+<result>All four findings stored. Here is the full structured research report.
+
+---
+
+## Research Report: Tiered Test Infrastructure for Dirigent
+
+### What was examined
+
+- `/home/dev/projects/outbid-dirigent/src/outbid_dirigent/init_phase.py` — the fragile probe being replaced
+- `/home/dev/projects/outbid-dirigent/src/outbid_dirigent/analyzer.py` (lines 530–750) — existing docker-compose detection
+- `/home/dev/projects/outbid-dirigent/src/outbid_dirigent/test_manifest.py` and `test_harness_schema.py`
+- All plugin skills: `run-init`, `build-manifest`, `increase-testability`
+- `/nix/store/REDACTED/plugins/` — devbox plugin source embedded in the nix derivation
+- `/home/dev/projects/cube-command-center/` — a real production project on this machine using devbox + docker-compose + Doppler
+- devbox 0.17.0 CLI directly
+
+---
+
+## Area 1: Devbox Capabilities Deep-Dive
+
+### The most important fact: devbox requires nix to be functional
+
+`devbox` is installed at `/usr/local/bin/devbox` (v0.17.0) on this machine, but `devbox info` and `devbox services` fail with a broken nix PATH error. The binary exists but nix is not in PATH. **Detection must be two-step**: `which devbox` is not enough. Always run `devbox version 2>/dev/null` and check exit code. If that fails, skip to tier 2.
+
+### devbox.json structure (confirmed from real schema + source)
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.0/.schema/devbox.schema.json",
+  "packages": ["nodejs@22", "postgresql@latest", "redis@latest"],
+  "env": {
+    "PGPORT": "5432",
+    "PGHOST": "/tmp/devbox/myapp",
+    "REDIS_PORT": "6379"
+  },
+  "shell": {
+    "init_hook": [
+      "mkdir -p $PGHOST",
+      "initdb 2>/dev/null || true"
+    ],
+    "scripts": {
+      "dev": ["devbox services start", "npm run dev"],
+      "test": ["devbox services start", "npm test"]
+    }
+  }
+}
+```
+
+**Key schema fields**: `packages` (array or object with version), `env` (flat dict), `shell.init_hook` (array of commands run when entering shell), `shell.scripts` (named multi-step commands). There is **no `services:` block in devbox.json itself** — services are implicit from packages that have plugins.
+
+### How `devbox services` works
+
+Services are driven by **process-compose**, a separate lightweight process manager binary that devbox installs automatically. Each package with a service plugin generates a `process-compose.yaml` in `.devbox/virtenv/<pkg>/`. The plugin definitions live in the devbox binary's embedded nix source:
+
+**postgresql plugin** (from `/nix/store/.../plugins/postgresql/process-compose.yaml`):
+```yaml
+version: "0.5"
+processes:
+  postgresql:
+    command: "sh -c 'exec postgres -k \"$PGHOST\" -p \"${PGPORT:-5432}\"'"
+    shutdown:
+      command: "pg_ctl stop -m fast"
+    readiness_probe:
+      exec:
+        command: "pg_isready -p \"${PGPORT:-5432}\""
+```
+Sets env: `PGDATA=.devbox/virtenv/postgresql/data`, `PGHOST=<virtenv_path>`.
+
+**redis plugin** (from `plugins/redis/process-compose.yaml`):
+```yaml
+processes:
+  redis:
+    command: "redis-server $REDIS_CONF --port $REDIS_PORT"
+    availability:
+      restart: on_failure
+      max_restarts: 5
+```
+Sets env: `REDIS_PORT=6379`, `REDIS_CONF=<devbox_dir>/redis.conf`.
+
+### Can devbox spin up Postgres and Redis natively?
+
+Yes. Both services run as native processes (not Docker). Postgres runs as a unix-socket-bound process via `pg_ctl`. Redis runs as a native redis-server. **No Docker daemon required.** This is the key advantage for CI/headless environments.
+
+**Critical constraint for Postgres**: Before `devbox services start postgresql`, you must run `initdb` to initialize the data directory. The django template shows this pattern:
+```json
+"test": ["initdb", "devbox services start", "devbox run create_db", "pytest"]
+```
+
+### Can `devbox generate` auto-detect from package.json / requirements.txt?
+
+**No.** `devbox generate` produces only: `devcontainer`, `dockerfile`, `direnv`, `readme`, `alias`. None of these detect the stack or generate devbox.json from existing project files. **Dirigent must detect the stack and write devbox.json itself.**
+
+There is **no `devbox init --detect` or `devbox create --auto`**. The `devbox create --template` requires an explicit template name from a fixed list (django, postgres, node-npm, etc.).
+
+### Is devbox viable in CI/headless?
+
+Yes, via `jetify-com/devbox-install-action` GitHub Action (confirmed in devbox's own CI at `.github/workflows/cli-tests.yaml`):
+```yaml
+- uses: jetify-com/devbox-install-action@v0.14.0
+```
+This action installs both nix and devbox together. Without it, if the CI runner already has nix installed, devbox can work. On vanilla GitHub-hosted runners, you need the action.
+
+**Headless detection heuristic**:
+```python
+result = subprocess.run(["devbox", "version"], capture_output=True, timeout=5)
+devbox_viable = result.returncode == 0
+```
+
+### Devbox.json examples for the two requested stacks
+
+**Next.js + Postgres** (devbox-native services, no Docker):
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.0/.schema/devbox.schema.json",
+  "packages": ["nodejs@22", "pnpm@latest", "postgresql@latest"],
+  "env": {
+    "PGPORT": "5432",
+    "PGHOST": "/tmp/devbox/appname",
+    "DATABASE_URL": "postgresql://postgres@localhost:5432/appdb"
+  },
+  "shell": {
+    "init_hook": ["mkdir -p $PGHOST", "initdb 2>/dev/null || true"],
+    "scripts": {
+      "setup": [
+        "devbox services start postgresql",
+        "createdb appdb 2>/dev/null || true",
+        "pnpm install",
+        "pnpm run db:migrate"
+      ],
+      "dev": ["devbox services start postgresql", "pnpm run dev"],
+      "test": ["devbox services start postgresql", "pnpm test"]
+    }
+  }
+}
+```
+
+**Python FastAPI + Redis** (devbox-native services):
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.0/.schema/devbox.schema.json",
+  "packages": ["python@3.12", "redis@latest", "uv@latest"],
+  "env": {"REDIS_PORT": "6379"},
+  "shell": {
+    "init_hook": [
+      ". .venv/bin/activate 2>/dev/null || (uv venv && . .venv/bin/activate && uv pip install -e '.[dev]')"
+    ],
+    "scripts": {
+      "dev": ["devbox services start redis", "uvicorn app.main:app --reload --port 8000"],
+      "test": ["devbox services start redis", "pytest tests/ -x -q"]
+    }
+  }
+}
+```
+
+---
+
+## Area 2: Competitive Landscape
+
+### How other agents handle test infra (research finding: none do it well)
+
+| Agent | Approach | Infra Provisioning |
+|---|---|---|
+| **Devin** | Cloud VM per task, Docker pre-installed | Runs existing docker-compose. No auto-generation. |
+| **OpenHands** | Docker container sandbox with Docker-in-Docker | Uses existing docker-compose. No detection/provisioning. |
+| **SWE-agent** | Pre-baked benchmark containers | All infra is in the container image. Agent runs `pytest` blindly. |
+| **Aider** | Runs in developer's local terminal | Zero infra handling. Developer must have services running. |
+| **Cursor Agent** | Runs in developer's IDE terminal | Same as Aider — local env only. |
+
+**Key finding**: No current agent auto-detects and provisions test infrastructure from scratch. The SWE-bench benchmark "cheats" by pre-baking environments. Devin's approach (cloud VM + existing docker-compose) is the best of the current field, but requires the repo to already have a docker-compose.yml.
+
+**Dirigent's tiered provisioning system would be industry-leading.** The specific differentiator is: when no infra exists, generate it rather than silently skip tests.
+
+### Progressive verification / confidence-annotated test results
+
+The concept exists in research (SWE-bench papers discuss "oracle-guided" test selection) but no production agent has shipped it. The actionable pattern:
+
+```json
+{
+  "test_result": "pass",
+  "confidence": "medium",
+  "infra_tier_used": "4_mocked",
+  "caveat": "Redis was mocked via fakeredis. Real Redis behavior not tested.",
+  "tests_run": 47,
+  "tests_skipped_infra": 12
+}
+```
+
+This belongs in the `TestHarness` schema as a `infra_tier` field and in test results output from `test_manifest.py`.
+
+---
+
+## Area 3: Test Data Seeding Patterns
+
+### Detection heuristic (ordered by confidence)
+
+**High confidence (exact command known):**
+1. `prisma/seed.ts` or `prisma/seed.js` exists → command: `npx prisma db seed`
+2. `package.json` has `scripts["db:seed"]` or `scripts["seed"]` → use that exact command
+3. `db/seeds.rb` exists → Rails project → command: `rails db:seed`
+4. `package.json` has `prisma.seed` key → command: `npx prisma db seed`
+
+**Medium confidence (pattern known, path may vary):**
+5. `seeds/` directory with `.js`/`.ts` files → likely knex → `npx knex seed:run`
+6. `factory_boy` in requirements/pyproject → tests create data via fixtures, no seed command needed, document as "factory-based"
+7. Django `fixtures/` dir → `python manage.py loaddata fixtures/initial_data.json` (enumerate files)
+
+**Low confidence / no seed needed:**
+8. `conftest.py` uses `sqlite:///:memory:` engine → tests are self-contained, zero infra required
+9. `testcontainers-go` in `go.sum` → tests provision their own Docker containers, command is `go test ./...` (requires Docker)
+10. Nothing found → document in `INFRA_GAPS.json`, set `seed_command: ""`
+
+### Observed real pattern on this machine
+
+`/home/dev/projects/cube-command-center/tests/conftest.py` uses the SQLite-in-memory pattern for unit tests (FastAPI + SQLModel):
+```python
+engine = create_engine("sqlite:///:memory:", echo=False)
+SQLModel.metadata.create_all(engine)
+# also: create_async_engine("sqlite+aiosqlite:///:memory:")
+```
+Integration tests use `doppler run -- pytest tests/integration` with real Postgres via docker-compose. This is the canonical two-tier pattern for Python projects.
+
+### Seed command auto-detection code sketch
+
+```python
+def detect_seed_command(repo_path: Path) -> tuple[str, str]:
+    """Returns (seed_command, confidence)."""
+    # Prisma
+    if (repo_path / "prisma" / "seed.ts").exists() or (repo_path / "prisma" / "seed.js").exists():
+        return "npx prisma db seed", "high"
+    # package.json scripts
+    pkg = repo_path / "package.json"
+    if pkg.exists():
+        scripts = json.loads(pkg.read_text()).get("scripts", {})
+        for key in ["db:seed", "seed", "db:seed:run"]:
+            if key in scripts:
+                return f"npm run {key}", "high"
+    # Rails
+    if (repo_path / "db" / "seeds.rb").exists():
+        return "rails db:seed", "high"
+    # Knex
+    if (repo_path / "seeds").is_dir():
+        return "npx knex seed:run", "medium"
+    # Django fixtures
+    fixtures = list((repo_path / "fixtures").glob("*.json")) if (repo_path / "fixtures").is_dir() else []
+    if fixtures:
+        return f"python manage.py loaddata {fixtures[0].name}", "medium"
+    return "", "none"
+```
+
+---
+
+## Area 4: CI Config Extraction (Services Tier 3)
+
+### GitHub Actions `services:` block structure
+
+Location: `jobs.<job_id>.services.<service_name>`. Example of a real Postgres + Redis block:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+```
+
+### Reliable extraction algorithm
+
+```python
+import yaml, glob
+
+def extract_ci_services(repo_path: Path) -> list[dict]:
+    """Extract service definitions from GitHub Actions workflows."""
+    services = []
+    for wf_path in (repo_path / ".github" / "workflows").glob("*.yml"):
+        try:
+            data = yaml.safe_load(wf_path.read_text())
+        except Exception:
+            continue
+        for job in (data or {}).get("jobs", {}).values():
+            for svc_name, svc in job.get("services", {}).items():
+                if not isinstance(svc, dict):
+                    continue
+                image = svc.get("image", "")
+                service_type = _normalize_image(image)  # "postgres:15" -> "postgres"
+                ports = svc.get("ports", [])
+                host_port = _extract_host_port(ports)  # "5432:5432" -> 5432
+                env = svc.get("env", {})
+                services.append({
+                    "name": svc_name,
+                    "type": service_type,
+                    "image": image,
+                    "host_port": host_port,
+                    "env": env,
+                })
+    return services
+
+def _normalize_image(image: str) -> str:
+    name = image.split(":")[0].split("/")[-1]
+    return {"postgresql": "postgres", "bitnami-pg": "postgres"}.get(name, name)
+
+def _extract_host_port(ports: list) -> int | None:
+    for p in ports:
+        parts = str(p).split(":")
+        if len(parts) == 2:
+            try:
+                return int(parts[0])
+            except ValueError:
+                pass
+    return None
+```
+
+### Connection string reconstruction from CI env
+
+For the most common services:
+- **Postgres**: `postgresql://{POSTGRES_USER:-postgres}:{POSTGRES_PASSWORD}@localhost:{host_port:-5432}/{POSTGRES_DB:-postgres}`
+- **Redis**: `redis://localhost:{host_port:-6379}`
+- **MySQL**: `mysql://{MYSQL_USER:-root}:{MYSQL_ROOT_PASSWORD}@localhost:{host_port:-3306}/{MYSQL_DATABASE}`
+
+**Caveat on reliability**: CI env values (passwords, usernames) are safe to use for local test runs because they are test credentials. However, CI may have `localhost` hardcoded in a `DATABASE_URL` env var at the job or step level (not in the services block). Also check `env:` at the job level and in individual `steps[*].env` for `DATABASE_URL` overrides.
+
+### Other CI formats
+
+- **GitLab CI**: `services:` block directly under the job, same structure but `alias:` field instead of a named key
+- **CircleCI**: `docker:` executor with list of images; second+ images become sidecar services
+- **All three** use the same conceptual model: Docker image + env vars + ports
+
+---
+
+## Findings Relevant to Existing Code
+
+### Current fragility in `init_phase.py`
+
+The current `InitPhase.run()` has a single execution path:
+1. Look for `.outbid/init.sh` or `init.sh`
+2. If not found, invoke `/dirigent:run-init` skill to guess from files
+3. No structured service detection, no tiered provisioning
+
+The existing `analyzer.py` (line 539 onwards) detects `uses_docker_compose` and service dependencies from `package.json`, but this information is not used to actually start services. It feeds into `RuntimeAnalysis` which feeds into prompts, but the services never get started programmatically.
+
+### What the tiered system must add to `init_phase.py`
+
+A new `InfraDetector` class that runs **before** the init script check:
+1. Probe devbox viability (`devbox version`)
+2. Probe Docker viability (`docker info`)
+3. Check signal files in priority order
+4. Select provisioning path and return an `InfraContext(tier, services_started, connection_strings, confidence)`
+5. Inject `InfraContext` into `TestHarness` as a new `infra_tier` field
+
+### What to add to `TestHarness` schema (`test_harness_schema.py`)
+
+```python
+class InfraTier(str, Enum):
+    DEVBOX = "1_devbox"
+    DOCKER_COMPOSE = "2_docker_compose"
+    CI_EXTRACTED = "3_ci_extracted"
+    IN_PROCESS_MOCKS = "4_mocked"
+    GENERATED_DEVBOX = "5_generated_devbox"
+    GENERATED_COMPOSE = "6_generated_compose"
+    NONE = "7_none"
+
+class InfraContext(BaseModel):
+    tier: InfraTier = InfraTier.NONE
+    services_started: list[str] = []
+    confidence: str = "low"  # high, medium, low
+    gaps: list[str] = []
+    generated_files: list[str] = []  # files Dirigent wrote to provision infra
+```
+
+---
+
+## Summary Table
+
+| Research Area | Key Finding | Actionable for Dirigent |
+|---|---|---|
+| Devbox capabilities | Services are process-compose driven, no Docker needed, but nix must be in PATH. `devbox generate` cannot auto-detect stack. | Two-step detection: `which devbox && devbox version`. Write devbox.json from detected stack. Must include `initdb` init hook for postgres. |
+| Competitive landscape | No agent auto-provisions infra. Dirigent would be first. Confidence annotation is unimplemented industry-wide. | Implement tiers 1-7. Add `infra_tier` + `confidence` to all test results. INFRA_GAPS.json is a genuine differentiator. |
+| Test data seeding | Detection is highly reliable for prisma/Rails/package.json scripts. Python often needs no seed (SQLite in-memory). Go uses testcontainers (Docker required). | Implement `detect_seed_command()` with 3-tier confidence. Store in `SeedData.seed_command`. Run it after service start if high/medium confidence. |
+| CI config extraction | GitHub Actions `services:` block is machine-parseable. Ports are explicit. Connection strings can be reconstructed from env vars. | YAML parse `.github/workflows/*.yml`, extract services and ports, reconstruct local connection strings for Postgres/Redis/MySQL. |
+
+All four findings have been stored in ruflo memory under namespace `dirigent-research` with keys: `devbox-capabilities-deep-dive`, `ci-config-extraction-patterns`, `test-data-seeding-patterns`, `autonomous-agent-test-infra-landscape`, and `tiered-infra-detection-decision-tree`.</result>
+<usage><total_tokens>90980</total_tokens><tool_uses>68</tool_uses><duration_ms>460690</duration_ms></usage>
+</task-notification>
+
+---
+
+looks great
+
+---
+
+yes
+
+---
+
+we have a lot ig json files that are read and written now. is schema enforced programmatically anywhere?
+
+---
+
+y
+
+---
+
+ok
