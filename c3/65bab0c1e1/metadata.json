@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.5.2",
+  "checkpoint_id": "c365bab0c1e1",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 3,
+  "files_touched": [
+    ".claude/settings.json",
+    "src/outbid_dirigent/executor.py",
+    "src/outbid_dirigent/oracle.py",
+    "src/outbid_dirigent/router.py",
+    "src/outbid_dirigent/shipper.py",
+    "src/outbid_dirigent/task_runner.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/c3/65bab0c1e1/0/metadata.json",
+      "transcript": "/c3/65bab0c1e1/0/full.jsonl",
+      "content_hash": "/c3/65bab0c1e1/0/content_hash.txt",
+      "prompt": "/c3/65bab0c1e1/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 167,
+    "cache_creation_tokens": 2212986,
+    "cache_read_tokens": 8258056,
+    "output_tokens": 43487,
+    "api_call_count": 104
+  }
+}
