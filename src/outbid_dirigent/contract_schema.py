@@ -174,6 +174,7 @@ class CriterionResult(BaseModel):
         default_factory=list,
         description="Commands run to verify this criterion. Required for functional criteria.",
     )
+    verification_tier: str = ""  # InfraTier value used to verify this criterion
 
 
 class Finding(BaseModel):
@@ -190,6 +191,11 @@ class Review(BaseModel):
     phase_id: str
     iteration: int = 1
     verdict: Verdict
+    confidence: str = "static"     # e2e | integration | unit | mocked | static | none
+    infra_tier: str = "7_none"      # InfraTier value active during execution
+    tests_run: int = 0
+    tests_skipped_infra: int = 0
+    caveat: str = ""                # human-readable explanation of what wasn't verified
     criteria_results: list[CriterionResult] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     summary: str = ""
