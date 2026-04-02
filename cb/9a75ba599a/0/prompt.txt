@@ -89,7 +89,3 @@ push
 ---
 
 debug why   Local plugins cannot be updated remotely. To update, modify the source at: ./src/outbid_dirigent/plugin
-
----
-
-this is not the uv plugin but the claude plugin.
