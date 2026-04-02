@@ -51,6 +51,15 @@ def detect_skill(prompt: str) -> str:
     for skill in SKILLS:
         if f"/dirigent:{skill}" in prompt:
             return skill
+    # Also detect agent-dispatch prompts: "Use the X agent to..."
+    agent_to_skill = {
+        "contract-negotiator": "create-contract",
+        "reviewer": "review-phase",
+        "implementer": "fix-review",
+    }
+    for agent_name, skill in agent_to_skill.items():
+        if f"{agent_name} agent" in prompt:
+            return skill
     return "unknown"
 
 

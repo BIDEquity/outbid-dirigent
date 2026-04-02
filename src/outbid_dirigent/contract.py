@@ -69,7 +69,10 @@ class ContractManager:
                            f"({len(contract.acceptance_criteria)} criteria)")
                 return True
 
-        prompt = f"Run /dirigent:create-contract {phase.id}"
+        prompt = (
+            f"Use the contract-negotiator agent to create an acceptance criteria "
+            f"contract for phase {phase.id}. Pass it: phase_id={phase.id}"
+        )
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
 
         if not success:
@@ -187,8 +190,8 @@ class ContractManager:
         review_path = self._review_path(phase.id)
 
         prompt = (
-            f"Run /dirigent:review-phase {phase.id} "
-            f"--commits {commit_count} --iteration {iteration}"
+            f"Use the reviewer agent to review phase {phase.id}. "
+            f"There are {commit_count} commits to review. This is iteration {iteration}."
         )
 
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
@@ -270,8 +273,10 @@ class ContractManager:
             logger.info(f"Phase {phase.id}: no actionable findings, skipping fix")
             return True
 
-        prompt = f"Run /dirigent:fix-review {phase.id} --iteration {iteration}"
-        # Fix uses the task's default model (implementer role)
+        prompt = (
+            f"Use the implementer agent to fix review findings for phase {phase.id}. "
+            f"This is iteration {iteration}."
+        )
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         if success:
