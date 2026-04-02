@@ -1,0 +1,9 @@
+ultrathink about a setup to efficiently test if a) the dirigent works end to end and b) it does at least some sensible things. Letting it run on a spec takes quite long and this is not a great feedback loop. Maybe choose fast models? Or mock model respones? Cost is of course also an issue
+
+---
+
+implement layer 1 and 2
+
+---
+
+yes. looks right
