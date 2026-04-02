@@ -6,11 +6,16 @@ on:
   push:
     branches: [master]
 
-  # Allow manual trigger with E2E option
+  # Allow manual trigger with E2E options
   workflow_dispatch:
     inputs:
-      run_e2e:
-        description: 'Run E2E tests (costs ~$0.50, uses real Claude Code)'
+      run_e2e_portal:
+        description: 'Run E2E tests against Portal (mocked Claude, tests real Portal API)'
+        required: false
+        type: boolean
+        default: false
+      run_e2e_full:
+        description: 'Run full E2E tests (real Claude Code, costs ~$0.50 per run)'
         required: false
         type: boolean
         default: false
@@ -38,13 +43,46 @@ jobs:
       - name: Run unit tests
         run: |
           source .venv/bin/activate
-          pytest tests/ -v --ignore=tests/integration/test_simple_feature.py -m "not e2e" --timeout=60
+          pytest tests/ -v --ignore=tests/integration/test_simple_feature.py --ignore=tests/integration/test_e2e_portal.py -m "not e2e" --timeout=60
 
-  # E2E tests (real Claude Code, manual trigger only)
-  e2e-tests:
+  # E2E tests against real Portal (mocked Claude - no API costs)
+  e2e-portal-tests:
+    name: E2E Tests (Portal Integration)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e_portal == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
+
+      - name: Run Portal E2E tests (mocked Claude)
+        env:
+          PORTAL_URL: ${{ secrets.PORTAL_URL }}
+          TEST_API_SECRET: ${{ secrets.TEST_API_SECRET }}
+        run: |
+          source .venv/bin/activate
+          pytest tests/integration/test_e2e_portal.py::TestE2EWithMockedClaude -v --e2e --timeout=300
+        timeout-minutes: 10
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-portal-results
+          path: |
+            tests/integration/*.log
+          retention-days: 7
+
+  # Full E2E tests (real Claude Code - costs money)
+  e2e-full-tests:
     name: E2E Tests (Real Claude Code)
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e_full == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -63,19 +101,21 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Run E2E tests
+      - name: Run full E2E tests
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PORTAL_URL: ${{ secrets.PORTAL_URL }}
+          TEST_API_SECRET: ${{ secrets.TEST_API_SECRET }}
         run: |
           source .venv/bin/activate
-          pytest tests/integration/ -v --e2e --timeout=600
+          pytest tests/integration/test_e2e_portal.py::TestE2EPortalIntegration -v --e2e --timeout=600
         timeout-minutes: 15
 
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-results
+          name: e2e-full-results
           path: |
             tests/integration/*.log
             /tmp/test-repo-*
