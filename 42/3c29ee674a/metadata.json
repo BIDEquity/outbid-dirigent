@@ -3,7 +3,7 @@
   "checkpoint_id": "423c29ee674a",
   "strategy": "manual-commit",
   "branch": "feat/tiered-infra-detection-confidence",
-  "checkpoints_count": 6,
+  "checkpoints_count": 20,
   "files_touched": [
     "src/outbid_dirigent/dirigent.py",
     "src/outbid_dirigent/executor.py",
@@ -30,13 +30,19 @@
       "transcript": "/42/3c29ee674a/1/full.jsonl",
       "content_hash": "/42/3c29ee674a/1/content_hash.txt",
       "prompt": "/42/3c29ee674a/1/prompt.txt"
+    },
+    {
+      "metadata": "/42/3c29ee674a/2/metadata.json",
+      "transcript": "/42/3c29ee674a/2/full.jsonl",
+      "content_hash": "/42/3c29ee674a/2/content_hash.txt",
+      "prompt": "/42/3c29ee674a/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 1900,
-    "cache_creation_tokens": 1098583,
-    "cache_read_tokens": 36267139,
-    "output_tokens": 102688,
-    "api_call_count": 314
+    "input_tokens": 1974,
+    "cache_creation_tokens": 1261429,
+    "cache_read_tokens": 39361296,
+    "output_tokens": 112701,
+    "api_call_count": 360
   }
 }

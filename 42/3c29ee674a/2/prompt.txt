@@ -1,0 +1,53 @@
+look into @inp/.claude/ . is there anything "better" than our current codebase?
+
+---
+
+how is that different to our execute -> review cycle.
+
+---
+
+add the timestamp detection
+
+---
+
+zip up our plugin
+
+---
+
+how to start finder in current dir from terminal
+
+---
+
+anything in  there we can/should not share?
+
+---
+
+any other "embarassing" stuff?
+
+---
+
+Can we also share the dirigent code itself (aka the whole repo)?
+
+---
+
+do the clenaup. rename inp to input/lbx and gitignore it. internal details are fine, secrets are not.
+
+---
+
+zip this up.
+
+---
+
+what is lbx mcp server doing?
+
+---
+
+are there any references to the codebase search mcp?
+
+---
+
+why did they build a clickip mcp themselves?
+
+---
+
+redo the zip without claude, github, .dirigent, coder dir. keep .claude-plugin dir
