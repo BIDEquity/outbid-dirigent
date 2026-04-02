@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "6ab8a4945feb",
+  "session_id": "d5598bd2-ce81-46da-b166-5162bb36b3f0",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-02T13:52:45.104262Z",
+  "branch": "feat/tiered-infra-detection-confidence",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/superpowers/plans/2026-04-02-test-layers-1-2.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "ace0ef09a7a1",
+  "token_usage": {
+    "input_tokens": 22402,
+    "cache_creation_tokens": 823374,
+    "cache_read_tokens": 59184477,
+    "output_tokens": 117941,
+    "api_call_count": 235
+  },
+  "session_metrics": {
+    "turn_count": 32
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-02T13:52:44.204192Z",
+    "agent_lines": 1943,
+    "human_added": 4455,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 6398,
+    "agent_percentage": 30.368865270397
+  }
+}
