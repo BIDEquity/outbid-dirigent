@@ -19,6 +19,7 @@ from loguru import logger
 from outbid_dirigent.analyzer import load_analysis
 from outbid_dirigent.contract import ContractManager
 from outbid_dirigent.init_phase import InitPhase
+from outbid_dirigent.opencode_bridge import OpenCodeBridge
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.planner import Planner
@@ -152,6 +153,15 @@ class Executor:
             runner=self.runner,
         )
 
+        # OpenCode bridge — convert .opencode skills to Claude plugin format
+        bridge = OpenCodeBridge(self.repo_path)
+        if bridge.available():
+            plugin_dir = bridge.convert()
+            if plugin_dir:
+                self.runner.opencode_plugin_dir = plugin_dir
+                self.runner.opencode_skill_catalog = bridge.skill_catalog()
+                self.runner.opencode_plugin_name = bridge.plugin_name()
+
         # Contract manager for review/fix iteration loop
         self.contract_manager = ContractManager(self.repo_path, self.runner)
 
@@ -195,6 +205,35 @@ class Executor:
             output = self.progress.text()
 
         self._legacy_logger.info(output)
+
+    # ══════════════════════════════════════════
+    # GREENFIELD SCAFFOLD (Greenfield Route)
+    # ══════════════════════════════════════════
+
+    def greenfield_scaffold(self) -> bool:
+        """Propose test setup and architecture best practices for greenfield projects."""
+        logger.info("Running greenfield scaffold...")
+        prompt = "Run /dirigent:greenfield-scaffold"
+        success, _, stderr = self.runner._run_claude(prompt, timeout=900)
+
+        if not success:
+            logger.error(f"Greenfield scaffold failed: {stderr[:200]}")
+            return False
+
+        strategy = self.dirigent_dir / "testing-strategy.md"
+        decisions = self.dirigent_dir / "architecture-decisions.md"
+        produced = []
+        if strategy.exists():
+            produced.append("testing-strategy.md")
+        if decisions.exists():
+            produced.append("architecture-decisions.md")
+
+        if produced:
+            logger.info(f"Greenfield scaffold produced: {', '.join(produced)}")
+            return True
+
+        logger.warning("Greenfield scaffold produced no artifacts")
+        return False
 
     # ══════════════════════════════════════════
     # INCREASE TESTABILITY (Testability Route)

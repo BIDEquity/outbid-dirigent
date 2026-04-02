@@ -63,6 +63,10 @@ class Shipper:
             return True
 
         try:
+            # Remove .dirigent/ and .planning/ from git history on the PR branch.
+            # These are execution artifacts — useful as logs, not as code changes.
+            self._strip_artifacts()
+
             # Create branch
             result = subprocess.run(
                 ["git", "checkout", "-b", branch_name],
@@ -100,6 +104,56 @@ class Shipper:
         except Exception as e:
             logger.error(f"Shipping failed: {e}")
             return False
+
+    # Directories that are execution artifacts and must not appear in PRs
+    ARTIFACT_DIRS = [".dirigent", ".planning"]
+
+    def _strip_artifacts(self) -> None:
+        """Remove execution artifact directories from git tracking.
+
+        Removes .dirigent/ and .planning/ from all commits that introduced them,
+        so the PR branch contains only production code changes.
+        """
+        # Check which artifact dirs are actually tracked
+        tracked = []
+        for d in self.ARTIFACT_DIRS:
+            result = subprocess.run(
+                ["git", "ls-files", d],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                tracked.append(d)
+
+        if not tracked:
+            return
+
+        logger.info(f"Stripping artifact dirs from git: {tracked}")
+
+        # Remove from index (keeps files on disk)
+        for d in tracked:
+            subprocess.run(
+                ["git", "rm", "-r", "--cached", "--quiet", d],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+
+        # Ensure they stay ignored
+        gitignore_path = self.repo_path / ".gitignore"
+        existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+        additions = [d + "/" for d in tracked if d + "/" not in existing and d not in existing]
+        if additions:
+            block = "\n# Dirigent execution artifacts\n" + "\n".join(additions) + "\n"
+            with open(gitignore_path, "a", encoding="utf-8") as f:
+                f.write(block)
+
+        # Commit the removal
+        subprocess.run(
+            ["git", "add", ".gitignore"],
+            cwd=self.repo_path, capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "chore: exclude execution artifacts from PR"],
+            cwd=self.repo_path, capture_output=True, text=True,
+        )
 
     def _build_verification_section(self) -> str:
         """Build ## Verification section from InfraContext for PR body."""

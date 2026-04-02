@@ -63,10 +63,25 @@ Before starting implementation, read `.dirigent/contracts/phase-{PHASE_ID}.json`
 
 If any criterion seems unverifiable or contradicts the task description, note it in your summary as `DEVIATION: Contract-Concern — [explanation]`.
 
+## Convention Awareness
+
+**If a `<convention-skills>` block is present**, load each listed skill BEFORE writing any code. These are project-specific convention skills that define exactly how this codebase writes code — authorization patterns, form objects, naming conventions, test structure.
+
+```
+Example: if the block says "ruby-code-writing" and "form-builder",
+run /opencode-reponame:ruby-code-writing and /opencode-reponame:form-builder
+before writing a single line.
+```
+
+**If a `<conventions>` block is present instead**, follow those patterns exactly.
+
+When conventions specify a pattern (e.g. "forms use ActiveAttr with DelegateValidation"), use that pattern even if you know an alternative. Consistency with the existing codebase is more important than your preference.
+
 ## Constraints
 
 - No questions. No waiting. Work through it and commit.
 - Stick to the task description. Do not add unrelated features.
 - Respect files_to_create and files_to_modify lists.
 - If business rules exist at `.dirigent/BUSINESS_RULES.md`, they MUST be preserved.
+- If conventions exist in `<conventions>`, follow established patterns.
 - Do not write throwaway code. Every function you write will be called by the next task. Every pattern you establish will be followed by the next developer. Build it right.

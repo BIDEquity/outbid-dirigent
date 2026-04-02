@@ -27,6 +27,7 @@ class RouteType(Enum):
 
 class StepType(Enum):
     INIT = "init"
+    GREENFIELD_SCAFFOLD = "greenfield_scaffold"
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
     INCREASE_TESTABILITY = "increase_testability"
@@ -84,6 +85,12 @@ class Router:
             step_type=StepType.INIT,
             name="Init Phase",
             description="Bootstrap dev environment, seed data, configure e2e credentials",
+            required=False,
+        ),
+        RouteStep(
+            step_type=StepType.GREENFIELD_SCAFFOLD,
+            name="Greenfield Scaffold",
+            description="Propose test setup and architecture best practices before planning",
             required=False,
         ),
         RouteStep(

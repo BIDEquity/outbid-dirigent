@@ -71,6 +71,10 @@ class TaskRunner:
         # Current task context for hooks
         self._current_task_id: Optional[str] = None
         self._current_phase: Optional[int] = None
+        # OpenCode bridge — set by Executor if .opencode/ exists
+        self.opencode_plugin_dir: Optional[Path] = None
+        self.opencode_skill_catalog: list[dict] = []
+        self.opencode_plugin_name: str = ""
         # Discover spec images in .planning/assets/
         self.spec_images = self._discover_spec_images()
 
@@ -119,6 +123,10 @@ class TaskRunner:
         plugin_dir = Path(__file__).parent / "plugin"
         if plugin_dir.exists():
             cmd.extend(["--plugin-dir", str(plugin_dir)])
+
+        # Inject OpenCode-sourced convention skills if available
+        if self.opencode_plugin_dir:
+            cmd.extend(["--plugin-dir", str(self.opencode_plugin_dir)])
 
         cmd.extend(["-p", prompt])
 
@@ -181,6 +189,51 @@ class TaskRunner:
     def _load_business_rules(self) -> Optional[str]:
         rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
         return rules_file.read_text(encoding="utf-8") if rules_file.exists() else None
+
+    def _build_convention_skills_block(self, task: "Task") -> Optional[str]:
+        """Build <convention-skills> block telling the agent which skills to load.
+
+        Uses task.convention_skills if the planner tagged the task.
+        Falls back to full catalog if not tagged.
+        """
+        if not self.opencode_skill_catalog:
+            return None
+
+        plugin = self.opencode_plugin_name
+
+        # Use planner-tagged skills if available, otherwise full skill catalog
+        if task.convention_skills:
+            catalog_by_name = {s["name"]: s for s in self.opencode_skill_catalog}
+            relevant = [
+                catalog_by_name[name]
+                for name in task.convention_skills
+                if name in catalog_by_name
+            ]
+        else:
+            # Fallback: include all skills (let the agent decide)
+            relevant = [s for s in self.opencode_skill_catalog if s["type"] == "skill"]
+
+        if not relevant:
+            return None
+
+        lines = ['<convention-skills hint="load these skills BEFORE writing any code">']
+        for skill in relevant:
+            desc = skill["description"][:100] if skill["description"] else ""
+            lines.append(f"- {skill['name']}: {desc}")
+        lines.append("")
+        lines.append(f"Load with: /{plugin}:{relevant[0]['name']}  (replace skill name as needed)")
+        lines.append("</convention-skills>")
+        return "\n".join(lines)
+
+    def _load_conventions(self, max_chars: int = 6000) -> Optional[str]:
+        """Load CONVENTIONS.md from repo root. Capped to stay within prompt budget."""
+        conv_file = self.repo_path / "CONVENTIONS.md"
+        if not conv_file.exists():
+            return None
+        content = conv_file.read_text(encoding="utf-8")
+        if len(content) > max_chars:
+            content = content[:max_chars] + "\n... (truncated)"
+        return content
 
     def _get_recent_diff(self, max_commits: int = 3, max_chars: int = 4000) -> str:
         try:
@@ -360,6 +413,26 @@ LIMIT 45;
         sections.append(f"<files-to-create>{', '.join(task.files_to_create) or 'keine'}</files-to-create>")
         sections.append(f"<files-to-modify>{', '.join(task.files_to_modify) or 'keine'}</files-to-modify>")
         sections.append("</your-task>")
+
+        # Convention skills — tell the agent which project-specific skills to load
+        skill_block = self._build_convention_skills_block(task)
+        if skill_block:
+            sections.append(skill_block)
+        else:
+            # Fallback: inject CONVENTIONS.md directly if no OpenCode skills
+            conventions = self._load_conventions()
+            if conventions:
+                sections.append(f"<conventions hint=\"follow these patterns when writing code\">\n{conventions}\n</conventions>")
+
+        # Greenfield scaffold context (testing strategy + architecture decisions)
+        for artifact, tag, hint in [
+            ("testing-strategy.md", "testing-strategy", "follow this test strategy"),
+            ("architecture-decisions.md", "architecture-decisions", "follow these architecture patterns"),
+        ]:
+            artifact_path = self.dirigent_dir / artifact
+            if artifact_path.exists():
+                content = artifact_path.read_text(encoding="utf-8")[:3000]
+                sections.append(f"<{tag} hint=\"{hint}\">\n{content}\n</{tag}>")
 
         # Business rules
         if business_rules:

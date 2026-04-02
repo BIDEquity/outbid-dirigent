@@ -586,6 +586,17 @@ class InitPhase:
         elif arch_path.exists():
             logger.info("ARCHITECTURE.md exists — skipping generation")
 
+        # Step 3c: Generate CONVENTIONS.md if no .opencode skills and no existing file
+        has_opencode = (self.repo_path / ".opencode" / "skills").is_dir()
+        conv_path = self.repo_path / "CONVENTIONS.md"
+        if has_opencode:
+            logger.info(".opencode/skills/ detected — skipping CONVENTIONS.md (bridge handles this)")
+        elif not conv_path.exists() and self.runner:
+            logger.info("No .opencode skills or CONVENTIONS.md — generating conventions")
+            self.runner._run_claude("Run /dirigent:generate-conventions", timeout=600)
+        elif conv_path.exists():
+            logger.info("CONVENTIONS.md exists — skipping generation")
+
         if harness is None:
             return True
 
