@@ -35,7 +35,7 @@ def _init_logger(tmp_path):
 def dirigent_dir(tmp_path):
     """Create and return a .dirigent directory inside tmp_path."""
     d = tmp_path / ".dirigent"
-    d.mkdir()
+    d.mkdir(exist_ok=True)
     return d
 
 
