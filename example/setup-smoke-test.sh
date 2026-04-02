@@ -14,6 +14,7 @@ fi
 
 echo "Copying sample repo to $TARGET"
 cp -r "$SCRIPT_DIR/sample-repo" "$TARGET"
+mkdir -p "$TARGET/.dirigent/logs" "$TARGET/.dirigent/contracts" "$TARGET/.dirigent/reviews" "$TARGET/.dirigent/summaries" "$TARGET/.dirigent/hooks" "$TARGET/tests"
 
 cd "$TARGET"
 

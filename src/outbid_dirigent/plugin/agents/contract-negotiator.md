@@ -52,9 +52,11 @@ Write acceptance criteria where every behavioral verification command is EXECUTA
 - Field name is `objective` — NOT `description` or `verification_strategy`
 - Each criterion `id`: format `AC-{PHASE_ID}-{NN}` (e.g., AC-01-01)
 - Each `verification` MUST start with `"Run: "`
-- `layer` must be: `"structural"`, `"behavioral"`, or `"boundary"`
+- `layer` MUST be one of EXACTLY these 3 strings: `"structural"`, `"behavioral"`, `"boundary"`
+  - NOT `"unit"`, `"code_quality"`, `"integration"`, `"functional"`, or any other value
 - **Max 8 criteria total**. Min 1.
 - Max 2 structural, min 3 behavioral, min 1 boundary
+- `expected_files` entries MUST be objects: `{"path": "src/foo.py", "change": "description"}` — NOT plain strings
 
 ## Fallback Strategy
 
@@ -63,3 +65,11 @@ If test harness is NOT running (curl fails):
 - Python: `Run: python -m pytest tests/test_feature.py -v -k "test_name"`
 - Node: `Run: npx jest --testPathPattern="feature" --verbose`
 - Go: `Run: go test ./pkg/feature/... -v -run TestName`
+
+## MANDATORY Post-Write Validation
+
+After writing the contract JSON, you MUST run:
+```bash
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/contracts/phase-{PHASE_ID}.json
+```
+If it fails, read the errors, fix the JSON, write again, and re-validate. Do NOT stop until VALIDATION PASSED.

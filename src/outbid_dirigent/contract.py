@@ -12,6 +12,7 @@ Contracts and reviews are structured JSON files validated by Pydantic.
 All prompts use /dirigent: slash commands resolved natively by the subprocess.
 """
 
+import subprocess
 from pathlib import Path
 
 from loguru import logger
@@ -20,6 +21,11 @@ import re
 
 from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict, CriterionLayer
 from outbid_dirigent.plan_schema import Plan, Phase
+
+# Validation scripts bundled with the plugin skills
+_PLUGIN_DIR = Path(__file__).parent / "plugin" / "skills"
+_CONTRACT_VALIDATOR = _PLUGIN_DIR / "create-contract" / "scripts" / "validate_schema.py"
+_REVIEW_VALIDATOR = _PLUGIN_DIR / "review-phase" / "scripts" / "validate_schema.py"
 
 
 class ContractManager:
@@ -46,8 +52,14 @@ class ContractManager:
     # CONTRACT CREATION
     # ══════════════════════════════════════════
 
+    MAX_SCHEMA_RETRIES = 2
+
     def create_contract(self, phase: Phase, plan: Plan, spec_content: str) -> bool:
-        """Create acceptance criteria contract for a phase before execution."""
+        """Create acceptance criteria contract for a phase before execution.
+
+        Runs a validation+retry loop: if the agent produces invalid JSON,
+        the orchestrator feeds validation errors back for a targeted fix.
+        """
         contract_path = self._contract_path(phase.id)
 
         if contract_path.exists():
@@ -64,13 +76,27 @@ class ContractManager:
             logger.error(f"Contract creation failed for phase {phase.id}: {stderr[:200]}")
             return False
 
-        # Validate the output
+        # Validate with schema script + Pydantic, retry with error feedback
+        for attempt in range(1, self.MAX_SCHEMA_RETRIES + 1):
+            errors = self._run_validator(_CONTRACT_VALIDATOR, contract_path)
+            if not errors:
+                break
+            logger.warning(
+                f"Contract phase {phase.id} schema errors (attempt {attempt}): "
+                + "; ".join(errors[:3])
+            )
+            fix_prompt = (
+                f"The contract JSON at {contract_path} has schema errors. "
+                f"Fix ONLY these errors and rewrite the file:\n"
+                + "\n".join(f"- {e}" for e in errors)
+            )
+            self.runner._run_claude(fix_prompt, timeout=120)
+
         contract = Contract.load(contract_path)
         if contract is None:
             logger.error(f"Contract for phase {phase.id} was not created or is invalid JSON")
             return False
 
-        # Soft validation: warn about weak contracts
         self._validate_contract_quality(contract)
 
         logger.info(
@@ -79,6 +105,28 @@ class ContractManager:
             f"{len(contract.expected_files)} expected files"
         )
         return True
+
+    @staticmethod
+    def _run_validator(script: Path, target: Path) -> list[str]:
+        """Run a validation script and return error lines. Empty list = valid."""
+        if not script.exists() or not target.exists():
+            return []
+        try:
+            result = subprocess.run(
+                ["python3", str(script), str(target)],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0:
+                return []
+            # Extract ERROR lines from output
+            return [
+                line.strip().removeprefix("ERROR: ").removeprefix("  ERROR: ")
+                for line in result.stdout.splitlines()
+                if "ERROR" in line
+            ]
+        except Exception as e:
+            logger.debug(f"Validator failed: {e}")
+            return []
 
     def load_contract(self, phase_id: str) -> Contract | None:
         """Load and validate a phase contract."""
@@ -149,6 +197,22 @@ class ContractManager:
             logger.warning(f"Phase {phase.id} review subprocess failed: {stderr[:200]}")
             return "error"
 
+        # Validate with schema script + retry with error feedback
+        for attempt in range(1, self.MAX_SCHEMA_RETRIES + 1):
+            errors = self._run_validator(_REVIEW_VALIDATOR, review_path)
+            if not errors:
+                break
+            logger.warning(
+                f"Phase {phase.id} review schema errors (attempt {attempt}): "
+                + "; ".join(errors[:3])
+            )
+            fix_prompt = (
+                f"The review JSON at {review_path} has schema errors. "
+                f"Fix ONLY these errors and rewrite the file:\n"
+                + "\n".join(f"- {e}" for e in errors)
+            )
+            self.runner._run_claude(fix_prompt, timeout=120)
+
         # Parse structured review
         review = Review.load(review_path)
         if review is None:
@@ -207,6 +271,7 @@ class ContractManager:
             return True
 
         prompt = f"Run /dirigent:fix-review {phase.id} --iteration {iteration}"
+        # Fix uses the task's default model (implementer role)
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         if success:
