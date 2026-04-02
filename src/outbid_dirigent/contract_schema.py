@@ -236,7 +236,34 @@ class Review(BaseModel):
         if not path.exists():
             return None
         try:
-            return cls.model_validate_json(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            # Backward compat: old schema used uppercase verdict, different field names
+            if "verdict" in raw and isinstance(raw["verdict"], str):
+                raw["verdict"] = raw["verdict"].lower()
+            if "results" in raw and "criteria_results" not in raw:
+                # Old field was "results" with id/status/layer/actual/notes
+                old_results = raw.pop("results")
+                raw["criteria_results"] = [
+                    {
+                        "ac_id": r.get("id", ""),
+                        "verdict": r.get("status", "fail").lower(),
+                        "notes": r.get("actual") or r.get("notes") or "",
+                    }
+                    for r in old_results
+                ]
+            if "issues" in raw and "findings" not in raw:
+                _sev_map = {"low": "info", "medium": "warn", "high": "critical"}
+                raw["findings"] = [
+                    {
+                        "severity": _sev_map.get(i.get("severity", "info"), i.get("severity", "info")),
+                        "file": i.get("criterion", ""),
+                        "line": 0,
+                        "description": i.get("description", ""),
+                        "suggestion": i.get("recommendation", ""),
+                    }
+                    for i in raw.pop("issues")
+                ]
+            return cls.model_validate(raw)
         except Exception:
             return None
 
