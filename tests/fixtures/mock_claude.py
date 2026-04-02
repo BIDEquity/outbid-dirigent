@@ -3,13 +3,14 @@
 Mock Claude Code CLI for integration testing.
 
 This script simulates Claude Code behavior without making API calls.
-It parses the task prompt and creates the expected outputs:
-1. Creates files mentioned in the task
-2. Creates a summary in .dirigent/summaries/
-3. Makes a git commit
+It detects the type of request and generates appropriate outputs:
+
+1. Planning requests → Creates .dirigent/PLAN.json
+2. Test manifest requests → Creates outbid-test-manifest.yaml
+3. Task execution requests → Creates files + commits
 
 Usage:
-    Set MOCK_CLAUDE_BIN to point to this script before running tests.
+    Set PATH to include this script's directory before running tests.
     The Dirigent will call this instead of the real `claude` CLI.
 """
 import argparse
@@ -19,6 +20,124 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+
+def detect_request_type(prompt: str) -> str:
+    """Detect what kind of request this is based on prompt content."""
+    prompt_lower = prompt.lower()
+
+    if "plan.json" in prompt_lower or "ausführungsplan" in prompt_lower:
+        return "plan"
+    elif "test-manifest" in prompt_lower or "outbid-test-manifest.yaml" in prompt_lower:
+        return "manifest"
+    elif "<task id=" in prompt:
+        return "task"
+    elif "business rules" in prompt_lower or "business_rules" in prompt_lower:
+        return "business_rules"
+    else:
+        return "unknown"
+
+
+def create_plan(repo_path: Path, prompt: str) -> None:
+    """Create a mock PLAN.json based on the spec in the prompt."""
+    dirigent_dir = repo_path / ".dirigent"
+    dirigent_dir.mkdir(parents=True, exist_ok=True)
+
+    # Extract spec content to understand what files to create
+    spec_match = re.search(r'<spec>(.*?)</spec>', prompt, re.DOTALL)
+    spec_content = spec_match.group(1) if spec_match else ""
+
+    # Detect files mentioned in spec
+    files_to_create = []
+    if "hello.txt" in spec_content.lower():
+        files_to_create.append("hello.txt")
+    if "file1.txt" in spec_content.lower():
+        files_to_create.append("file1.txt")
+    if "file2.txt" in spec_content.lower():
+        files_to_create.append("file2.txt")
+
+    # Default to hello.txt if nothing specific found
+    if not files_to_create:
+        files_to_create = ["hello.txt"]
+
+    # Create a simple plan
+    plan = {
+        "title": "Test Feature Implementation",
+        "summary": "Implementing the requested feature",
+        "assumptions": [
+            "Repository is a valid git repo",
+            "No external dependencies required"
+        ],
+        "out_of_scope": [
+            "Deployment",
+            "Documentation updates"
+        ],
+        "phases": [
+            {
+                "id": "01",
+                "name": "Implementation",
+                "description": "Create the required files",
+                "tasks": [
+                    {
+                        "id": "01-01",
+                        "name": f"Create {files_to_create[0]}",
+                        "description": f"Create the {files_to_create[0]} file with appropriate content",
+                        "files_to_create": [files_to_create[0]],
+                        "files_to_modify": [],
+                        "depends_on": [],
+                        "model": "haiku",
+                        "effort": "low",
+                        "test_level": ""
+                    }
+                ]
+            }
+        ],
+        "estimated_complexity": "low",
+        "risks": []
+    }
+
+    # Add additional tasks for more files
+    for i, filename in enumerate(files_to_create[1:], start=2):
+        plan["phases"][0]["tasks"].append({
+            "id": f"01-{i:02d}",
+            "name": f"Create {filename}",
+            "description": f"Create the {filename} file",
+            "files_to_create": [filename],
+            "files_to_modify": [],
+            "depends_on": [],
+            "model": "haiku",
+            "effort": "low",
+            "test_level": ""
+        })
+
+    plan_path = dirigent_dir / "PLAN.json"
+    plan_path.write_text(json.dumps(plan, indent=2))
+
+    print(f"[mock-claude] Created PLAN.json with {len(plan['phases'][0]['tasks'])} task(s)")
+
+
+def create_test_manifest(repo_path: Path) -> None:
+    """Create a minimal mock test manifest."""
+    manifest = """# Auto-generated test manifest
+name: test-repo
+version: "1.0"
+
+prerequisites: []
+
+components: []
+
+test_commands:
+  l1:
+    - name: lint
+      run: "echo 'lint ok'"
+      timeout: 60
+  l2: []
+
+gaps: []
+"""
+    manifest_path = repo_path / "outbid-test-manifest.yaml"
+    manifest_path.write_text(manifest)
+    print("[mock-claude] Created outbid-test-manifest.yaml")
 
 
 def parse_task_from_prompt(prompt: str) -> dict:
@@ -51,25 +170,24 @@ def parse_task_from_prompt(prompt: str) -> dict:
     if create_match:
         files = create_match.group(1).strip()
         if files and files.lower() != "keine":
-            task_info["files_to_create"] = [f.strip() for f in files.split(",")]
+            task_info["files_to_create"] = [f.strip() for f in files.split(",") if f.strip()]
 
     # Extract files to modify
     modify_match = re.search(r'<files-to-modify>([^<]+)</files-to-modify>', prompt)
     if modify_match:
         files = modify_match.group(1).strip()
         if files and files.lower() != "keine":
-            task_info["files_to_modify"] = [f.strip() for f in files.split(",")]
+            task_info["files_to_modify"] = [f.strip() for f in files.split(",") if f.strip()]
 
     return task_info
 
 
-def create_mock_output(repo_path: Path, task_info: dict) -> None:
-    """Create mock output files based on task info."""
+def execute_task(repo_path: Path, task_info: dict) -> None:
+    """Execute a task by creating files and committing."""
     task_id = task_info["id"]
     task_name = task_info["name"]
-    description = task_info["description"]
 
-    # Create files mentioned in files_to_create
+    # Create files
     for filename in task_info["files_to_create"]:
         filepath = repo_path / filename
         filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -91,13 +209,13 @@ def create_mock_output(repo_path: Path, task_info: dict) -> None:
             content = f"Created by task {task_id}\n"
 
         filepath.write_text(content)
+        print(f"[mock-claude] Created {filename}")
 
-    # Modify files mentioned in files_to_modify
+    # Modify files
     for filename in task_info["files_to_modify"]:
         filepath = repo_path / filename
         if filepath.exists():
             current = filepath.read_text()
-            # Add a comment/modification marker
             if filename.endswith(".json"):
                 try:
                     data = json.loads(current)
@@ -107,6 +225,7 @@ def create_mock_output(repo_path: Path, task_info: dict) -> None:
                     pass
             else:
                 filepath.write_text(f"// Modified by task {task_id}\n{current}")
+            print(f"[mock-claude] Modified {filename}")
 
     # Create summary file
     summaries_dir = repo_path / ".dirigent" / "summaries"
@@ -117,8 +236,6 @@ def create_mock_output(repo_path: Path, task_info: dict) -> None:
 ## Was wurde gemacht
 {task_name}
 
-{description}
-
 ## Geänderte Dateien
 """
     for f in task_info["files_to_create"]:
@@ -126,31 +243,41 @@ def create_mock_output(repo_path: Path, task_info: dict) -> None:
     for f in task_info["files_to_modify"]:
         summary_content += f"- Modified: {f}\n"
 
-    summary_content += """
-## Deviations
-Keine.
-
-## Nächste Schritte
-Task abgeschlossen.
-"""
+    summary_content += "\n## Deviations\nKeine.\n"
 
     summary_file = summaries_dir / f"{task_id}-SUMMARY.md"
     summary_file.write_text(summary_content)
 
-
-def git_commit(repo_path: Path, task_id: str, task_name: str) -> None:
-    """Create a git commit for the task."""
-    subprocess.run(
-        ["git", "add", "-A"],
-        cwd=repo_path,
-        capture_output=True,
-    )
-
+    # Git commit
+    subprocess.run(["git", "add", "-A"], cwd=repo_path, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", f"feat({task_id}): {task_name}"],
         cwd=repo_path,
         capture_output=True,
     )
+
+    print(f"[mock-claude] Task {task_id} completed with commit")
+
+
+def create_business_rules(repo_path: Path) -> None:
+    """Create a mock business rules file."""
+    dirigent_dir = repo_path / ".dirigent"
+    dirigent_dir.mkdir(parents=True, exist_ok=True)
+
+    rules_content = """# Business Rules
+
+## Entities
+- User: Basic user entity
+
+## Rules
+- No specific business rules for test repo
+
+## API Endpoints
+- None defined
+"""
+    rules_path = dirigent_dir / "BUSINESS_RULES.md"
+    rules_path.write_text(rules_content)
+    print("[mock-claude] Created BUSINESS_RULES.md")
 
 
 def main():
@@ -160,7 +287,7 @@ def main():
     parser.add_argument("--effort", help="Effort level (ignored)")
     parser.add_argument("--append-system-prompt", help="System prompt (ignored)")
     parser.add_argument("--plugin-dir", help="Plugin directory (ignored)")
-    parser.add_argument("--dangerously-skip-permissions", action="store_true", help="Skip permissions (ignored)")
+    parser.add_argument("--dangerously-skip-permissions", action="store_true")
 
     args = parser.parse_args()
 
@@ -168,24 +295,24 @@ def main():
         print("Error: No prompt provided", file=sys.stderr)
         sys.exit(1)
 
-    # Get repo path from cwd
     repo_path = Path.cwd()
+    request_type = detect_request_type(args.prompt)
 
-    # Parse task from prompt
-    task_info = parse_task_from_prompt(args.prompt)
+    print(f"[mock-claude] Request type: {request_type}")
 
-    # Log what we're doing
-    print(f"[mock-claude] Processing task: {task_info['id']} - {task_info['name']}")
-    print(f"[mock-claude] Files to create: {task_info['files_to_create']}")
-    print(f"[mock-claude] Files to modify: {task_info['files_to_modify']}")
+    if request_type == "plan":
+        create_plan(repo_path, args.prompt)
+    elif request_type == "manifest":
+        create_test_manifest(repo_path)
+    elif request_type == "task":
+        task_info = parse_task_from_prompt(args.prompt)
+        print(f"[mock-claude] Task: {task_info['id']} - {task_info['name']}")
+        execute_task(repo_path, task_info)
+    elif request_type == "business_rules":
+        create_business_rules(repo_path)
+    else:
+        print(f"[mock-claude] Unknown request type, doing nothing")
 
-    # Create mock outputs
-    create_mock_output(repo_path, task_info)
-
-    # Commit changes
-    git_commit(repo_path, task_info["id"], task_info["name"])
-
-    print(f"[mock-claude] Task {task_info['id']} completed successfully")
     sys.exit(0)
 
 
