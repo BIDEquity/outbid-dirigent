@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "579993c7cc4a",
+  "session_id": "d5598bd2-ce81-46da-b166-5162bb36b3f0",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-02T12:39:53.358557Z",
+  "branch": "feat/tiered-infra-detection-confidence",
+  "checkpoints_count": 10,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/agents/contract-negotiator.md",
+    "src/outbid_dirigent/plugin/agents/doc-cleaner.md",
+    "src/outbid_dirigent/plugin/agents/implementer.md",
+    "src/outbid_dirigent/plugin/agents/infra-architect.md",
+    "src/outbid_dirigent/plugin/agents/reviewer.md",
+    "src/outbid_dirigent/plugin/agents/spec-writer.md",
+    "src/outbid_dirigent/plugin/commands/create-contract.md",
+    "src/outbid_dirigent/plugin/skills/create-contract/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/entropy-minimization/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/execute-task/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/fix-review/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/generate-spec/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/review-phase/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/run-init/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "05052529f6c7",
+  "token_usage": {
+    "input_tokens": 22245,
+    "cache_creation_tokens": 740162,
+    "cache_read_tokens": 20708589,
+    "output_tokens": 83844,
+    "api_call_count": 118
+  },
+  "session_metrics": {
+    "turn_count": 15
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-02T12:39:52.638733Z",
+    "agent_lines": 0,
+    "human_added": 1418,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1418,
+    "agent_percentage": 0
+  }
+}

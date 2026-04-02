@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "579993c7cc4a",
+  "strategy": "manual-commit",
+  "branch": "feat/tiered-infra-detection-confidence",
+  "checkpoints_count": 10,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/agents/contract-negotiator.md",
+    "src/outbid_dirigent/plugin/agents/doc-cleaner.md",
+    "src/outbid_dirigent/plugin/agents/implementer.md",
+    "src/outbid_dirigent/plugin/agents/infra-architect.md",
+    "src/outbid_dirigent/plugin/agents/reviewer.md",
+    "src/outbid_dirigent/plugin/agents/spec-writer.md",
+    "src/outbid_dirigent/plugin/commands/create-contract.md",
+    "src/outbid_dirigent/plugin/skills/create-contract/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/entropy-minimization/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/execute-task/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/fix-review/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/generate-spec/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/review-phase/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/run-init/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/57/9993c7cc4a/0/metadata.json",
+      "transcript": "/57/9993c7cc4a/0/full.jsonl",
+      "content_hash": "/57/9993c7cc4a/0/content_hash.txt",
+      "prompt": "/57/9993c7cc4a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 22245,
+    "cache_creation_tokens": 740162,
+    "cache_read_tokens": 20708589,
+    "output_tokens": 83844,
+    "api_call_count": 118
+  }
+}
