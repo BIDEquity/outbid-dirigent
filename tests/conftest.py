@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import subprocess
 from pathlib import Path
-from typing import Generator, Any
+from typing import Generator, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
@@ -54,8 +54,8 @@ class PortalEvent:
 @dataclass
 class MockPortalState:
     """State for the mock portal server."""
-    events: list[PortalEvent] = field(default_factory=list)
-    pending_execution: dict | None = None
+    events: List[PortalEvent] = field(default_factory=list)
+    pending_execution: Optional[dict] = None
     execution_claimed: bool = False
 
 
@@ -116,7 +116,7 @@ class MockPortalHandler(BaseHTTPRequestHandler):
 
 
 @pytest.fixture
-def mock_portal() -> Generator[tuple[str, MockPortalState], None, None]:
+def mock_portal() -> Generator[Tuple[str, MockPortalState], None, None]:
     """
     Start a mock portal server and return its URL and state.
 
@@ -234,7 +234,7 @@ def count_commits(repo_path: Path) -> int:
     return int(result.stdout.strip())
 
 
-def get_commit_messages(repo_path: Path, count: int = 10) -> list[str]:
+def get_commit_messages(repo_path: Path, count: int = 10) -> List[str]:
     """Get recent commit messages."""
     result = subprocess.run(
         ["git", "log", f"-{count}", "--format=%s"],

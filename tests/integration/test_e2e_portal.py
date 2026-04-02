@@ -33,11 +33,20 @@ PORTAL_URL = os.environ.get("PORTAL_URL", "https://dev.portal.outbid.ai")
 TEST_API_SECRET = os.environ.get("TEST_API_SECRET", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# Use venv Python if available (needed for Python 3.10+ syntax)
+VENV_PYTHON = Path(__file__).parent.parent.parent / ".venv" / "bin" / "python"
+PYTHON_EXE = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
 
-def skip_if_missing_env():
-    """Check required environment variables."""
+
+def skip_if_missing_portal_env():
+    """Check Portal-related environment variables."""
     if not TEST_API_SECRET:
         pytest.skip("TEST_API_SECRET not set")
+
+
+def skip_if_missing_claude_env():
+    """Check Claude-related environment variables."""
+    skip_if_missing_portal_env()
     if not ANTHROPIC_API_KEY:
         pytest.skip("ANTHROPIC_API_KEY not set")
 
@@ -83,7 +92,7 @@ class PortalTestClient:
 @pytest.fixture
 def portal_client():
     """Portal test client fixture."""
-    skip_if_missing_env()
+    skip_if_missing_portal_env()
     return PortalTestClient(PORTAL_URL, TEST_API_SECRET)
 
 
@@ -157,11 +166,18 @@ class TestE2EPortalIntegration:
     """
     End-to-end tests that run Dirigent against the real Portal.
 
+    Requires ANTHROPIC_API_KEY for real Claude Code execution.
+
     These tests verify the complete integration:
     1. Portal creates execution
     2. Dirigent sends events
     3. Portal receives and stores events
     """
+
+    @pytest.fixture(autouse=True)
+    def require_claude_key(self):
+        """Skip if ANTHROPIC_API_KEY not set."""
+        skip_if_missing_claude_env()
 
     def test_dirigent_sends_events_to_portal(
         self, portal_client: PortalTestClient, test_repo: Path, spec_file: Path
@@ -194,7 +210,7 @@ class TestE2EPortalIntegration:
 
             result = subprocess.run(
                 [
-                    sys.executable, "-m", "outbid_dirigent.dirigent",
+                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
                     "--spec", str(spec_file),
                     "--repo", str(test_repo),
                     "--execution-mode", "autonomous",
@@ -271,7 +287,7 @@ class TestE2EPortalIntegration:
 
             subprocess.run(
                 [
-                    sys.executable, "-m", "outbid_dirigent.dirigent",
+                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
                     "--spec", str(spec_file),
                     "--repo", str(test_repo),
                     "--execution-mode", "autonomous",
@@ -322,7 +338,7 @@ class TestE2EPortalIntegration:
 
             subprocess.run(
                 [
-                    sys.executable, "-m", "outbid_dirigent.dirigent",
+                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
                     "--spec", str(spec_file),
                     "--repo", str(test_repo),
                     "--execution-mode", "autonomous",
@@ -415,7 +431,7 @@ class TestE2EWithMockedClaude:
 
             result = subprocess.run(
                 [
-                    sys.executable, "-m", "outbid_dirigent.dirigent",
+                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
                     "--spec", str(spec_file),
                     "--repo", str(test_repo),
                     "--execution-mode", "autonomous",
