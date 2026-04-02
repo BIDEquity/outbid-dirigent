@@ -238,4 +238,5 @@ class TestE2ERouteSelection:
         )
 
         route, reason, confidence, legacy_s, gf_s = analyzer._determine_route(repo_analysis, spec_analysis)
-        assert route == "tracking", f"Expected tracking, got {route} (reason: {reason})"
+        # Tracking route is disabled — should fall through to general routing
+        assert route != "tracking", f"Tracking route should be disabled, got {route}"

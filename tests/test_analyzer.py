@@ -87,14 +87,15 @@ class TestDetermineRoute:
         route, _, _, _, _ = analyzer._determine_route(_make_repo(), spec)
         assert route != "testability"
 
-    def test_tracking_route_two_keywords(self):
+    def test_tracking_route_disabled(self):
+        """Tracking route is disabled — should fall through to general routing."""
         analyzer = _make_analyzer()
         spec = _make_spec(
             has_tracking_keywords=True,
             tracking_keywords_found=["posthog", "event tracking"],
         )
         route, reason, confidence, legacy, greenfield = analyzer._determine_route(_make_repo(), spec)
-        assert route == "tracking"
+        assert route != "tracking"
         assert confidence == "high"
 
     def test_inactive_repo_adds_legacy_signals(self):
