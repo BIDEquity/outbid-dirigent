@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "cd38b35580be",
+  "strategy": "manual-commit",
+  "branch": "feat/tiered-infra-detection-confidence",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/cd/38b35580be/0/metadata.json",
+      "transcript": "/cd/38b35580be/0/full.jsonl",
+      "content_hash": "/cd/38b35580be/0/content_hash.txt",
+      "prompt": "/cd/38b35580be/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 22531,
+    "cache_creation_tokens": 1639386,
+    "cache_read_tokens": 100439260,
+    "output_tokens": 139907,
+    "api_call_count": 340
+  }
+}
