@@ -1,9 +1,11 @@
 {
   "cli_version": "0.5.1",
   "checkpoint_id": "423c29ee674a",
+  "session_id": "a4e395df-f0b5-4405-a522-12d42eeefe84",
   "strategy": "manual-commit",
+  "created_at": "2026-04-02T10:28:38.940853Z",
   "branch": "feat/tiered-infra-detection-confidence",
-  "checkpoints_count": 6,
+  "checkpoints_count": 3,
   "files_touched": [
     "src/outbid_dirigent/dirigent.py",
     "src/outbid_dirigent/executor.py",
@@ -18,25 +20,26 @@
     "src/outbid_dirigent/shipper.py",
     "src/outbid_dirigent/task_runner.py"
   ],
-  "sessions": [
-    {
-      "metadata": "/42/3c29ee674a/0/metadata.json",
-      "transcript": "/42/3c29ee674a/0/full.jsonl",
-      "content_hash": "/42/3c29ee674a/0/content_hash.txt",
-      "prompt": "/42/3c29ee674a/0/prompt.txt"
-    },
-    {
-      "metadata": "/42/3c29ee674a/1/metadata.json",
-      "transcript": "/42/3c29ee674a/1/full.jsonl",
-      "content_hash": "/42/3c29ee674a/1/content_hash.txt",
-      "prompt": "/42/3c29ee674a/1/prompt.txt"
-    }
-  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6[1m]",
+  "turn_id": "5fe1af0cbe42",
   "token_usage": {
-    "input_tokens": 1900,
-    "cache_creation_tokens": 1098583,
-    "cache_read_tokens": 36267139,
-    "output_tokens": 102688,
-    "api_call_count": 314
+    "input_tokens": 1649,
+    "cache_creation_tokens": 162387,
+    "cache_read_tokens": 10659862,
+    "output_tokens": 40069,
+    "api_call_count": 97
+  },
+  "session_metrics": {
+    "turn_count": 7
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-02T10:28:37.876641Z",
+    "agent_lines": 901,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 901,
+    "agent_percentage": 100
   }
 }

@@ -1,0 +1,37 @@
+look in the .opencode dir. Any cool stuff we can copy?
+
+---
+
+how application specific are the skills?
+
+---
+
+got it! honest opinion: is the architect.md better than our dirigent?
+
+---
+
+Hallo zusammen,
+ich habe mir einen Feature-Request generieren lassen und diesen im autonomen Modus angestoßen.
+Das Positive vorweg: Es wurde erfolgreich ein Pull-Request erzeugt.
+Allerdings fällt der Output im Vergleich zu unserer aktuellen Arbeitsweise recht bescheiden aus.
+Ich habe den Feature-Request außerdem als .md-Datei exportiert und unserem Architekten-Agenten (GLM-5) gegeben. Das Ergebnis war nicht nur qualitativ deutlich besser, sondern auch erheblich schneller. Zusätzlich wurden funktionierende, umfangreichere und insgesamt bessere Tests generiert.
+Konkretes Feedback für euch:
+Der Debug-Output wie ".dirigent" und ".planning" ist zwar aufschlussreich, gehört aber nicht in den PR. Er wäre besser als „Log“ direkt beim Feature-Request in Outbid aufgehoben.
+Die Coder-Instanz bekommt (wie erwartet) MOCO nicht zum Laufen. Aktuell sieht sie lediglich die Codebase und fügt relativ „blind“ Code hinzu, ohne dessen Funktionsfähigkeit zu prüfen. Größtenteils an den richtigen Stellen, aber leider auch mit invalider Ruby-Syntax.
+Liebe Grüsse -> feedback (the glm-Agent is the one i am just talking about).
+
+---
+
+implemennt 1. 2 is again codebase specific. ultrathink about how to implement 3
+
+---
+
+hmm. why reinvent the wheel when we can just copycat the opencode skills and make them claude skills :D
+
+---
+
+hmm. why reinvent the wheel when we can just copycat the opencode skills and make them claude skills :D. Think hard about the idea of the dirigent - on startup - looking for a .opencode directory and copying all skills/agents as claude skills. Ideally, to machine-wide skills to not accidentally overwrite skills in the codebase.
+
+---
+
+write a skill that for greenfield projects proposes a test setup and architecture best practices
