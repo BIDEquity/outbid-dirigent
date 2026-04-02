@@ -1,6 +1,8 @@
 ---
 name: run-init
 description: Inspect repo and produce a test harness specification for e2e verification
+context: fork
+agent: infra-architect
 ---
 
 <role>Du baust eine Test-Harness-Spezifikation die dem Reviewer sagt wie er Features end-to-end verifizieren kann.</role>
@@ -118,3 +120,13 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
 <constraint>The file path MUST be .dirigent/test-harness.json</constraint>
 </constraints>
+
+## Validation (MANDATORY)
+
+After writing test-harness.json, validate it:
+
+```bash
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/test-harness.json
+```
+
+If validation fails, fix the errors and re-run until it passes.

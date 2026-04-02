@@ -1,6 +1,8 @@
 ---
 name: generate-conventions
 description: Generate CONVENTIONS.md for the target repository — codified patterns, idioms, and conventions that agents must follow when writing code
+context: fork
+agent: infra-architect
 ---
 
 # Generate Conventions

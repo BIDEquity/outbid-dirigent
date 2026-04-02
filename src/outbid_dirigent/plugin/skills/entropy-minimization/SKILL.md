@@ -1,6 +1,8 @@
 ---
 name: entropy-minimization
 description: Align code and documentation, remove dead code, resolve contradictions after execution
+context: fork
+agent: doc-cleaner
 ---
 
 # Entropy Minimization

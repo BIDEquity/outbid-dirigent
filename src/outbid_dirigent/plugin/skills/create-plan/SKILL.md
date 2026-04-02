@@ -1,6 +1,8 @@
 ---
 name: create-plan
 description: Create a phased execution plan (PLAN.json) from spec and repo context
+context: fork
+agent: infra-architect
 ---
 
 # Create Execution Plan
@@ -144,3 +146,13 @@ Write `.dirigent/PLAN.json` with this exact format:
 10. **Plan for maintainability** — the agent executing these tasks is the long-term maintainer of the codebase. Task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies. Do not plan throwaway code.
 11. **Plan for real verification** — each phase will be reviewed with executable verification commands. Do not plan tasks that "work" only in the sense that they compile. The reviewer will hit real endpoints and run real test suites.
 12. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Be specific — a task creating a Ruby form object needs `["ruby-code-writing", "form-builder"]`, not the entire skill list. Empty array `[]` if no convention skills are relevant.
+
+## Validation (MANDATORY)
+
+After writing PLAN.json, validate it:
+
+```bash
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/PLAN.json
+```
+
+If validation fails, fix the errors and re-run until it passes.

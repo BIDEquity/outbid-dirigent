@@ -1,6 +1,8 @@
 ---
 name: execute-task
 description: Behavioral rules for autonomous task execution from a plan
+context: fork
+agent: implementer
 ---
 
 # Execute Task

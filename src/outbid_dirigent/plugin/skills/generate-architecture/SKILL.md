@@ -1,6 +1,8 @@
 ---
 name: generate-architecture
 description: Generate ARCHITECTURE.md for the target repository — a complete, agent-readable map of the codebase
+context: fork
+agent: infra-architect
 ---
 
 # Generate Architecture

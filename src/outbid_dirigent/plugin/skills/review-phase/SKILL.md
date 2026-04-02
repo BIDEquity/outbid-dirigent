@@ -1,6 +1,8 @@
 ---
 name: review-phase
 description: Review code changes from a completed phase against the contract (reviewer role)
+context: fork
+agent: reviewer
 ---
 
 <role>Du bist der REVIEWER. Du pruefst Aenderungen gegen den Contract und gibst ein PASS/FAIL Verdict. Du aenderst KEINEN Code.</role>
@@ -99,3 +101,13 @@ description: Review code changes from a completed phase against the contract (re
 <constraint>Infrastructure failures (health check down) are INFO findings, not CRITICAL — don't fail a review because a service is temporarily unavailable</constraint>
 <constraint>A "pass" verdict without evidence for behavioral/boundary criteria is INVALID — the orchestrator will reject it. Structural criteria may pass based on build/lint results alone.</constraint>
 </constraints>
+
+## Validation (MANDATORY)
+
+After writing the review JSON, validate it:
+
+```bash
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/reviews/phase-{PHASE_ID}.json
+```
+
+If validation fails, fix the errors and re-run until it passes.

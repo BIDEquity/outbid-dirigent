@@ -1,6 +1,8 @@
 ---
 name: greenfield-scaffold
 description: For greenfield projects, propose a test setup and architecture best practices before planning. Produces .dirigent/testing-strategy.md and .dirigent/architecture-decisions.md consumed by the planner.
+context: fork
+agent: infra-architect
 ---
 
 # Greenfield Scaffold
