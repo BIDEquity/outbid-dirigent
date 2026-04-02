@@ -1,5 +1,5 @@
 ---
-name: execute-task
+name: implement-task
 description: Behavioral rules for autonomous task execution from a plan
 context: fork
 agent: implementer

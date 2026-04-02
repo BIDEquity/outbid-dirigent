@@ -498,10 +498,10 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
         start_time = datetime.now()
         context = self._build_prompt(task, plan)
 
-        # The prompt tells Claude to follow /dirigent:execute-task, then provides
+        # The prompt tells Claude to follow /dirigent:implement-task, then provides
         # all the task context. The skill is loaded natively by the subprocess
         # via the --plugin-dir flag.
-        prompt = f"/dirigent:execute-task\n\n{context}"
+        prompt = f"/dirigent:implement-task\n\n{context}"
 
         # Per-task model/effort override
         task_model = task.model or self.default_model

@@ -38,7 +38,7 @@ def parse_args():
 
 SKILLS = [
     "create-plan",
-    "execute-task",
+    "implement-task",
     "create-contract",
     "review-phase",
     "fix-review",
@@ -275,7 +275,7 @@ def handle_unknown(prompt: str):
 
 HANDLERS = {
     "create-plan": handle_create_plan,
-    "execute-task": handle_execute_task,
+    "implement-task": handle_execute_task,
     "create-contract": handle_create_contract,
     "review-phase": handle_review_phase,
     "fix-review": handle_fix_review,
