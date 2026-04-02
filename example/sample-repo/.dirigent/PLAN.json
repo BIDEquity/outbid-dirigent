@@ -1,0 +1,79 @@
+{
+  "title": "Add Greeting and Math Utilities",
+  "summary": "Add two utility modules (greet, calc) with type hints, docstrings, and tests",
+  "assumptions": [
+    "Project uses pytest for testing",
+    "Modules go in src/ directory"
+  ],
+  "out_of_scope": [
+    "CLI interface",
+    "Packaging and distribution",
+    "CI pipeline"
+  ],
+  "phases": [
+    {
+      "id": "01",
+      "name": "Utility Modules",
+      "description": "Create the greet and calc modules with all functions",
+      "tasks": [
+        {
+          "id": "01-01",
+          "name": "Create greet module",
+          "description": "Create src/greet.py with hello(name: str) -> str and goodbye(name: str) -> str. Both return formatted strings. Include type hints and docstrings.",
+          "files_to_create": ["src/greet.py"],
+          "files_to_modify": [],
+          "depends_on": [],
+          "model": "haiku",
+          "effort": "low",
+          "test_level": "",
+          "convention_skills": []
+        },
+        {
+          "id": "01-02",
+          "name": "Create calc module",
+          "description": "Create src/calc.py with add(a: int, b: int) -> int and multiply(a: int, b: int) -> int. Include type hints and docstrings.",
+          "files_to_create": ["src/calc.py"],
+          "files_to_modify": [],
+          "depends_on": [],
+          "model": "haiku",
+          "effort": "low",
+          "test_level": "",
+          "convention_skills": []
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Tests",
+      "description": "Add pytest tests for both modules",
+      "tasks": [
+        {
+          "id": "02-01",
+          "name": "Test greet module",
+          "description": "Create tests/test_greet.py with tests for hello() and goodbye(). Test with normal names, empty string, and special characters.",
+          "files_to_create": ["tests/test_greet.py"],
+          "files_to_modify": [],
+          "depends_on": ["01-01"],
+          "model": "haiku",
+          "effort": "low",
+          "test_level": "L1",
+          "convention_skills": []
+        },
+        {
+          "id": "02-02",
+          "name": "Test calc module",
+          "description": "Create tests/test_calc.py with tests for add() and multiply(). Test with positive, negative, and zero values.",
+          "files_to_create": ["tests/test_calc.py"],
+          "files_to_modify": [],
+          "depends_on": ["01-02"],
+          "model": "haiku",
+          "effort": "low",
+          "test_level": "L1",
+          "convention_skills": []
+        }
+      ]
+    }
+  ],
+  "estimated_complexity": "low",
+  "risks": []
+}

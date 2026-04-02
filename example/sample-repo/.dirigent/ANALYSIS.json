@@ -1,0 +1,20 @@
+{
+  "repo_path": "/tmp/sample-repo",
+  "repo_name": "sample-repo",
+  "primary_language": "Python",
+  "secondary_languages": [],
+  "framework_detected": null,
+  "build_tool": "Poetry/pip",
+  "commit_count": 1,
+  "last_commit_days_ago": 0,
+  "file_count": 4,
+  "total_lines": 25,
+  "spec_title": "Add Greeting and Math Utilities",
+  "spec_keywords": ["add"],
+  "route": "greenfield",
+  "route_reason": "Greenfield-Keywords in Spec: add; Aktiv entwickeltes Projekt; Kleines Projekt",
+  "confidence": "high",
+  "legacy_signals": 0,
+  "greenfield_signals": 4,
+  "analyzed_at": "2026-04-02T12:00:00.000000"
+}
