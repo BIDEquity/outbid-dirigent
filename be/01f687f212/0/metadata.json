@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "be01f687f212",
+  "session_id": "d5598bd2-ce81-46da-b166-5162bb36b3f0",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-02T17:11:05.889115Z",
+  "branch": "feat/tiered-infra-detection-confidence",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/commands/create-contract.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "db191c38c916",
+  "token_usage": {
+    "input_tokens": 22443,
+    "cache_creation_tokens": 1599341,
+    "cache_read_tokens": 70911183,
+    "output_tokens": 123952,
+    "api_call_count": 268
+  },
+  "session_metrics": {
+    "turn_count": 36
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-02T17:11:04.625634Z",
+    "agent_lines": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 17,
+    "total_committed": 0,
+    "agent_percentage": 0
+  }
+}
