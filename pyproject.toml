@@ -19,6 +19,19 @@ dirigent = "outbid_dirigent.dirigent:main"
 [project.optional-dependencies]
 dev = [
     "bump-my-version>=0.28.0",
+    "pytest>=8.0.0",
+    "pytest-timeout>=2.3.0",
+    "requests>=2.28.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "e2e: marks tests as end-to-end (requires --e2e flag and ANTHROPIC_API_KEY)",
 ]
 
 [build-system]

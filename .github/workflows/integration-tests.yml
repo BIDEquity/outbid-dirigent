@@ -1,0 +1,77 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+  # Allow manual trigger with E2E option
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'Run E2E tests (costs ~$0.50, uses real Claude Code)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # Fast tests (mocked, no API calls)
+  integration-tests:
+    name: Integration Tests (Mocked)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
+
+      - name: Run integration tests (mocked)
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -v --ignore=tests/integration/test_simple_feature.py::TestSimpleFeatureE2E
+
+  # E2E tests (real Claude Code, manual trigger only)
+  e2e-tests:
+    name: E2E Tests (Real Claude Code)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -e ".[dev]"
+
+      - name: Install Node.js (for Claude Code)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run E2E tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          source .venv/bin/activate
+          pytest tests/integration/ -v --e2e --timeout=600
+        timeout-minutes: 15
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            tests/integration/*.log
+            /tmp/test-repo-*
+          retention-days: 7
