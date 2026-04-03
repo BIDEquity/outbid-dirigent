@@ -20,7 +20,8 @@ dirigent = "outbid_dirigent.dirigent:main"
 dev = [
     "bump-my-version>=0.28.0",
     "pytest>=8.0.0",
-    "pytest-cov>=4.0.0",  # Für Test-Coverage Reports
+    "pytest-cov>=4.0.0",
+    "pytest-timeout>=2.3.0",
 ]
 
 [build-system]
