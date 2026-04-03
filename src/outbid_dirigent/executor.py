@@ -534,8 +534,12 @@ class Executor:
             save_state(str(self.repo_path), state)
             self._legacy_logger.phase_complete(phase.id, phase.name, phase_tasks_completed, phase_deviation_count, phase_commit_count)
 
-        self._legacy_logger.run_complete(success=True)
+        # NOTE: run_complete() is called by finalize() after shipping, not here
         return True
+
+    def finalize(self, success: bool = True):
+        """Send the final 'complete' event after all steps (entropy, tests, ship) are done."""
+        self._legacy_logger.run_complete(success=success)
 
     def _load_or_init_state(self) -> dict:
         state = load_state(str(self.repo_path))

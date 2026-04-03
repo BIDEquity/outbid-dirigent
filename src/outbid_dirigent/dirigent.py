@@ -463,6 +463,8 @@ def run_execution(
             success = executor.ship()
             if reporter:
                 reporter.stage_complete("shipping", "PR erstellt" if success else "Shipping fehlgeschlagen")
+            # Send 'complete' event AFTER shipping (not after execute_plan)
+            executor.finalize(success=success)
 
         if success:
             mark_step_complete(str(repo_path), step_name)
