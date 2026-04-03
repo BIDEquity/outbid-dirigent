@@ -20,9 +20,11 @@ Prompt for the agent:
 >
 > Write a brief plan to `.dirigent/quick-plan.md` with:
 > - Which files to create or modify (be specific)
+> - Which test files to create or modify (EVERY new feature MUST have tests)
 > - What each change does (1-2 sentences per file)
-> - How to verify it works (a command the reviewer can run)
+> - How to verify it works (a command the reviewer can run — must include running the tests)
 >
+> The plan MUST include tests. No feature ships without tests.
 > Keep it short — this is a small change, not a multi-phase project.
 
 After the agent returns, read `.dirigent/quick-plan.md` to get the plan.
@@ -37,7 +39,7 @@ Prompt for the agent:
 >
 > {paste the contents of .dirigent/quick-plan.md}
 >
-> Follow project conventions. Run tests after your changes. Write a summary to `.dirigent/summaries/quick-feature-SUMMARY.md`.
+> You MUST create tests for every new function and endpoint. Run ALL tests after your changes and ensure they pass. Write a summary to `.dirigent/summaries/quick-feature-SUMMARY.md`.
 
 After the agent returns, verify the summary file exists.
 
@@ -51,7 +53,7 @@ Prompt for the agent:
 >
 > {paste the contents of .dirigent/quick-plan.md}
 >
-> Run the verification commands from the plan. Check code quality.
+> Run the verification commands from the plan. Run the test suite. Check code quality. If tests are missing for new functionality, verdict MUST be "fail".
 > Write your review to `.dirigent/reviews/quick-feature.json` using this exact schema:
 >
 > ```json
