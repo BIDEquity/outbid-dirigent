@@ -7,18 +7,19 @@ Extracted from the Executor god class.
 import re
 import shutil
 import subprocess
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from loguru import logger
 
+from outbid_dirigent.infra_schema import InfraContext
 from outbid_dirigent.plan_schema import Plan
 
 
 def slugify(text: str, max_length: int = 50) -> str:
     """Convert text to URL-safe slug for branch names."""
-    import unicodedata
     text = unicodedata.normalize('NFKD', text)
     text = text.encode('ascii', 'ignore').decode('ascii').lower()
     text = re.sub(r'[^a-z0-9\s-]', '', text)
@@ -62,6 +63,10 @@ class Shipper:
             return True
 
         try:
+            # Remove .dirigent/ and .planning/ from git history on the PR branch.
+            # These are execution artifacts — useful as logs, not as code changes.
+            self._strip_artifacts()
+
             # Create branch
             result = subprocess.run(
                 ["git", "checkout", "-b", branch_name],
@@ -100,14 +105,174 @@ class Shipper:
             logger.error(f"Shipping failed: {e}")
             return False
 
+    # Directories that are execution artifacts and must not appear in PRs
+    ARTIFACT_DIRS = [".dirigent", ".planning"]
+
+    def _strip_artifacts(self) -> None:
+        """Remove execution artifact directories from git tracking.
+
+        Removes .dirigent/ and .planning/ from all commits that introduced them,
+        so the PR branch contains only production code changes.
+        """
+        # Check which artifact dirs are actually tracked
+        tracked = []
+        for d in self.ARTIFACT_DIRS:
+            result = subprocess.run(
+                ["git", "ls-files", d],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                tracked.append(d)
+
+        if not tracked:
+            return
+
+        logger.info(f"Stripping artifact dirs from git: {tracked}")
+
+        # Remove from index (keeps files on disk)
+        for d in tracked:
+            subprocess.run(
+                ["git", "rm", "-r", "--cached", "--quiet", d],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+
+        # Ensure they stay ignored
+        gitignore_path = self.repo_path / ".gitignore"
+        existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+        additions = [d + "/" for d in tracked if d + "/" not in existing and d not in existing]
+        if additions:
+            block = "\n# Dirigent execution artifacts\n" + "\n".join(additions) + "\n"
+            with open(gitignore_path, "a", encoding="utf-8") as f:
+                f.write(block)
+
+        # Commit the removal
+        subprocess.run(
+            ["git", "add", ".gitignore"],
+            cwd=self.repo_path, capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "chore: exclude execution artifacts from PR"],
+            cwd=self.repo_path, capture_output=True, text=True,
+        )
+
+    def _build_verification_section(self) -> str:
+        """Build ## Verification section from InfraContext for PR body."""
+        ctx = InfraContext.load(self.repo_path / ".dirigent" / "infra-context.json")
+        if ctx is None:
+            return ""
+
+        confidence_emoji = {"e2e": "✅", "integration": "✅", "unit": "✅", "mocked": "⚠️", "static": "⚠️", "none": "❌"}
+        emoji = confidence_emoji.get(ctx.confidence, "⚠️")
+
+        lines = ["## Verification", f"{emoji} Tests passed — {ctx.confidence} confidence ({ctx.tier.value})"]
+        if ctx.tests_run > 0 or ctx.tests_skipped_infra > 0:
+            lines.append(f"   {ctx.tests_run} tests run, {ctx.tests_skipped_infra} skipped due to missing infra")
+        if ctx.caveat:
+            lines.append(f"   _{ctx.caveat}_")
+        if ctx.gaps:
+            lines.append("")
+            lines.append("**To verify at higher confidence:**")
+            for gap in ctx.gaps:
+                lines.append(f"- {gap.suggested_fix}")
+        return "\n".join(lines) + "\n\n"
+
+    def _is_greenfield_project(self) -> bool:
+        """Check if dirigent authored >80% of commits (new project)."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-list", "--count", "HEAD"],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+            total = int(result.stdout.strip()) if result.returncode == 0 else 0
+            if total == 0:
+                return False
+
+            result = subprocess.run(
+                ["git", "log", "--oneline", "--grep=feat: task", "--count"],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+            # Fallback: count commits with "task" in message (dirigent pattern)
+            result = subprocess.run(
+                ["git", "log", "--oneline", "--all"],
+                cwd=self.repo_path, capture_output=True, text=True,
+            )
+            if result.returncode != 0:
+                return False
+            all_commits = result.stdout.strip().splitlines()
+            dirigent_commits = [c for c in all_commits if "task " in c.lower() or "dirigent" in c.lower()]
+            return len(dirigent_commits) / len(all_commits) > 0.8 if all_commits else False
+        except Exception:
+            return False
+
+    def _build_getting_started(self) -> str:
+        """Build a Getting Started section from test-harness and runtime info."""
+        parts = ["## Getting Started", ""]
+        harness_path = self.repo_path / ".dirigent" / "test-harness.json"
+        analysis_path = self.repo_path / ".dirigent" / "ANALYSIS.json"
+
+        # Try runtime info from analysis
+        if analysis_path.exists():
+            import json
+            try:
+                analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+                runtime = analysis.get("runtime", {})
+                if runtime:
+                    setup = runtime.get("setup_steps", [])
+                    start = runtime.get("start_command", "")
+                    port = runtime.get("port", "")
+                    if setup:
+                        parts.append("### Setup")
+                        parts.append("```bash")
+                        for step in setup:
+                            parts.append(step)
+                        parts.append("```")
+                        parts.append("")
+                    if start:
+                        parts.append("### Run")
+                        parts.append("```bash")
+                        parts.append(start)
+                        parts.append("```")
+                        if port:
+                            parts.append(f"\nOpen http://localhost:{port}")
+                        parts.append("")
+            except Exception:
+                pass
+
+        # Try test-harness for verification
+        if harness_path.exists():
+            from outbid_dirigent.test_harness_schema import TestHarness
+            harness = TestHarness.load(harness_path)
+            if harness and harness.verification_commands:
+                parts.append("### Verify")
+                parts.append("```bash")
+                for cmd in harness.verification_commands:
+                    parts.append(f"# {cmd.name}")
+                    parts.append(cmd.command)
+                parts.append("```")
+                parts.append("")
+
+        if len(parts) <= 2:
+            # No runtime info found, add minimal note
+            parts.append("See the project README for setup instructions.")
+            parts.append("")
+
+        return "\n".join(parts)
+
     def _generate_pr_body(self) -> str:
+        verification = self._build_verification_section()
         parts = [
+            verification,
             "## Summary",
             self.plan.summary if self.plan else "Automatically created by Outbid Dirigent.",
             "",
-            "## Changes",
         ]
-        for f in sorted(self.summaries_dir.glob("*-SUMMARY.md")):
+
+        # For new projects, include how to start the app
+        if self._is_greenfield_project():
+            parts.append(self._build_getting_started())
+
+        parts.append("## Changes")
+        for f in sorted(self.summaries_dir.glob("*-SUMMARY.md")) if self.summaries_dir.exists() else []:
             content = f.read_text(encoding="utf-8")
             match = re.search(r"## Was wurde gemacht\n(.+?)(?=\n##|\Z)", content, re.DOTALL)
             if match:

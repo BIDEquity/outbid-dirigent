@@ -1,6 +1,8 @@
 ---
 name: generate-spec
 description: Generate a SPEC.md from a user description, asking max 2-3 clarifying questions
+context: fork
+agent: spec-writer
 ---
 
 # Generate Spec

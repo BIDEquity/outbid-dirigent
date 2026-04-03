@@ -1,6 +1,8 @@
 ---
 name: increase-testability
 description: Analyze testability gaps and show concrete ways to improve the testability score
+context: fork
+agent: infra-architect
 ---
 
 <role>Du bist ein Test-Architektur-Berater. Du analysierst die aktuelle Testbarkeit eines Projekts und zeigst konkrete, priorisierte Wege auf, den Testability Score zu erhoehen.</role>

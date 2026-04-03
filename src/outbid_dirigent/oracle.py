@@ -70,7 +70,24 @@ class Oracle:
                 return decision
         return None
 
-    def _load_context(self) -> str:
+    def _relevant_decisions(self, question: str, top_n: int = 8) -> list[dict]:
+        """Return past decisions ranked by keyword overlap with the current question."""
+        all_decisions = self.decisions.get("decisions", [])
+        if not all_decisions:
+            return []
+        q_words = set(question.lower().split())
+        def score(d: dict) -> float:
+            d_words = set(d.get("question", "").lower().split())
+            union = len(q_words | d_words)
+            return len(q_words & d_words) / union if union else 0.0
+        ranked = sorted(all_decisions, key=score, reverse=True)
+        # Always include the most recent decision even if score is low
+        top = ranked[:top_n]
+        if all_decisions[-1] not in top:
+            top = top[: top_n - 1] + [all_decisions[-1]]
+        return top
+
+    def _load_context(self, question: str = "") -> str:
         """Lädt relevanten Kontext für die Oracle-Entscheidung."""
         context_parts = []
 
@@ -106,12 +123,12 @@ class Oracle:
                 rules_content = rules_content[:5000] + "\n... (truncated)"
             context_parts.append(f"<business-rules>\n{rules_content}\n</business-rules>")
 
-        # Bisherige Entscheidungen
+        # Bisherige Entscheidungen — ranked by relevance to current question
         if self.decisions.get("decisions"):
-            recent_decisions = self.decisions["decisions"][-5:]
+            relevant = self._relevant_decisions(question)
             decisions_text = "\n".join([
-                f"<decision question=\"{d['question'][:100]}\">{d['decision']}</decision>"
-                for d in recent_decisions
+                f"<decision question=\"{d['question'][:100]}\" confidence=\"{d.get('confidence', '?')}\">{d['decision']}</decision>"
+                for d in relevant
             ])
             context_parts.append(f"<previous-decisions>\n{decisions_text}\n</previous-decisions>")
 
@@ -145,7 +162,7 @@ class Oracle:
             return {"decision": cached["decision"], "reason": cached["reason"]}
 
         # Kontext laden
-        context = context_override or self._load_context()
+        context = context_override or self._load_context(question)
 
         # Prompt bauen
         options_text = ""
@@ -195,7 +212,7 @@ Antworte als JSON:
             cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
             cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
 
-            # Kosten berechnen (Sonnet 4: $3/M input, $15/M output)
+            # Kosten berechnen (Sonnet 4.x: $3/M input, $15/M output)
             cost_cents = int((input_tokens * 3 + output_tokens * 15) / 10000)
 
             # API Usage Event emittieren

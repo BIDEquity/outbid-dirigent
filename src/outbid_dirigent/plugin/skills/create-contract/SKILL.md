@@ -1,11 +1,48 @@
 ---
 name: create-contract
 description: Create acceptance criteria contract for a phase before execution
+context: fork
+agent: contract-negotiator
 ---
 
 # Create Phase Contract
 
 You define the acceptance criteria that the REVIEWER will check after the EXECUTOR finishes a phase. The criteria you write are the definition of "done" — if they pass, the phase ships. If they fail, the executor has to fix.
+
+## ⛔ MANDATORY JSON SCHEMA — Your output MUST match this EXACTLY
+
+The output file is validated by Pydantic. **Any deviation = silent rejection.** Use EXACTLY these field names:
+
+```json
+{
+  "phase_id": "01",
+  "phase_name": "Phase Name",
+  "objective": "One sentence: what this phase achieves",
+  "acceptance_criteria": [
+    {
+      "id": "AC-{PHASE_ID}-01",
+      "description": "What must be true",
+      "verification": "Run: <executable command>",
+      "layer": "structural|behavioral|boundary"
+    }
+  ],
+  "quality_gates": ["All new/modified files compile without errors", "No regressions in existing functionality", "Code follows project conventions"],
+  "out_of_scope": ["What this phase does NOT cover"],
+  "expected_files": [{"path": "src/foo.py", "change": "Add new class"}]
+}
+```
+
+**Hard constraints enforced by Pydantic validation:**
+- Field name is `acceptance_criteria` — NOT `criteria`, NOT `tests`, NOT `checks`
+- Field name is `objective` — NOT `description`, NOT `verification_strategy`
+- Field name is `verification` — NOT `verify`, NOT `command`, NOT `check`
+- Each criterion `id` format: `AC-{PHASE_ID}-{NN}` (e.g., AC-01-01) — NOT S01, B01, etc.
+- Each `verification` MUST start with `"Run: "` followed by an executable shell command
+- `layer` must be one of: `"structural"`, `"behavioral"`, `"boundary"`
+- Min 1, **max 8** criteria total (Pydantic rejects >8)
+- Max 2 structural, min 3 behavioral, min 1 boundary
+
+---
 
 ## The Three-Layer Testing Pyramid
 
@@ -229,3 +266,13 @@ Write `.dirigent/contracts/phase-{PHASE_ID}.json`:
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
 <constraint>File path MUST be .dirigent/contracts/phase-{PHASE_ID}.json</constraint>
 </constraints>
+
+## Validation (MANDATORY)
+
+After writing the JSON file, validate it:
+
+```bash
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/contracts/phase-$ARGUMENTS.json
+```
+
+If validation fails, read the error messages, fix the JSON, and re-run until it passes.

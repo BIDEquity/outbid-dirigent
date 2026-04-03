@@ -22,6 +22,7 @@ class Task(BaseModel):
     model: str = ""
     effort: str = ""
     test_level: str = ""  # "", "L1", "L2"
+    convention_skills: list[str] = Field(default_factory=list)  # e.g. ["ruby-code-writing", "form-builder"]
 
 
 class Phase(BaseModel):
@@ -134,7 +135,8 @@ class Plan(BaseModel):
           "depends_on": [],
           "model": "sonnet|haiku|opus (welches Modell für diesen Task am besten ist)",
           "effort": "low|medium|high (wie viel Denkaufwand nötig ist)",
-          "test_level": "L1|L2| (welches Test-Level nach diesem Task laufen soll, leer wenn kein Test nötig)"
+          "test_level": "L1|L2| (welches Test-Level nach diesem Task laufen soll, leer wenn kein Test nötig)",
+          "convention_skills": ["skill-name-1", "skill-name-2 (aus .opencode/skills/, leer wenn keine)"]
         }
       ]
     }

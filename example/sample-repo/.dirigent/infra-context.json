@@ -1,0 +1,16 @@
+{
+  "tier": "7_none",
+  "services_started": [],
+  "confidence": "static",
+  "gaps": [],
+  "seed": {
+    "command": "",
+    "detection_confidence": "none",
+    "ran": false,
+    "error": ""
+  },
+  "generated_files": [],
+  "tests_run": 0,
+  "tests_skipped_infra": 0,
+  "caveat": "No infrastructure detected. Pure library project — pytest only."
+}

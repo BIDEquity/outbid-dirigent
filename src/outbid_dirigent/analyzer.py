@@ -856,10 +856,10 @@ class Analyzer:
             reason = f"Testability-Keywords: {', '.join(spec.testability_keywords_found[:3])}"
             return "testability", reason, "high", 0, 0
 
-        # Tracking route: triggered when spec focuses on adding analytics/PostHog
-        if spec.has_tracking_keywords and len(spec.tracking_keywords_found) >= 2:
-            reason = f"Tracking-Keywords: {', '.join(spec.tracking_keywords_found[:3])}"
-            return "tracking", reason, "high", 0, 0
+        # Tracking route: disabled — too sensitive, triggers on common words like "analytics"
+        # if spec.has_tracking_keywords and len(spec.tracking_keywords_found) >= 2:
+        #     reason = f"Tracking-Keywords: {', '.join(spec.tracking_keywords_found[:3])}"
+        #     return "tracking", reason, "high", 0, 0
 
         # ── General routes ──
 

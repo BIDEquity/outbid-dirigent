@@ -11,6 +11,8 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from enum import Enum
 
+from pydantic import BaseModel, ValidationError
+
 from outbid_dirigent.analyzer import AnalysisResult
 from outbid_dirigent.logger import get_logger
 
@@ -25,6 +27,7 @@ class RouteType(Enum):
 
 class StepType(Enum):
     INIT = "init"
+    GREENFIELD_SCAFFOLD = "greenfield_scaffold"
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
     INCREASE_TESTABILITY = "increase_testability"
@@ -56,6 +59,23 @@ class Route:
     repo_context_needed: bool
 
 
+class RouteRecord(BaseModel):
+    route: str
+    reason: str
+    steps: list[str]
+    step_details: list[dict]
+    estimated_tasks: int
+    oracle_needed: bool
+    repo_context_needed: bool
+    created_at: str
+
+
+class StateRecord(BaseModel):
+    completed_steps: list[str]
+    started_at: str
+    updated_at: str = ""
+
+
 class Router:
     """Bestimmt den Ausführungspfad basierend auf der Analyse."""
 
@@ -65,6 +85,12 @@ class Router:
             step_type=StepType.INIT,
             name="Init Phase",
             description="Bootstrap dev environment, seed data, configure e2e credentials",
+            required=False,
+        ),
+        RouteStep(
+            step_type=StepType.GREENFIELD_SCAFFOLD,
+            name="Greenfield Scaffold",
+            description="Propose test setup and architecture best practices before planning",
             required=False,
         ),
         RouteStep(
@@ -317,7 +343,6 @@ class Router:
             repo_context_needed=file_count > 10,
         )
 
-
     def _estimate_tasks(self, scope: str) -> int:
         """Schätzt die Anzahl der Tasks basierend auf dem Scope."""
         estimates = {
@@ -362,10 +387,15 @@ class Router:
 def load_route(repo_path: str) -> Optional[Dict]:
     """Lädt eine existierende Route."""
     route_file = Path(repo_path) / ".dirigent" / "ROUTE.json"
-    if route_file.exists():
-        with open(route_file, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    if not route_file.exists():
+        return None
+    try:
+        raw = json.loads(route_file.read_text(encoding="utf-8"))
+        RouteRecord.model_validate(raw)
+        return raw
+    except ValidationError as e:
+        get_logger().error(f"ROUTE.json schema validation failed: {e}")
+        return None
 
 
 def get_next_step(repo_path: str) -> Optional[str]:
@@ -391,10 +421,15 @@ def get_next_step(repo_path: str) -> Optional[str]:
 def load_state(repo_path: str) -> Optional[Dict]:
     """Lädt den aktuellen State."""
     state_file = Path(repo_path) / ".dirigent" / "STATE.json"
-    if state_file.exists():
-        with open(state_file, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    if not state_file.exists():
+        return None
+    try:
+        raw = json.loads(state_file.read_text(encoding="utf-8"))
+        StateRecord.model_validate(raw)
+        return raw
+    except ValidationError as e:
+        get_logger().error(f"STATE.json schema validation failed: {e}")
+        return None
 
 
 def save_state(repo_path: str, state: Dict):

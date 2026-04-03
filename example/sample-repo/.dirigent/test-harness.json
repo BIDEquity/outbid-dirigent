@@ -1,0 +1,39 @@
+{
+  "base_url": "http://localhost:8000",
+  "port": 8000,
+  "auth": {
+    "method": "none"
+  },
+  "seed": {
+    "users": [],
+    "description": "",
+    "seed_command": ""
+  },
+  "health_checks": [],
+  "e2e_framework": {
+    "framework": "none",
+    "config_file": "",
+    "run_command": "",
+    "has_global_setup": false,
+    "global_setup_file": ""
+  },
+  "verification_commands": [
+    {
+      "name": "pytest runs",
+      "command": "python -m pytest tests/ -v",
+      "expected": "exit 0"
+    }
+  ],
+  "services": [],
+  "testability_score": 3,
+  "testability_rationale": "No server, no docker, no e2e framework. Only pytest available for unit tests.",
+  "testability_description": "Pure Python library with pytest. No services needed. Verification via pytest only.",
+  "testability_gaps": [
+    "No e2e framework configured",
+    "No integration test infrastructure",
+    "No CI pipeline"
+  ],
+  "status": "ready",
+  "notes": "",
+  "infra_tier": "7_none"
+}

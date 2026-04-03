@@ -1,6 +1,8 @@
 ---
 name: create-plan
 description: Create a phased execution plan (PLAN.json) from spec and repo context
+context: fork
+agent: infra-architect
 ---
 
 # Create Execution Plan
@@ -81,6 +83,10 @@ Read all available context files:
 3. **Optional:** `.dirigent/CONTEXT.md` — relevant file analysis (Hybrid route)
 4. **Optional:** `.dirigent/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
 5. **Optional:** `ARCHITECTURE.md` — system architecture (if not already read in Step 0)
+6. **Optional:** `CONVENTIONS.md` — project coding conventions and patterns. If present, task descriptions MUST reference relevant conventions so coder instances follow established patterns.
+7. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
+8. **Optional:** `.dirigent/testing-strategy.md` — proposed test layers, frameworks, patterns (Greenfield route). Tasks must follow this strategy.
+9. **Optional:** `.dirigent/architecture-decisions.md` — proposed patterns, file organization, conventions (Greenfield route). Tasks must follow these decisions.
 
 ## Step 2: Analyze the Repo
 
@@ -115,7 +121,8 @@ Write `.dirigent/PLAN.json` with this exact format:
           "depends_on": [],
           "model": "sonnet",
           "effort": "medium",
-          "test_level": "L1"
+          "test_level": "L1",
+          "convention_skills": ["ruby-code-writing", "form-builder"]
         }
       ]
     }
@@ -138,3 +145,14 @@ Write `.dirigent/PLAN.json` with this exact format:
 9. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command. The reviewer will use these to verify features end-to-end.
 10. **Plan for maintainability** — the agent executing these tasks is the long-term maintainer of the codebase. Task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies. Do not plan throwaway code.
 11. **Plan for real verification** — each phase will be reviewed with executable verification commands. Do not plan tasks that "work" only in the sense that they compile. The reviewer will hit real endpoints and run real test suites.
+12. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Be specific — a task creating a Ruby form object needs `["ruby-code-writing", "form-builder"]`, not the entire skill list. Empty array `[]` if no convention skills are relevant.
+
+## Validation (MANDATORY)
+
+After writing PLAN.json, validate it:
+
+```bash
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/PLAN.json
+```
+
+If validation fails, fix the errors and re-run until it passes.

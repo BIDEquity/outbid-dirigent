@@ -1,6 +1,8 @@
 ---
 name: fix-review
 description: Fix issues found during phase review (executor role)
+context: fork
+agent: implementer
 ---
 
 <role>Du bist der EXECUTOR. Der Reviewer hat Findings in `.dirigent/reviews/phase-{PHASE_ID}.json` dokumentiert. Deine Aufgabe: alle critical und warn Findings fixen.</role>

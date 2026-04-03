@@ -71,6 +71,10 @@ class TaskRunner:
         # Current task context for hooks
         self._current_task_id: Optional[str] = None
         self._current_phase: Optional[int] = None
+        # OpenCode bridge — set by Executor if .opencode/ exists
+        self.opencode_plugin_dir: Optional[Path] = None
+        self.opencode_skill_catalog: list[dict] = []
+        self.opencode_plugin_name: str = ""
         # Discover spec images in .planning/assets/
         self.spec_images = self._discover_spec_images()
 
@@ -119,6 +123,10 @@ class TaskRunner:
         plugin_dir = Path(__file__).parent / "plugin"
         if plugin_dir.exists():
             cmd.extend(["--plugin-dir", str(plugin_dir)])
+
+        # Inject OpenCode-sourced convention skills if available
+        if self.opencode_plugin_dir:
+            cmd.extend(["--plugin-dir", str(self.opencode_plugin_dir)])
 
         cmd.extend(["-p", prompt])
 
@@ -181,6 +189,51 @@ class TaskRunner:
     def _load_business_rules(self) -> Optional[str]:
         rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
         return rules_file.read_text(encoding="utf-8") if rules_file.exists() else None
+
+    def _build_convention_skills_block(self, task: "Task") -> Optional[str]:
+        """Build <convention-skills> block telling the agent which skills to load.
+
+        Uses task.convention_skills if the planner tagged the task.
+        Falls back to full catalog if not tagged.
+        """
+        if not self.opencode_skill_catalog:
+            return None
+
+        plugin = self.opencode_plugin_name
+
+        # Use planner-tagged skills if available, otherwise full skill catalog
+        if task.convention_skills:
+            catalog_by_name = {s["name"]: s for s in self.opencode_skill_catalog}
+            relevant = [
+                catalog_by_name[name]
+                for name in task.convention_skills
+                if name in catalog_by_name
+            ]
+        else:
+            # Fallback: include all skills (let the agent decide)
+            relevant = [s for s in self.opencode_skill_catalog if s["type"] == "skill"]
+
+        if not relevant:
+            return None
+
+        lines = ['<convention-skills hint="load these skills BEFORE writing any code">']
+        for skill in relevant:
+            desc = skill["description"][:100] if skill["description"] else ""
+            lines.append(f"- {skill['name']}: {desc}")
+        lines.append("")
+        lines.append(f"Load with: /{plugin}:{relevant[0]['name']}  (replace skill name as needed)")
+        lines.append("</convention-skills>")
+        return "\n".join(lines)
+
+    def _load_conventions(self, max_chars: int = 6000) -> Optional[str]:
+        """Load CONVENTIONS.md from repo root. Capped to stay within prompt budget."""
+        conv_file = self.repo_path / "CONVENTIONS.md"
+        if not conv_file.exists():
+            return None
+        content = conv_file.read_text(encoding="utf-8")
+        if len(content) > max_chars:
+            content = content[:max_chars] + "\n... (truncated)"
+        return content
 
     def _get_recent_diff(self, max_commits: int = 3, max_chars: int = 4000) -> str:
         try:
@@ -251,18 +304,25 @@ class TaskRunner:
                 if not any(search_path.parent.glob("*.jsonl")):
                     return ""
 
+            # Extract DEVIATION, LESSON, and WARNING markers from past sessions
             query = f"""
-SELECT DISTINCT
-  regexp_replace(
-    regexp_extract(message.content::VARCHAR, 'DEVIATION:\\s*(\\S+[-\\w]*)\\s*[-—]?\\s*([^\\n\"]+)', 0),
-    '^DEVIATION:\\s*', ''
-  ) AS deviation
-FROM read_ndjson('{search_path}', auto_detect=true, ignore_errors=true, filename=true)
-WHERE message.role = 'assistant'
-  AND message.content::VARCHAR LIKE '%DEVIATION:%'
-  AND length(regexp_extract(message.content::VARCHAR, 'DEVIATION:\\s*\\S+[-\\w]*\\s*[-—]?\\s*([^\\n\"]+)', 1)) > 5
-ORDER BY 1
-LIMIT 30;
+WITH raw AS (
+  SELECT
+    regexp_extract(message.content::VARCHAR, '(DEVIATION|LESSON|WARNING):\\s*(\\S+[-\\w]*)\\s*[-—]?\\s*([^\\n\"]+)', 0) AS marker,
+    regexp_extract(message.content::VARCHAR, '(DEVIATION|LESSON|WARNING):', 1) AS kind
+  FROM read_ndjson('{search_path}', auto_detect=true, ignore_errors=true, filename=true)
+  WHERE message.role = 'assistant'
+    AND (
+      message.content::VARCHAR LIKE '%DEVIATION:%'
+      OR message.content::VARCHAR LIKE '%LESSON:%'
+      OR message.content::VARCHAR LIKE '%WARNING:%'
+    )
+)
+SELECT DISTINCT kind, regexp_replace(marker, '^(DEVIATION|LESSON|WARNING):\\s*', '') AS entry
+FROM raw
+WHERE length(entry) > 5
+ORDER BY kind, entry
+LIMIT 45;
 """
             result = subprocess.run(
                 ["duckdb", ":memory:", "-csv", "-c", query],
@@ -271,29 +331,36 @@ LIMIT 30;
             if result.returncode != 0 or not result.stdout.strip():
                 return ""
 
+            tagged: dict[str, list[str]] = {"DEVIATION": [], "LESSON": [], "WARNING": []}
+            for row in result.stdout.strip().splitlines()[1:]:
+                parts = row.strip().split(",", 1)
+                if len(parts) != 2:
+                    continue
+                kind, entry = parts[0].strip().strip('"'), parts[1].strip().strip('"')
+                entry = entry.replace("\\n", " ").replace('\\"', '"')[:150].strip()
+                if len(entry) > 10 and kind in tagged:
+                    tagged[kind].append(entry)
+
+            # Deduplicate within each category using word-set overlap
+            def dedupe(entries: list[str]) -> list[str]:
+                seen_sets: list[set] = []
+                unique = []
+                for entry in entries:
+                    words = set(entry.lower().split())
+                    if not any(len(words & s) / max(len(words | s), 1) > 0.6 for s in seen_sets):
+                        seen_sets.append(words)
+                        unique.append(entry)
+                return unique
+
             lines = []
-            for l in result.stdout.strip().splitlines()[1:]:
-                l = l.strip().strip('"')
-                # Clean up escape sequences and truncate at first newline
-                l = l.replace("\\n", " ").replace('\\"', '"')
-                l = l.split("DEVIATION:")[0].strip() if "DEVIATION:" in l[20:] else l
-                l = l[:150].strip()
-                if len(l) > 10:
-                    lines.append(l)
+            for kind, prefix in [("LESSON", "lesson"), ("WARNING", "warning"), ("DEVIATION", "deviation")]:
+                for entry in dedupe(tagged[kind])[:8]:
+                    lines.append(f"[{prefix}] {entry}")
+
             if not lines:
                 return ""
 
-            # Deduplicate similar entries
-            seen = set()
-            unique = []
-            for line in lines:
-                key = line[:50].lower()
-                if key not in seen:
-                    seen.add(key)
-                    unique.append(line)
-
-            recall = "\n".join(f"- {l}" for l in unique[:15])
-            return recall[:max_chars]
+            return "\n".join(f"- {l}" for l in lines)[:max_chars]
         except Exception:
             return ""
 
@@ -346,6 +413,26 @@ LIMIT 30;
         sections.append(f"<files-to-create>{', '.join(task.files_to_create) or 'keine'}</files-to-create>")
         sections.append(f"<files-to-modify>{', '.join(task.files_to_modify) or 'keine'}</files-to-modify>")
         sections.append("</your-task>")
+
+        # Convention skills — tell the agent which project-specific skills to load
+        skill_block = self._build_convention_skills_block(task)
+        if skill_block:
+            sections.append(skill_block)
+        else:
+            # Fallback: inject CONVENTIONS.md directly if no OpenCode skills
+            conventions = self._load_conventions()
+            if conventions:
+                sections.append(f"<conventions hint=\"follow these patterns when writing code\">\n{conventions}\n</conventions>")
+
+        # Greenfield scaffold context (testing strategy + architecture decisions)
+        for artifact, tag, hint in [
+            ("testing-strategy.md", "testing-strategy", "follow this test strategy"),
+            ("architecture-decisions.md", "architecture-decisions", "follow these architecture patterns"),
+        ]:
+            artifact_path = self.dirigent_dir / artifact
+            if artifact_path.exists():
+                content = artifact_path.read_text(encoding="utf-8")[:3000]
+                sections.append(f"<{tag} hint=\"{hint}\">\n{content}\n</{tag}>")
 
         # Business rules
         if business_rules:
@@ -411,10 +498,10 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
         start_time = datetime.now()
         context = self._build_prompt(task, plan)
 
-        # The prompt tells Claude to follow /dirigent:execute-task, then provides
+        # The prompt tells Claude to follow /dirigent:implement-task, then provides
         # all the task context. The skill is loaded natively by the subprocess
         # via the --plugin-dir flag.
-        prompt = f"/dirigent:execute-task\n\n{context}"
+        prompt = f"/dirigent:implement-task\n\n{context}"
 
         # Per-task model/effort override
         task_model = task.model or self.default_model

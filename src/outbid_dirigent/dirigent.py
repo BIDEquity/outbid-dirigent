@@ -354,6 +354,13 @@ def run_execution(
             if reporter:
                 reporter.stage_complete("init", "Init phase complete" if success else "Init phase failed")
 
+        elif step.step_type == StepType.GREENFIELD_SCAFFOLD:
+            if reporter:
+                reporter.stage_start("greenfield_scaffold", "Propose test setup and architecture best practices")
+            success = executor.greenfield_scaffold()
+            if reporter:
+                reporter.stage_complete("greenfield_scaffold", "Scaffold complete" if success else "Scaffold failed")
+
         elif step.step_type == StepType.BUSINESS_RULE_EXTRACTION:
             if reporter:
                 reporter.stage_start("business_rules", "Extrahiere Business Rules aus der Codebase")

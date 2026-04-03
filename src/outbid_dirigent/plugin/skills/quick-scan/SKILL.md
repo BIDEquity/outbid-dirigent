@@ -1,6 +1,8 @@
 ---
 name: quick-scan
 description: Quick scan of relevant files for a feature (Hybrid route)
+context: fork
+agent: infra-architect
 ---
 
 # Quick Scan
