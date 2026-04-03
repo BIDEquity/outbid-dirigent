@@ -427,3 +427,7 @@ nice. commit and put on top of pr
 ---
 
 build a plugin-builder that scans a codebase, looks for existingt plugins (claude, opencode) and automatically builds a claude plugin facilitating development ont this particular codebase. Not a general "write tests" plugin but more a "use this tool and these command to e2e-test this codebase". Tell it to get inspiration from this plugin and all skills/agents etc. taht exist. The skill should use two agents: one codebase-mapper (running in opus) that understands a codebase very deeply on a "how to make it run" level and one claude code expert that writes the plugin
+
+---
+
+make the destination dir an argument and default to .claude
