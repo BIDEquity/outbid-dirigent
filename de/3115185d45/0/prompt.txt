@@ -439,3 +439,7 @@ is the implementer allowed to use skills? is the reviewr?
 ---
 
 can you give a summary (and just a summary) of the dirigent (2 sentences) and of each files/artifacts it writes (1 sentence each)
+
+---
+
+tell the implementer more thoruoughly to make use of skills and agents defined in the codebase.
