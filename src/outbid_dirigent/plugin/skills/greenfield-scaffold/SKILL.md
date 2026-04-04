@@ -1,6 +1,6 @@
 ---
 name: greenfield-scaffold
-description: For greenfield projects, propose a test setup and architecture best practices before planning. Produces .dirigent/testing-strategy.md and .dirigent/architecture-decisions.md consumed by the planner.
+description: For greenfield projects, propose a test setup and architecture best practices before planning. Produces ${DIRIGENT_RUN_DIR}/testing-strategy.md and ${DIRIGENT_RUN_DIR}/architecture-decisions.md consumed by the planner.
 context: fork
 agent: infra-architect
 ---
@@ -16,9 +16,9 @@ These artifacts become the project's engineering DNA. Every task the planner cre
 ## When This Runs
 
 After init (test harness exists), before planning. You have:
-- `.dirigent/SPEC.md` — what's being built
-- `.dirigent/ANALYSIS.json` — repo structure, language, framework
-- `.dirigent/test-harness.json` — available infra (services, auth, seed data)
+- `${DIRIGENT_RUN_DIR}/SPEC.md` — what's being built
+- `${DIRIGENT_RUN_DIR}/ANALYSIS.json` — repo structure, language, framework
+- `${DIRIGENT_RUN_DIR}/test-harness.json` — available infra (services, auth, seed data)
 - `ARCHITECTURE.md` — system overview (if generated during init)
 - The live repo — read whatever you need
 
@@ -41,9 +41,9 @@ ls test/**/*.test.* tests/**/*.py spec/**/*_spec.rb 2>/dev/null | head -10
 ls .github/workflows/*.yml .gitlab-ci.yml Jenkinsfile .circleci/config.yml 2>/dev/null
 ```
 
-Read `.dirigent/ANALYSIS.json` for detected language, framework, and test infrastructure.
-Read `.dirigent/test-harness.json` for available services and testability score.
-Read `.dirigent/SPEC.md` for feature requirements.
+Read `${DIRIGENT_RUN_DIR}/ANALYSIS.json` for detected language, framework, and test infrastructure.
+Read `${DIRIGENT_RUN_DIR}/test-harness.json` for available services and testability score.
+Read `${DIRIGENT_RUN_DIR}/SPEC.md` for feature requirements.
 
 ## Step 2: Decide Test Strategy
 
@@ -154,7 +154,7 @@ Read the spec and decide which patterns apply. Only propose patterns the feature
 
 ## Step 4: Write the Artifacts
 
-### Artifact 1: `.dirigent/testing-strategy.md`
+### Artifact 1: `${DIRIGENT_RUN_DIR}/testing-strategy.md`
 
 ```markdown
 # Testing Strategy
@@ -191,7 +191,7 @@ Read the spec and decide which patterns apply. Only propose patterns the feature
 - {e.g. "Generated code — test the generator, not the output"}
 ```
 
-### Artifact 2: `.dirigent/architecture-decisions.md`
+### Artifact 2: `${DIRIGENT_RUN_DIR}/architecture-decisions.md`
 
 ```markdown
 # Architecture Decisions
@@ -249,7 +249,7 @@ Before writing:
 ## Step 6: Commit
 
 ```bash
-git add .dirigent/testing-strategy.md .dirigent/architecture-decisions.md
+git add ${DIRIGENT_RUN_DIR}/testing-strategy.md ${DIRIGENT_RUN_DIR}/architecture-decisions.md
 git commit -m "docs: greenfield testing strategy and architecture decisions"
 ```
 
@@ -267,7 +267,7 @@ git commit -m "docs: greenfield testing strategy and architecture decisions"
 </rules>
 
 <constraints>
-<constraint>Output: .dirigent/testing-strategy.md + .dirigent/architecture-decisions.md</constraint>
+<constraint>Output: ${DIRIGENT_RUN_DIR}/testing-strategy.md + ${DIRIGENT_RUN_DIR}/architecture-decisions.md</constraint>
 <constraint>Maximum 15 minutes</constraint>
 <constraint>Both artifacts combined should be under 300 lines — these get consumed by the planner, not published as docs</constraint>
 </constraints>

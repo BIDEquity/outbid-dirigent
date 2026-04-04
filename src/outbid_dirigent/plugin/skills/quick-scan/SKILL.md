@@ -7,11 +7,11 @@ agent: infra-architect
 
 # Quick Scan
 
-Analyze the codebase to implement the feature described in `.dirigent/SPEC.md`.
+Analyze the codebase to implement the feature described in `${DIRIGENT_RUN_DIR}/SPEC.md`.
 
 ## Step 1
 
-Read `.dirigent/SPEC.md` to understand the feature.
+Read `${DIRIGENT_RUN_DIR}/SPEC.md` to understand the feature.
 
 ## Step 2
 
@@ -19,7 +19,7 @@ Scan the repo for files relevant to this feature. Focus ONLY on the relevant par
 
 ## Step 3
 
-Write `.dirigent/CONTEXT.md`:
+Write `${DIRIGENT_RUN_DIR}/CONTEXT.md`:
 
 ```markdown
 # Relevant Files for Feature

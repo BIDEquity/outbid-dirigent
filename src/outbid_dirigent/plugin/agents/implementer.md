@@ -36,11 +36,11 @@ Before writing any code, discover what the codebase already provides to help you
 
 ### Testing Strategy
 
-If `.dirigent/testing-strategy.md` exists, follow it. It defines the test approach agreed during scaffolding. If `.claude/skills/run-tests/` exists, use it to run tests — it has the exact command for THIS project.
+If `${DIRIGENT_RUN_DIR}/testing-strategy.md` exists, follow it. It defines the test approach agreed during scaffolding. If `.claude/skills/run-tests/` exists, use it to run tests — it has the exact command for THIS project.
 
 ## Output
 
-After completing your task, write `.dirigent/summaries/{task_id}-SUMMARY.md` with:
+After completing your task, write `${DIRIGENT_RUN_DIR}/summaries/{task_id}-SUMMARY.md` with:
 - What was done
 - Changed files
 - Deviations (if any): prefix with `DEVIATION: {type} - {description}`

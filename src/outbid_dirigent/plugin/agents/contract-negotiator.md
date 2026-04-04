@@ -14,15 +14,15 @@ Write acceptance criteria where every behavioral verification command is EXECUTA
 
 ## Process
 
-1. Read `.dirigent/PLAN.json` to find the phase
-2. Read `.dirigent/SPEC.md` for feature context
-3. Read `.dirigent/test-harness.json` for test infrastructure (base_url, auth, seed data, health checks)
+1. Read `${DIRIGENT_RUN_DIR}/PLAN.json` to find the phase
+2. Read `${DIRIGENT_RUN_DIR}/SPEC.md` for feature context
+3. Read `${DIRIGENT_RUN_DIR}/test-harness.json` for test infrastructure (base_url, auth, seed data, health checks)
 4. **PROBE the environment**: Before writing a verification command, try a simpler version to confirm it's plausible
    - Can curl reach the base_url? Try: `curl -sf {base_url}/health || echo "NOT REACHABLE"`
    - What test runner is available? Check: `which pytest`, `npx jest --version`, `go test --help`
    - Are ports open? Check: `lsof -i :{port} 2>/dev/null | head -3`
 5. Write the contract JSON
-6. **VALIDATE**: Run `python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/contracts/phase-{PHASE_ID}.json`
+6. **VALIDATE**: Run `python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json`
 7. Fix any validation errors and re-run until it passes
 
 ## Contract JSON Schema (Pydantic-validated — EXACT field names required)
@@ -70,6 +70,6 @@ If test harness is NOT running (curl fails):
 
 After writing the contract JSON, you MUST run:
 ```bash
-python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/contracts/phase-{PHASE_ID}.json
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json
 ```
 If it fails, read the errors, fix the JSON, write again, and re-validate. Do NOT stop until VALIDATION PASSED.

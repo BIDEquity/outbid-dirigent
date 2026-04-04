@@ -9,11 +9,11 @@ Show the current execution progress of the dirigent run.
 
 ## Files to read
 
-1. `.dirigent/STATE.json` — progress state (completed tasks/phases)
-2. `.dirigent/PLAN.json` — the full plan
-3. `.dirigent/ROUTE.json` — route info
-4. `.dirigent/contracts/` — contract status per phase
-5. `.dirigent/reviews/` — review verdicts per phase
+1. `${DIRIGENT_RUN_DIR}/STATE.json` — progress state (completed tasks/phases)
+2. `${DIRIGENT_RUN_DIR}/PLAN.json` — the full plan
+3. `${DIRIGENT_RUN_DIR}/ROUTE.json` — route info
+4. `${DIRIGENT_RUN_DIR}/contracts/` — contract status per phase
+5. `${DIRIGENT_RUN_DIR}/reviews/` — review verdicts per phase
 
 ## Output
 

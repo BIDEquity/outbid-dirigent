@@ -5,7 +5,7 @@ argument-hint: [--format console|text|json]
 allowed-tools: Read
 ---
 
-Display the current execution plan from `.dirigent/PLAN.json`.
+Display the current execution plan from `${DIRIGENT_RUN_DIR}/PLAN.json`.
 
 Read the plan file and format it based on `--format` in $ARGUMENTS (default: console).
 

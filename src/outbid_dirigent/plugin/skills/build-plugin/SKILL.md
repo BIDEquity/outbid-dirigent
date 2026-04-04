@@ -21,7 +21,7 @@ Use the codebase-mapper agent (runs on Opus) to produce a deep operational analy
 
 Prompt for the agent:
 
-> Analyze this repository and produce an operational map. Write it to `.dirigent/codebase-map.md`.
+> Analyze this repository and produce an operational map. Write it to `${DIRIGENT_RUN_DIR}/codebase-map.md`.
 >
 > I need to understand:
 > 1. Stack & services (languages, frameworks, databases, how services start)
@@ -33,7 +33,7 @@ Prompt for the agent:
 >
 > Be precise — include exact commands that work. Run discovery commands to verify. Your output drives a plugin generator.
 
-After the agent returns, read `.dirigent/codebase-map.md`.
+After the agent returns, read `${DIRIGENT_RUN_DIR}/codebase-map.md`.
 
 ## Step 2: Check for Existing Config
 
@@ -53,7 +53,7 @@ Prompt for the agent:
 
 > Build a plugin configuration at `{output-dir}/` for this project based on the operational map below.
 >
-> {paste the contents of .dirigent/codebase-map.md}
+> {paste the contents of ${DIRIGENT_RUN_DIR}/codebase-map.md}
 >
 > **Output directory: {output-dir}** — write ALL files under this directory.
 >

@@ -11,7 +11,7 @@ You turn a loose user description into a structured SPEC.md that the Dirigent ca
 
 ## Input
 
-Read `.dirigent/spec-seed.json` which contains:
+Read `${DIRIGENT_RUN_DIR}/spec-seed.json` which contains:
 - `user_description` — what the user typed (e.g. "Add a dark mode toggle")
 - `repo_context` — auto-gathered content from ARCHITECTURE.md, README.md, CLAUDE.md
 
@@ -44,7 +44,7 @@ Ask all questions in a single message, not one at a time.
 
 ## Step 3: Write SPEC.md
 
-Write `.dirigent/SPEC.md` with this structure:
+Write `${DIRIGENT_RUN_DIR}/SPEC.md` with this structure:
 
 ```markdown
 # {Feature Name}
@@ -84,5 +84,5 @@ Write `.dirigent/SPEC.md` with this structure:
 <rule>Out of Scope is required — it prevents the executor from gold-plating.</rule>
 <rule>Technical Notes should reference actual files and patterns in the repo.</rule>
 <rule>Write the spec even if you couldn't ask questions (non-interactive mode). Use your best judgment.</rule>
-<rule>Output path is always .dirigent/SPEC.md — overwrite if it exists.</rule>
+<rule>Output path is always ${DIRIGENT_RUN_DIR}/SPEC.md — overwrite if it exists.</rule>
 </rules>

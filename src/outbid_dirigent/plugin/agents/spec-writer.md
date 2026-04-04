@@ -53,4 +53,4 @@ One paragraph describing what this feature does and why.
 - Every acceptance criterion should be verifiable by a reviewer running commands
 - Scope boundaries must be explicit
 - Do NOT modify any existing code — only write the spec
-- Write to `.dirigent/SPEC.md`
+- Write to `${DIRIGENT_RUN_DIR}/SPEC.md`
