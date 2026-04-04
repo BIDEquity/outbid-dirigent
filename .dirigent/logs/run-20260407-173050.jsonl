@@ -1,0 +1,2 @@
+{"level": "INFO", "icon": "stats", "message": "API Usage (spec_compactor): 2202 in / 67 out = $0.0000", "data": {"component": "spec_compactor", "model": "claude-haiku-4-5", "inputTokens": 2202, "outputTokens": 67, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costCents": 0, "operation": "compact_spec", "durationMs": 14997}, "timestamp": "2026-04-07T17:31:05.599782"}
+{"level": "INFO", "icon": "stats", "message": "Spec compacted: 1 reqs, 0 glossary terms, 0 entities, 0 flows", "timestamp": "2026-04-07T17:31:05.602708"}
