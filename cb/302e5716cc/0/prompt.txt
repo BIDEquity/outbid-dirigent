@@ -1,0 +1,30 @@
+I recently read about this: https://docs.byterover.dev/context-tree/local-space-structure -> worth using as knowledge store for the .dirigent? at least, if brv store exists, dirigent should know how to use.
+
+---
+
+◇ ultraplan
+Starting Claude Code on the web…
+
+---
+
+Ultraplan terminated: no approval after 30 minutes
+
+Session: https://claude.ai/code/REDACTED
+
+---
+
+Remote Ultraplan session failed. Wait for the user's next instructions.
+
+---
+
+<task-notification>
+<task-id>ra43f8lk6</task-id>
+<task-type>remote_agent</task-type>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/b7921f14-5138-4dbf-95b5-96fb1ff2828b/tasks/ra43f8lk6.output</output-file>
+<status>completed</status>
+<summary>Remote task "Ultraplan" completed successfully</summary>
+</task-notification>
+
+---
+
+increase dirigent version to 1.3.1

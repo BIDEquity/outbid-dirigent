@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "cb302e5716cc",
+  "strategy": "manual-commit",
+  "branch": "feat/dirigent-v2-run-dir",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/.claude-plugin/plugin.json"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cb/302e5716cc/0/metadata.json",
+      "transcript": "/cb/302e5716cc/0/full.jsonl",
+      "content_hash": "/cb/302e5716cc/0/content_hash.txt",
+      "prompt": "/cb/302e5716cc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 658,
+    "cache_creation_tokens": 583185,
+    "cache_read_tokens": 45633432,
+    "output_tokens": 85345,
+    "api_call_count": 363
+  }
+}
