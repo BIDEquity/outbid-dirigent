@@ -76,6 +76,8 @@ class TaskRunner:
         self.opencode_plugin_dir: Optional[Path] = None
         self.opencode_skill_catalog: list[dict] = []
         self.opencode_plugin_name: str = ""
+        # BRV context-tree bridge — set by Executor if .brv/context-tree/ exists
+        self.brv_bridge = None
         # Discover spec images in .planning/assets/
         self.spec_images = self._discover_spec_images()
 
@@ -453,6 +455,17 @@ LIMIT 45;
             sections.append(f"""<session-recall hint="Bekannte Probleme aus frueheren Runs — pruefe ob relevant und vermeide proaktiv">
 {recall}
 </session-recall>""")
+
+        # BRV domain knowledge
+        if self.brv_bridge:
+            brv_ctx = self.brv_bridge.context_for_task(task)
+            if brv_ctx:
+                sections.append(
+                    '<knowledge-store hint="domain knowledge from .brv/context-tree/ '
+                    '— use /dirigent:query-brv for deeper queries">\n'
+                    f'{brv_ctx}\n'
+                    '</knowledge-store>'
+                )
 
         # Test harness context (e2e environment, auth, verification commands)
         from outbid_dirigent.test_harness_schema import TestHarness

@@ -19,6 +19,7 @@ from loguru import logger
 from outbid_dirigent.analyzer import load_analysis
 from outbid_dirigent.contract import ContractManager
 from outbid_dirigent.init_phase import InitPhase
+from outbid_dirigent.brv_bridge import BrvBridge
 from outbid_dirigent.opencode_bridge import OpenCodeBridge
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.plan_schema import Plan
@@ -172,6 +173,11 @@ class Executor:
                 self.runner.opencode_plugin_dir = plugin_dir
                 self.runner.opencode_skill_catalog = bridge.skill_catalog()
                 self.runner.opencode_plugin_name = bridge.plugin_name()
+
+        # BRV context-tree — inject domain knowledge if .brv/ + brv CLI exist
+        brv = BrvBridge(self.repo_path)
+        if brv.available():
+            self.runner.brv_bridge = brv
 
         # Contract manager for review/fix iteration loop
         self.contract_manager = ContractManager(self.repo_path, self.runner, dirigent_dir=self.dirigent_dir)
