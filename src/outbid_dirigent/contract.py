@@ -284,9 +284,18 @@ class ContractManager:
             f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
             f"(NOT in .dirigent/ in the repo). Read review/contract from there."
         )
+        head_before = self.runner._get_latest_commit_hash()
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         if success:
+            # Auto-commit if the fix agent forgot to commit
+            head_after = self.runner._get_latest_commit_hash()
+            if head_after == head_before and self.runner._has_uncommitted_changes():
+                logger.warning(f"Phase {phase.id} fix: agent did not commit — auto-committing")
+                self.runner._auto_commit_msg(
+                    f"fix(phase-{phase.id}): review fixes iteration {iteration}\n\n"
+                    f"[auto-committed by dirigent — agent forgot to commit]"
+                )
             logger.info(f"Phase {phase.id} fixes applied (iteration {iteration})")
             return True
 

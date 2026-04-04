@@ -502,6 +502,47 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
 
     # ── Task execution ──
 
+    def _has_uncommitted_changes(self) -> bool:
+        """Check if the working tree has staged or unstaged changes."""
+        try:
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode != 0:
+                return False
+            # Filter out dirigent artifacts and untracked files in run dir
+            for line in result.stdout.splitlines():
+                path = line[3:].strip()
+                if not path.startswith(".dirigent/"):
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _auto_commit(self, task: Task) -> Optional[str]:
+        """Auto-commit uncommitted changes the agent forgot to commit."""
+        msg = f"feat({task.id}): {task.name}\n\n[auto-committed by dirigent — agent forgot to commit]"
+        return self._auto_commit_msg(msg)
+
+    def _auto_commit_msg(self, msg: str) -> Optional[str]:
+        """Auto-commit with a custom message. Returns new commit hash or None."""
+        try:
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+            )
+            result = subprocess.run(
+                ["git", "commit", "-m", msg],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                return self._get_latest_commit_hash()
+            return None
+        except Exception as e:
+            logger.warning(f"Auto-commit failed: {e}")
+            return None
+
     def run_task(self, task: Task, plan: Plan, phase_num: int | str = 1) -> TaskResult:
         """Execute a single task with retries."""
         start_time = datetime.now()
@@ -520,6 +561,8 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
             if attempt > 1:
                 logger.info(f"Task {task.id} retry {attempt}/{self.MAX_RETRIES}")
 
+            head_before = self._get_latest_commit_hash()
+
             success, stdout, stderr = self._run_claude(
                 prompt, model=task_model, effort=task_effort,
                 system_prompt=self.AGENT_SYSTEM_PROMPT,
@@ -527,6 +570,16 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
 
             if success:
                 commit_hash = self._get_latest_commit_hash()
+
+                # Agent forgot to commit — rescue uncommitted work
+                if commit_hash == head_before and self._has_uncommitted_changes():
+                    logger.warning(f"Task {task.id}: agent did not commit — auto-committing changes")
+                    auto_hash = self._auto_commit(task)
+                    if auto_hash:
+                        commit_hash = auto_hash
+                    else:
+                        logger.error(f"Task {task.id}: auto-commit failed, changes are uncommitted")
+
                 summary_file = self.summaries_dir / f"{task.id}-SUMMARY.md"
                 summary = summary_file.read_text(encoding="utf-8") if summary_file.exists() else ""
                 deviations = self._extract_deviations(summary)
