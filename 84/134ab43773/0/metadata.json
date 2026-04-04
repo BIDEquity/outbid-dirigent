@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "84134ab43773",
+  "session_id": "505192f5-203d-4b40-aced-37d47c9e3e66",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-04T20:08:19.865454Z",
+  "branch": "feat/dirigent-v2-run-dir",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/.claude-plugin/plugin.json",
+    "src/outbid_dirigent/plugin/agents/contract-negotiator.md",
+    "src/outbid_dirigent/plugin/agents/doc-cleaner.md",
+    "src/outbid_dirigent/plugin/agents/implementer.md",
+    "src/outbid_dirigent/plugin/agents/infra-architect.md",
+    "src/outbid_dirigent/plugin/agents/reviewer.md",
+    "src/outbid_dirigent/plugin/agents/spec-writer.md",
+    "src/outbid_dirigent/plugin/commands/show-plan.md",
+    "src/outbid_dirigent/plugin/commands/show-progress.md",
+    "src/outbid_dirigent/plugin/skills/add-posthog/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/build-plugin/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/create-contract/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/create-plan/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/entropy-minimization/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/extract-business-rules/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/fix-review/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/generate-spec/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/implement-task/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/increase-testability/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/quick-feature/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/quick-scan/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/review-phase/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/run-init/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-haiku-4-5-20251001",
+  "turn_id": "5d4e7680a48d",
+  "token_usage": {
+    "input_tokens": 544,
+    "cache_creation_tokens": 458389,
+    "cache_read_tokens": 32841340,
+    "output_tokens": 59211,
+    "api_call_count": 265
+  },
+  "session_metrics": {
+    "turn_count": 16
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-04T20:08:18.416086Z",
+    "agent_lines": 95,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 95,
+    "agent_percentage": 100
+  }
+}
