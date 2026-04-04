@@ -52,6 +52,7 @@ class BrvBridge:
                 ["brv", "query", query],
                 cwd=self.repo_path,
                 capture_output=True, text=True, timeout=30,
+                stdin=subprocess.DEVNULL,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 if result.stderr.strip():
