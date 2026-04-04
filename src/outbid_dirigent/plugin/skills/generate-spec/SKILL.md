@@ -21,6 +21,7 @@ Read the seed file. Then quickly scan the repo to understand:
 - What tech stack is in use (check package.json, pyproject.toml, etc.)
 - What existing patterns apply (check ARCHITECTURE.md if it exists)
 - Where this feature would live in the codebase
+- If `.brv/context-tree/` exists, run `brv query "<user_description>"` to check for existing domain knowledge that should inform the spec (e.g., existing patterns, past decisions, business rules)
 
 ## Step 2: Ask Clarifying Questions (max 2-3)
 

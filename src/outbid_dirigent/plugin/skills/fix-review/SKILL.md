@@ -10,6 +10,7 @@ agent: implementer
 <instructions>
 <step id="1">Read `${DIRIGENT_RUN_DIR}/reviews/phase-{PHASE_ID}.json` to get the structured review with findings.</step>
 <step id="2">Read `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` to understand which acceptance criteria failed.</step>
+<step id="2b">If `.brv/context-tree/` exists, run `brv query` with the finding descriptions to check for domain context that helps inform the fix approach.</step>
 <step id="3">Fix all findings with severity "critical" first, then "warn". Skip "info" unless trivial.</step>
 <step id="4">For each failed acceptance criterion (verdict "fail" in criteria_results), address the root cause noted in the "notes" field.</step>
 <step id="5">Commit: `git add -A && git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"`</step>

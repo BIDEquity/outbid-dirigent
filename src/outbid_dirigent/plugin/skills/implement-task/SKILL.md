@@ -44,6 +44,7 @@ Use these only when genuinely blocked, not routinely:
 - `/dirigent:find-edits <file>` — find previous changes to a file
 - `/dirigent:find-errors` — find known errors from past runs
 - `/dirigent:query-data <sql>` — ad-hoc DuckDB query on data files
+- `/dirigent:query-brv <question>` — query or curate domain knowledge from .brv/
 
 ## Completion
 
@@ -78,6 +79,13 @@ before writing a single line.
 **If a `<conventions>` block is present instead**, follow those patterns exactly.
 
 When conventions specify a pattern (e.g. "forms use ActiveAttr with DelegateValidation"), use that pattern even if you know an alternative. Consistency with the existing codebase is more important than your preference.
+
+## Knowledge Store Awareness
+
+If a `<knowledge-store>` block is present, it contains domain knowledge from `.brv/context-tree/`.
+Use summaries as context. For deeper queries, run `/dirigent:query-brv <question>`.
+After establishing new patterns, save them with `/dirigent:query-brv` (curate mode).
+Do NOT modify `.brv/` files directly.
 
 ## Constraints
 

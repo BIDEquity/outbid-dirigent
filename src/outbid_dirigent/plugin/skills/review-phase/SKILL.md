@@ -9,6 +9,7 @@ agent: reviewer
 
 <instructions>
 <step id="1">Read the contract from `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` to understand the acceptance criteria.</step>
+<step id="1b">If `.brv/context-tree/` exists and `brv` CLI is available, run `brv query "What domain rules and patterns apply to phase {PHASE_ID}?"` to understand domain expectations the code should meet.</step>
 <step id="2">Run `git diff HEAD~{COMMITS}` to see all changes made during this phase. Examine each changed file.</step>
 <step id="3">For each acceptance criterion, EXECUTE the verification method described in the criterion. Do NOT judge pass/fail by reading code alone — you MUST run the actual command and record the output as evidence.</step>
 <step id="4">Check for code quality issues: bugs, broken API compatibility, incomplete work, logic errors.</step>

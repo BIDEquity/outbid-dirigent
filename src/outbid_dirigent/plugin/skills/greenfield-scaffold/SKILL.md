@@ -41,6 +41,12 @@ ls test/**/*.test.* tests/**/*.py spec/**/*_spec.rb 2>/dev/null | head -10
 ls .github/workflows/*.yml .gitlab-ci.yml Jenkinsfile .circleci/config.yml 2>/dev/null
 ```
 
+If `.brv/context-tree/` exists and `brv` CLI is available, query for existing architectural decisions:
+```bash
+brv query "What architecture patterns, testing strategies, and design decisions exist?"
+```
+Incorporate any relevant BRV knowledge into your strategy — don't propose patterns that contradict curated decisions.
+
 Read `${DIRIGENT_RUN_DIR}/ANALYSIS.json` for detected language, framework, and test infrastructure.
 Read `${DIRIGENT_RUN_DIR}/test-harness.json` for available services and testability score.
 Read `${DIRIGENT_RUN_DIR}/SPEC.md` for feature requirements.

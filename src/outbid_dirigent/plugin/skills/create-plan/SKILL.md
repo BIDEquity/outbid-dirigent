@@ -87,6 +87,7 @@ Read all available context files:
 7. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
 8. **Optional:** `${DIRIGENT_RUN_DIR}/testing-strategy.md` — proposed test layers, frameworks, patterns (Greenfield route). Tasks must follow this strategy.
 9. **Optional:** `${DIRIGENT_RUN_DIR}/architecture-decisions.md` — proposed patterns, file organization, conventions (Greenfield route). Tasks must follow these decisions.
+10. **Optional:** `.brv/context-tree/` — if this directory exists and `brv` CLI is available, run `brv query "What are the key domain patterns, rules, and architectural decisions for this project?"` to gather domain knowledge. Incorporate relevant findings into task descriptions so coder instances have domain context.
 
 ## Step 2: Analyze the Repo
 
