@@ -5,10 +5,13 @@ Uses pydantic for validation, serialization, and deserialization.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class Task(BaseModel):
@@ -96,14 +99,25 @@ class Plan(BaseModel):
             return None
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-            # Normalize phase id field
+            # Normalize phase/task fields from common LLM output variations
             for p in raw.get("phases", []):
                 if "phase" in p and "id" not in p:
                     p["id"] = str(p.pop("phase"))
                 elif "id" in p:
                     p["id"] = str(p["id"])
+                for t in p.get("tasks", []):
+                    # title → name
+                    if "title" in t and "name" not in t:
+                        t["name"] = t.pop("title")
+                    # files → files_to_modify (conservative default)
+                    if "files" in t and "files_to_modify" not in t and "files_to_create" not in t:
+                        t["files_to_modify"] = t.pop("files")
             return cls.model_validate(raw)
-        except Exception:
+        except json.JSONDecodeError as e:
+            logger.error("PLAN.json is not valid JSON: %s", e)
+            return None
+        except Exception as e:
+            logger.error("PLAN.json validation failed: %s", e)
             return None
 
     @staticmethod
