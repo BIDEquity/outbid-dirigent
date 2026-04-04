@@ -56,12 +56,13 @@ class TaskRunner:
         portal_url: str = "",
         execution_id: str = "",
         reporter_token: str = "",
+        dirigent_dir: Optional[Path] = None,
     ):
         self.repo_path = repo_path
         self.spec_content = spec_content
         self.default_model = default_model
         self.default_effort = default_effort
-        self.dirigent_dir = repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
         # Portal connection for hooks
@@ -111,13 +112,20 @@ class TaskRunner:
         model = model or self.default_model
         effort = effort or self.default_effort
 
+        # Always tell the subprocess where artifacts live
+        run_dir_hint = (
+            f"DIRIGENT_RUN_DIR={self.dirigent_dir} — "
+            f"all dirigent artifacts (PLAN.json, SPEC.md, contracts/, reviews/, summaries/, test-harness.json) "
+            f"live here, NOT in .dirigent/ in the repo."
+        )
+        full_system_prompt = f"{run_dir_hint}\n\n{system_prompt}" if system_prompt else run_dir_hint
+
         cmd = ["claude", "--dangerously-skip-permissions"]
         if model:
             cmd.extend(["--model", model])
         if effort:
             cmd.extend(["--effort", effort])
-        if system_prompt:
-            cmd.extend(["--append-system-prompt", system_prompt])
+        cmd.extend(["--append-system-prompt", full_system_prompt])
 
         # Inject bundled plugin for session recall skills
         plugin_dir = Path(__file__).parent / "plugin"
@@ -154,8 +162,9 @@ class TaskRunner:
                 clean_env["OUTBID_CURRENT_PHASE"] = str(self._current_phase)
 
         # Set hook log directory to match where Executor looks for events
-        # This ensures hooks write to {repo}/.dirigent/hooks/events.jsonl
         clean_env["DIRIGENT_HOOK_LOG_DIR"] = str(self.dirigent_dir / "hooks")
+        # Tell skills where to find/write artifacts
+        clean_env["DIRIGENT_RUN_DIR"] = str(self.dirigent_dir)
 
         try:
             result = subprocess.run(
@@ -249,7 +258,7 @@ class TaskRunner:
             return ""
 
     def _get_run_file_list(self) -> str:
-        state = load_state(str(self.repo_path))
+        state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         if not state or not state.get("completed_tasks"):
             return ""
         try:
@@ -471,7 +480,7 @@ LIMIT 45;
 
         # Summary format hint (deviation rules are in system prompt)
         sections.append(f"""<output-instructions>
-Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
+Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
 - Was wurde gemacht
 - Geaenderte Dateien
 - Deviations (falls vorhanden)
