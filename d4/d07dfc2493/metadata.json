@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "d4d07dfc2493",
+  "strategy": "manual-commit",
+  "branch": "feat/dirigent-v2-run-dir",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "example/setup-smoke-test.sh"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d4/d07dfc2493/0/metadata.json",
+      "transcript": "/d4/d07dfc2493/0/full.jsonl",
+      "content_hash": "/d4/d07dfc2493/0/content_hash.txt",
+      "prompt": "/d4/d07dfc2493/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 545,
+    "cache_creation_tokens": 458663,
+    "cache_read_tokens": 32895852,
+    "output_tokens": 59399,
+    "api_call_count": 266
+  }
+}
