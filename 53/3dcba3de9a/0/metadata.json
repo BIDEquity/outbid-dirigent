@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "533dcba3de9a",
+  "session_id": "505192f5-203d-4b40-aced-37d47c9e3e66",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-04T20:08:09.979959Z",
+  "branch": "feat/dirigent-v2-run-dir",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outbid_dirigent/dirigent.py",
+    "src/outbid_dirigent/executor.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-haiku-4-5-20251001",
+  "turn_id": "5d4e7680a48d",
+  "token_usage": {
+    "input_tokens": 543,
+    "cache_creation_tokens": 458103,
+    "cache_read_tokens": 32787114,
+    "output_tokens": 59011,
+    "api_call_count": 264
+  },
+  "session_metrics": {
+    "turn_count": 16
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-04T20:08:08.622976Z",
+    "agent_lines": 77,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 77,
+    "agent_percentage": 100
+  }
+}
