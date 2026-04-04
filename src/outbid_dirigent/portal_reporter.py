@@ -160,6 +160,57 @@ class PortalReporter:
         )
 
     # ══════════════════════════════════════════
+    # CONTRACT EVENTS
+    # ══════════════════════════════════════════
+
+    def contract_created(
+        self,
+        phase_id: str,
+        criteria_count: int,
+        expected_files_count: int = 0,
+    ) -> bool:
+        """Signal that a contract was created for a phase."""
+        return self._send_event("contract_created", {
+            "phaseId": phase_id,
+            "criteriaCount": criteria_count,
+            "expectedFilesCount": expected_files_count,
+        })
+
+    def review_result(
+        self,
+        phase_id: str,
+        verdict: str,  # "pass", "fail", "error"
+        iteration: int,
+        passed_count: int = 0,
+        failed_count: int = 0,
+        critical_count: int = 0,
+        warn_count: int = 0,
+    ) -> bool:
+        """Signal the result of a phase review."""
+        return self._send_event("review_result", {
+            "phaseId": phase_id,
+            "verdict": verdict,
+            "iteration": iteration,
+            "passedCount": passed_count,
+            "failedCount": failed_count,
+            "criticalCount": critical_count,
+            "warnCount": warn_count,
+        })
+
+    def review_fix(
+        self,
+        phase_id: str,
+        iteration: int,
+        success: bool,
+    ) -> bool:
+        """Signal that fixes were applied for a failed review."""
+        return self._send_event("review_fix", {
+            "phaseId": phase_id,
+            "iteration": iteration,
+            "success": success,
+        })
+
+    # ══════════════════════════════════════════
     # PLAN EVENTS
     # ══════════════════════════════════════════
 
