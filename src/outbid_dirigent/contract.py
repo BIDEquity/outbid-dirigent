@@ -21,7 +21,6 @@ import re
 
 from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict, CriterionLayer
 from outbid_dirigent.plan_schema import Plan, Phase
-from outbid_dirigent.dirigent import get_portal_reporter
 
 # Validation scripts bundled with the plugin skills
 _PLUGIN_DIR = Path(__file__).parent / "plugin" / "skills"
@@ -109,7 +108,8 @@ class ContractManager:
             f"{len(contract.expected_files)} expected files"
         )
 
-        # Send portal event
+        # Send portal event (import here to avoid circular dependency)
+        from outbid_dirigent.dirigent import get_portal_reporter
         reporter = get_portal_reporter()
         if reporter:
             reporter.contract_created(
@@ -250,7 +250,8 @@ class ContractManager:
         critical = review.critical_count
         warn = review.warn_count
 
-        # Send portal event
+        # Send portal event (import here to avoid circular dependency)
+        from outbid_dirigent.dirigent import get_portal_reporter
         reporter = get_portal_reporter()
         if reporter:
             reporter.review_result(
@@ -303,7 +304,8 @@ class ContractManager:
         )
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
-        # Send portal event
+        # Send portal event (import here to avoid circular dependency)
+        from outbid_dirigent.dirigent import get_portal_reporter
         reporter = get_portal_reporter()
         if reporter:
             reporter.review_fix(
