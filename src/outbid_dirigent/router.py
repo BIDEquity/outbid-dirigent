@@ -352,12 +352,12 @@ class Router:
         }
         return estimates.get(scope, 6)
 
-    def save_route(self, route: Route):
-        """Speichert die Route in .dirigent/ROUTE.json."""
-        dirigent_dir = self.repo_path / ".dirigent"
-        dirigent_dir.mkdir(parents=True, exist_ok=True)
+    def save_route(self, route: Route, dirigent_dir: Optional[Path] = None):
+        """Speichert die Route in ROUTE.json."""
+        target_dir = dirigent_dir or (self.repo_path / ".dirigent")
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-        route_file = dirigent_dir / "ROUTE.json"
+        route_file = target_dir / "ROUTE.json"
 
         data = {
             "route": route.route_type.value,
@@ -384,9 +384,9 @@ class Router:
         self.logger.debug(f"Route gespeichert in {route_file}")
 
 
-def load_route(repo_path: str) -> Optional[Dict]:
+def load_route(repo_path: str, dirigent_dir: Optional[Path] = None) -> Optional[Dict]:
     """Lädt eine existierende Route."""
-    route_file = Path(repo_path) / ".dirigent" / "ROUTE.json"
+    route_file = (dirigent_dir or Path(repo_path) / ".dirigent") / "ROUTE.json"
     if not route_file.exists():
         return None
     try:
@@ -398,10 +398,10 @@ def load_route(repo_path: str) -> Optional[Dict]:
         return None
 
 
-def get_next_step(repo_path: str) -> Optional[str]:
+def get_next_step(repo_path: str, dirigent_dir: Optional[Path] = None) -> Optional[str]:
     """Ermittelt den nächsten auszuführenden Schritt."""
-    state = load_state(repo_path)
-    route = load_route(repo_path)
+    state = load_state(repo_path, dirigent_dir=dirigent_dir)
+    route = load_route(repo_path, dirigent_dir=dirigent_dir)
 
     if not route:
         return None
@@ -418,9 +418,9 @@ def get_next_step(repo_path: str) -> Optional[str]:
     return None  # Alle Schritte abgeschlossen
 
 
-def load_state(repo_path: str) -> Optional[Dict]:
+def load_state(repo_path: str, dirigent_dir: Optional[Path] = None) -> Optional[Dict]:
     """Lädt den aktuellen State."""
-    state_file = Path(repo_path) / ".dirigent" / "STATE.json"
+    state_file = (dirigent_dir or Path(repo_path) / ".dirigent") / "STATE.json"
     if not state_file.exists():
         return None
     try:
@@ -432,18 +432,18 @@ def load_state(repo_path: str) -> Optional[Dict]:
         return None
 
 
-def save_state(repo_path: str, state: Dict):
+def save_state(repo_path: str, state: Dict, dirigent_dir: Optional[Path] = None):
     """Speichert den aktuellen State."""
-    state_file = Path(repo_path) / ".dirigent" / "STATE.json"
+    state_file = (dirigent_dir or Path(repo_path) / ".dirigent") / "STATE.json"
     state["updated_at"] = datetime.now().isoformat()
 
     with open(state_file, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, ensure_ascii=False)
 
 
-def mark_step_complete(repo_path: str, step: str):
+def mark_step_complete(repo_path: str, step: str, dirigent_dir: Optional[Path] = None):
     """Markiert einen Schritt als abgeschlossen."""
-    state = load_state(repo_path) or {"completed_steps": [], "started_at": datetime.now().isoformat()}
+    state = load_state(repo_path, dirigent_dir=dirigent_dir) or {"completed_steps": [], "started_at": datetime.now().isoformat()}
 
     if "completed_steps" not in state:
         state["completed_steps"] = []
@@ -451,4 +451,4 @@ def mark_step_complete(repo_path: str, step: str):
     if step not in state["completed_steps"]:
         state["completed_steps"].append(step)
 
-    save_state(repo_path, state)
+    save_state(repo_path, state, dirigent_dir=dirigent_dir)

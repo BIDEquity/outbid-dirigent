@@ -18,11 +18,11 @@ from outbid_dirigent.task_runner import TaskRunner
 class Planner:
     """Creates PLAN.json via Claude Code."""
 
-    def __init__(self, repo_path: Path, spec_content: str, runner: TaskRunner):
+    def __init__(self, repo_path: Path, spec_content: str, runner: TaskRunner, dirigent_dir: Optional[Path] = None):
         self.repo_path = repo_path
         self.spec_content = spec_content
         self.runner = runner
-        self.dirigent_dir = repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
 
     def create_plan(self) -> Optional[Plan]:
         """Generate PLAN.json via Claude Code. Returns Plan or None on failure."""

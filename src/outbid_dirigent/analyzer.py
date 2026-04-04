@@ -247,10 +247,11 @@ LANGUAGE_KEYWORDS = {
 class Analyzer:
     """Analysiert Repository und Spec für die Routing-Entscheidung."""
 
-    def __init__(self, repo_path: str, spec_path: str):
+    def __init__(self, repo_path: str, spec_path: str, dirigent_dir: Optional[Path] = None):
         self.repo_path = Path(repo_path).resolve()
         self.spec_path = Path(spec_path).resolve()
         self.logger = get_logger()
+        self._dirigent_dir = dirigent_dir
 
     def analyze(self) -> AnalysisResult:
         """Führt die komplette Analyse durch."""
@@ -930,7 +931,7 @@ class Analyzer:
 
     def _save_analysis(self, result: AnalysisResult):
         """Speichert das Analyse-Ergebnis."""
-        dirigent_dir = self.repo_path / ".dirigent"
+        dirigent_dir = self._dirigent_dir or (self.repo_path / ".dirigent")
         dirigent_dir.mkdir(parents=True, exist_ok=True)
 
         analysis_file = dirigent_dir / "ANALYSIS.json"
@@ -987,9 +988,9 @@ class Analyzer:
         self.logger.debug(f"Analyse gespeichert in {analysis_file}")
 
 
-def load_analysis(repo_path: str) -> Optional[Dict]:
+def load_analysis(repo_path: str, dirigent_dir: Optional[Path] = None) -> Optional[Dict]:
     """Lädt eine existierende Analyse."""
-    analysis_file = Path(repo_path) / ".dirigent" / "ANALYSIS.json"
+    analysis_file = (dirigent_dir or Path(repo_path) / ".dirigent") / "ANALYSIS.json"
     if analysis_file.exists():
         with open(analysis_file, encoding="utf-8") as f:
             return json.load(f)

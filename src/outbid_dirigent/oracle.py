@@ -32,14 +32,15 @@ class Oracle:
     Nutzt Claude API direkt (nicht Claude Code) für schnelle Antworten.
     """
 
-    def __init__(self, repo_path: str, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, repo_path: str, model: str = "claude-sonnet-4-20250514", dirigent_dir: Optional[Path] = None):
         self.repo_path = Path(repo_path)
         self.model = model
         self.logger = get_logger()
         self.client = anthropic.Anthropic()
+        self._dirigent_dir = dirigent_dir or (self.repo_path / ".dirigent")
 
         # Lade oder initialisiere Decision Cache
-        self.decisions_file = self.repo_path / ".dirigent" / "DECISIONS.json"
+        self.decisions_file = self._dirigent_dir / "DECISIONS.json"
         self.decisions = self._load_decisions()
 
     def _load_decisions(self) -> Dict:
@@ -102,21 +103,21 @@ class Oracle:
                 break
 
         # Analyse laden
-        analysis_file = self.repo_path / ".dirigent" / "ANALYSIS.json"
+        analysis_file = self._dirigent_dir / "ANALYSIS.json"
         if analysis_file.exists():
             with open(analysis_file, encoding="utf-8") as f:
                 analysis = json.load(f)
             context_parts.append(f"<analysis>\n{json.dumps(analysis, indent=2)}\n</analysis>")
 
         # Plan laden falls vorhanden
-        plan_file = self.repo_path / ".dirigent" / "PLAN.json"
+        plan_file = self._dirigent_dir / "PLAN.json"
         if plan_file.exists():
             with open(plan_file, encoding="utf-8") as f:
                 plan = json.load(f)
             context_parts.append(f"<plan>\n{json.dumps(plan, indent=2)}\n</plan>")
 
         # Business Rules laden falls vorhanden
-        rules_file = self.repo_path / ".dirigent" / "BUSINESS_RULES.md"
+        rules_file = self._dirigent_dir / "BUSINESS_RULES.md"
         if rules_file.exists():
             rules_content = rules_file.read_text(encoding="utf-8")
             if len(rules_content) > 5000:
@@ -439,6 +440,6 @@ Antworte als JSON:
         self.logger.info("Oracle Cache gelöscht")
 
 
-def create_oracle(repo_path: str, model: str = "claude-sonnet-4-20250514") -> Oracle:
+def create_oracle(repo_path: str, model: str = "claude-sonnet-4-20250514", dirigent_dir: Optional[Path] = None) -> Oracle:
     """Factory-Funktion für Oracle-Instanz."""
-    return Oracle(repo_path, model)
+    return Oracle(repo_path, model, dirigent_dir=dirigent_dir)
