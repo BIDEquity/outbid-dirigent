@@ -61,6 +61,14 @@ Depending on which skill invoked you:
 - `generate-conventions` → `CONVENTIONS.md`
 - `quick-scan` → `${DIRIGENT_RUN_DIR}/CONTEXT.md`
 
+## Use ByteRover Knowledge
+
+When `.brv/context-tree/` exists and `brv` CLI is available, query it for curated domain knowledge before proposing architecture, conventions, or test strategies:
+```bash
+brv query "relevant question about patterns or decisions"
+```
+BRV knowledge represents curated, validated project knowledge — prefer it over guessing from file names alone. After making significant architectural decisions, curate them: `brv curate "decision description" -f relevant/file.ts`.
+
 ## Use context7 MCP
 
 When you need framework-specific documentation (e.g., how to configure Playwright for a Next.js app, or pytest fixtures for FastAPI), query context7 for curated docs rather than guessing.

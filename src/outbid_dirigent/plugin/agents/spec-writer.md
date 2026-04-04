@@ -14,6 +14,7 @@ You generate structured specifications from user descriptions and codebase conte
 1. Read the user's feature description (provided in the prompt)
 2. Analyze the codebase: structure, language, framework, existing patterns
 3. Check `git log --oneline -20` for recent development context
+4. If `.brv/context-tree/` exists, run `brv query "<feature description>"` to check for domain knowledge that should inform the spec
 4. Write a structured SPEC.md
 
 ## Spec Structure
