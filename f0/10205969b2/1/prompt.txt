@@ -1,0 +1,25 @@
+list all routes the dirigent knows as of now
+
+---
+
+just the names
+
+---
+
+what is the discriminator for each route?
+
+---
+
+so: no llm deciding?
+
+---
+
+why?
+
+---
+
+add a "quick"-route that fires when spec is very small and doable in one run.
+
+---
+
+add a "quick"-route that fires when spec is very small and doable in one run.
