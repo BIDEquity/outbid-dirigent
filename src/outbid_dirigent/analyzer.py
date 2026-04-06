@@ -850,6 +850,14 @@ class Analyzer:
     def _determine_route(self, repo: RepoAnalysis, spec: SpecAnalysis) -> Tuple[str, str, str, int, int]:
         """Bestimmt die optimale Route basierend auf der Analyse."""
 
+        # ── Quick route (highest priority — small spec, one-shot doable) ──
+
+        if (spec.estimated_scope == "small"
+            and not spec.has_legacy_keywords
+            and not spec.has_testability_keywords
+            and not spec.has_greenfield_keywords):
+            return "quick", "Kleine Spec, in einem Durchlauf machbar", "high", 0, 0
+
         # ── Specialized routes (take priority over general routes) ──
 
         # Testability route: triggered when spec focuses on improving test infrastructure

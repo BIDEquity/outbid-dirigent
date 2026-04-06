@@ -52,7 +52,7 @@ def _make_spec(**overrides) -> SpecAnalysis:
         tracking_keywords_found=[],
         target_language=None,
         complexity=None,
-        estimated_scope="small",
+        estimated_scope="medium",
     )
     defaults.update(overrides)
     return SpecAnalysis(**defaults)
@@ -77,6 +77,25 @@ class TestDetermineRoute:
         route, reason, confidence, legacy, greenfield = analyzer._determine_route(_make_repo(), spec)
         assert route == "testability"
         assert confidence == "high"
+
+    def test_quick_route_for_small_spec_without_keywords(self):
+        analyzer = _make_analyzer()
+        spec = _make_spec(estimated_scope="small")
+        route, reason, confidence, _, _ = analyzer._determine_route(_make_repo(), spec)
+        assert route == "quick"
+        assert confidence == "high"
+
+    def test_quick_route_not_for_medium_spec(self):
+        analyzer = _make_analyzer()
+        spec = _make_spec(estimated_scope="medium")
+        route, _, _, _, _ = analyzer._determine_route(_make_repo(), spec)
+        assert route != "quick"
+
+    def test_quick_route_not_when_legacy_keywords(self):
+        analyzer = _make_analyzer()
+        spec = _make_spec(estimated_scope="small", has_legacy_keywords=True, legacy_keywords_found=["migrate"])
+        route, _, _, _, _ = analyzer._determine_route(_make_repo(), spec)
+        assert route != "quick"
 
     def test_testability_needs_at_least_two_keywords(self):
         analyzer = _make_analyzer()
