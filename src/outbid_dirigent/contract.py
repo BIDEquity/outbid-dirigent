@@ -12,6 +12,7 @@ Contracts and reviews are structured JSON files validated by Pydantic.
 All prompts use /dirigent: slash commands resolved natively by the subprocess.
 """
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -48,6 +49,23 @@ class ContractManager:
 
     def _review_path(self, phase_id: str) -> Path:
         return self.reviews_dir / f"phase-{phase_id}.json"
+
+    @staticmethod
+    def _extract_raw_verdict(path: Path) -> Optional[str]:
+        """Last-resort fallback: read just the verdict from raw JSON when Pydantic fails."""
+        try:
+            if not path.exists():
+                return None
+            content = path.read_text(encoding="utf-8")
+            if not content.strip():
+                return None
+            raw = json.loads(content)
+            verdict = raw.get("verdict", "").strip().lower()
+            if verdict in ("pass", "fail"):
+                return verdict
+            return None
+        except Exception:
+            return None
 
     # ══════════════════════════════════════════
     # CONTRACT CREATION
@@ -240,6 +258,13 @@ class ContractManager:
         # Parse structured review
         review = Review.load(review_path)
         if review is None:
+            # Fallback: try to extract just the verdict from raw JSON
+            verdict = self._extract_raw_verdict(review_path)
+            if verdict:
+                logger.warning(
+                    f"Phase {phase.id} review: Pydantic validation failed but raw verdict is '{verdict}' — using fallback"
+                )
+                return verdict
             logger.warning(f"Phase {phase.id} review: output missing or invalid JSON")
             return "error"
 

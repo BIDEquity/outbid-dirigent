@@ -233,6 +233,81 @@ class Review(BaseModel):
         )
 
     @classmethod
+    def _normalize_raw(cls, raw: dict) -> dict:
+        """Aggressively normalize a raw review dict for Pydantic compatibility."""
+        # Normalize top-level verdict
+        if "verdict" in raw and isinstance(raw["verdict"], str):
+            raw["verdict"] = raw["verdict"].strip().lower()
+            if raw["verdict"] not in ("pass", "fail"):
+                raw["verdict"] = "fail"  # unknown verdict → fail
+
+        # Backward compat: old field names
+        if "results" in raw and "criteria_results" not in raw:
+            old_results = raw.pop("results")
+            raw["criteria_results"] = [
+                {
+                    "ac_id": r.get("id", ""),
+                    "verdict": r.get("status", "fail").lower(),
+                    "notes": r.get("actual") or r.get("notes") or "",
+                }
+                for r in old_results
+            ]
+        if "issues" in raw and "findings" not in raw:
+            _sev_map = {"low": "info", "medium": "warn", "high": "critical"}
+            raw["findings"] = [
+                {
+                    "severity": _sev_map.get(i.get("severity", "info"), i.get("severity", "info")),
+                    "file": i.get("criterion", ""),
+                    "line": 0,
+                    "description": i.get("description", ""),
+                    "suggestion": i.get("recommendation", ""),
+                }
+                for i in raw.pop("issues")
+            ]
+
+        # Normalize criterion verdicts
+        valid_cr_verdicts = {"pass", "fail", "warn"}
+        for cr in raw.get("criteria_results", []):
+            if "verdict" in cr and isinstance(cr["verdict"], str):
+                cr["verdict"] = cr["verdict"].strip().lower()
+                if cr["verdict"] not in valid_cr_verdicts:
+                    cr["verdict"] = "fail"
+            # Ensure required fields exist
+            if "ac_id" not in cr:
+                cr["ac_id"] = "UNKNOWN"
+            if "verdict" not in cr:
+                cr["verdict"] = "fail"
+
+        # Normalize finding severities
+        valid_severities = {"critical", "warn", "info"}
+        for f in raw.get("findings", []):
+            if "severity" in f and isinstance(f["severity"], str):
+                f["severity"] = f["severity"].strip().lower()
+                if f["severity"] not in valid_severities:
+                    f["severity"] = "warn"
+            # Ensure required fields exist
+            if "file" not in f:
+                f["file"] = "unknown"
+            if "description" not in f:
+                f["description"] = ""
+
+        # Strip unknown top-level fields that Pydantic might reject
+        known_fields = {
+            "phase_id", "iteration", "verdict", "confidence", "infra_tier",
+            "tests_run", "tests_skipped_infra", "caveat", "criteria_results",
+            "findings", "summary",
+        }
+        unknown = set(raw.keys()) - known_fields
+        for key in unknown:
+            raw.pop(key)
+
+        # Ensure phase_id is a string
+        if "phase_id" in raw:
+            raw["phase_id"] = str(raw["phase_id"])
+
+        return raw
+
+    @classmethod
     def load(cls, path: Path) -> Optional["Review"]:
         if not path.exists():
             return None
@@ -242,40 +317,7 @@ class Review(BaseModel):
                 logger.warning(f"Review file is empty: {path}")
                 return None
             raw = json.loads(content)
-            # Backward compat: old schema used uppercase verdict, different field names
-            if "verdict" in raw and isinstance(raw["verdict"], str):
-                raw["verdict"] = raw["verdict"].lower()
-            # Normalize criterion verdicts to lowercase
-            for cr in raw.get("criteria_results", []):
-                if "verdict" in cr and isinstance(cr["verdict"], str):
-                    cr["verdict"] = cr["verdict"].lower()
-            if "results" in raw and "criteria_results" not in raw:
-                # Old field was "results" with id/status/layer/actual/notes
-                old_results = raw.pop("results")
-                raw["criteria_results"] = [
-                    {
-                        "ac_id": r.get("id", ""),
-                        "verdict": r.get("status", "fail").lower(),
-                        "notes": r.get("actual") or r.get("notes") or "",
-                    }
-                    for r in old_results
-                ]
-            if "issues" in raw and "findings" not in raw:
-                _sev_map = {"low": "info", "medium": "warn", "high": "critical"}
-                raw["findings"] = [
-                    {
-                        "severity": _sev_map.get(i.get("severity", "info"), i.get("severity", "info")),
-                        "file": i.get("criterion", ""),
-                        "line": 0,
-                        "description": i.get("description", ""),
-                        "suggestion": i.get("recommendation", ""),
-                    }
-                    for i in raw.pop("issues")
-                ]
-            # Normalize finding severities to lowercase
-            for f in raw.get("findings", []):
-                if "severity" in f and isinstance(f["severity"], str):
-                    f["severity"] = f["severity"].lower()
+            raw = cls._normalize_raw(raw)
             return cls.model_validate(raw)
         except Exception as e:
             logger.error(f"Review.load() failed for {path}: {e}")
