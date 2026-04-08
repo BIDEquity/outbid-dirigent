@@ -54,6 +54,16 @@ dev = [
 ]
 
 # ══════════════════════════════════════════
+# TY (type checker) — exclude self-contained
+# uv-script files that declare their own deps
+# inline and are not part of the main package.
+# ══════════════════════════════════════════
+[tool.ty.src]
+exclude = [
+    "src/outbid_dirigent/plugin/mcp/",
+]
+
+# ══════════════════════════════════════════
 # PYTEST CONFIGURATION
 # ══════════════════════════════════════════
 [tool.pytest.ini_options]
