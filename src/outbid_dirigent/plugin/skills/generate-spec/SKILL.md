@@ -56,11 +56,22 @@ Write `${DIRIGENT_RUN_DIR}/SPEC.md` with this structure:
 
 ## Requirements
 
-{Bulleted list of concrete, testable requirements. Each requirement should be something the reviewer can verify.}
+{Numbered list of concrete, testable requirements with stable IDs. Each requirement MUST use this exact format so the downstream spec-compactor can parse them:}
 
-- [ ] Requirement 1
-- [ ] Requirement 2
-- [ ] Requirement 3
+- **R1** (category/priority): Requirement text
+- **R2** (category/priority): Requirement text
+- **R3** (category/priority): Requirement text
+
+Where:
+- **Rn** — stable ID, sequential from R1, never reused or renumbered
+- **category** — one of: `data-model`, `api`, `ui`, `auth`, `integration`, `infra`, `policy`, `workflow`, `validation`, `other`
+- **priority** — one of: `must`, `should`, `may`
+
+Example:
+- **R1** (auth/must): Users sign in via Google OAuth
+- **R2** (ui/must): Dashboard shows active tax year as a persistent top banner
+- **R3** (data-model/must): Entity has fields `id`, `name`, `legalForm`, `active`
+- **R4** (validation/should): Uploaded files max 50 MB
 
 ## Scope
 
@@ -82,6 +93,7 @@ Write `${DIRIGENT_RUN_DIR}/SPEC.md` with this structure:
 <rule>Questions must offer defaults. The user should be able to press Enter for all of them.</rule>
 <rule>The spec must be concrete enough for the Dirigent to create a plan from it.</rule>
 <rule>Requirements must be testable — "looks good" is not testable, "dark mode class is applied to body element" is.</rule>
+<rule>Every requirement MUST have a stable ID in the format `**Rn** (category/priority): text` — see the Requirements section template. IDs are sequential from R1 and must never be reused. Split compound requirements ("X and Y and Z") into separate Rn entries.</rule>
 <rule>Out of Scope is required — it prevents the executor from gold-plating.</rule>
 <rule>Technical Notes should reference actual files and patterns in the repo.</rule>
 <rule>Write the spec even if you couldn't ask questions (non-interactive mode). Use your best judgment.</rule>
