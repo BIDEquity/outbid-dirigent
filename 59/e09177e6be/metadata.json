@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "59e09177e6be",
+  "strategy": "manual-commit",
+  "branch": "feat/spec-compaction",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/59/e09177e6be/0/metadata.json",
+      "transcript": "/59/e09177e6be/0/full.jsonl",
+      "content_hash": "/59/e09177e6be/0/content_hash.txt",
+      "prompt": "/59/e09177e6be/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 236,
+    "cache_creation_tokens": 698661,
+    "cache_read_tokens": 12128724,
+    "output_tokens": 57175,
+    "api_call_count": 95
+  }
+}
