@@ -47,3 +47,7 @@ give me a script (test-compaction.py) to test the compaction prompt on arbitrary
 ---
 
 logger nicht initialisiert
+
+---
+
+make a pr for this
