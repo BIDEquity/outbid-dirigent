@@ -11,6 +11,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
 from pydantic import BaseModel, Field
 
 
@@ -236,10 +237,18 @@ class Review(BaseModel):
         if not path.exists():
             return None
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            content = path.read_text(encoding="utf-8")
+            if not content.strip():
+                logger.warning(f"Review file is empty: {path}")
+                return None
+            raw = json.loads(content)
             # Backward compat: old schema used uppercase verdict, different field names
             if "verdict" in raw and isinstance(raw["verdict"], str):
                 raw["verdict"] = raw["verdict"].lower()
+            # Normalize criterion verdicts to lowercase
+            for cr in raw.get("criteria_results", []):
+                if "verdict" in cr and isinstance(cr["verdict"], str):
+                    cr["verdict"] = cr["verdict"].lower()
             if "results" in raw and "criteria_results" not in raw:
                 # Old field was "results" with id/status/layer/actual/notes
                 old_results = raw.pop("results")
@@ -263,8 +272,13 @@ class Review(BaseModel):
                     }
                     for i in raw.pop("issues")
                 ]
+            # Normalize finding severities to lowercase
+            for f in raw.get("findings", []):
+                if "severity" in f and isinstance(f["severity"], str):
+                    f["severity"] = f["severity"].lower()
             return cls.model_validate(raw)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Review.load() failed for {path}: {e}")
             return None
 
     @staticmethod
