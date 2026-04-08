@@ -1,0 +1,57 @@
+ultrathink about adding an interactive "what is the outbid dirifent and what does it do" skill / mcp / whatever. A quick onboarding. Be creative. Users do not want to read docs of our skills. They want to dive in directly.
+
+---
+
+what exactly is the plan now?
+
+---
+
+/superpowers:brainstorm how can this be even more interactive / frictionless onboarding while serving at the same time as vibecoding/outbid playbook?
+
+---
+
+B sounds right. But with more than the skills. Need also a "what is vibecoding/what not, good reads etc."
+
+---
+
+C with Notion maybe?
+
+---
+
+A. /superpowers:brainstorm what topics does the inline canon need to cover. look inside the claide session logs (use duckdb) on this machine to find patterns/best practices
+
+---
+
+go.
+
+---
+
+/build-plugin
+
+---
+
+/greenfield-scaffold
+
+---
+
+/hi
+
+---
+
+research tools to build custom agent repls but still using claude repl in background
+
+---
+
+oh yeah and add statusline. ask no questions.
+
+---
+
+/hi
+
+---
+
+i do not see the mcp
+
+---
+
+no. but anyway. commit.
