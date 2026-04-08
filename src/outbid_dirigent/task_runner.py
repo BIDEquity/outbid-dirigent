@@ -402,8 +402,28 @@ LIMIT 45;
         if plan.out_of_scope:
             sections.append("<out-of-scope>\n" + "\n".join(f"- {x}" for x in plan.out_of_scope) + "\n</out-of-scope>")
 
-        # Spec
-        sections.append(f"<spec>\n{self.spec_content}\n</spec>")
+        # Spec — prefer compacted form, fall back to full blob
+        spec_block: Optional[str] = None
+        compact_path = self.dirigent_dir / "SPEC.compact.json"
+        if compact_path.exists():
+            try:
+                from outbid_dirigent.spec_compactor import CompactSpec
+                compact = CompactSpec.model_validate_json(
+                    compact_path.read_text(encoding="utf-8")
+                )
+                # If task has no relevant_req_ids, inject ALL reqs (safe fallback
+                # so we never silently drop requirements when the planner forgot
+                # to tag a task).
+                relevant = set(task.relevant_req_ids) if task.relevant_req_ids else None
+                spec_block = compact.render_xml(only_req_ids=relevant)
+            except Exception as e:
+                logger.warning(
+                    f"Compact spec load failed, falling back to full spec: {e}"
+                )
+
+        if spec_block is None:
+            spec_block = f"<spec>\n{self.spec_content}\n</spec>"
+        sections.append(spec_block)
 
         # Reference spec images if available
         if self.spec_images:

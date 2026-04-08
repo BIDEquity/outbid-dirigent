@@ -78,6 +78,7 @@ Keep it short — 20-40 lines max. The spec exists to give the planner enough co
 
 Read all available context files:
 
+0. **Required if present:** `${DIRIGENT_RUN_DIR}/SPEC.compact.json` — pre-compacted requirements with stable IDs (R1, R2, …), glossary, entities, and flows. When this exists, you MUST tag every task in the plan with its `relevant_req_ids` (see Step 3 and Rule 13).
 1. **Required:** `${DIRIGENT_RUN_DIR}/SPEC.md` — the feature specification (just written or pre-existing)
 2. **Optional:** `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
 3. **Optional:** `${DIRIGENT_RUN_DIR}/CONTEXT.md` — relevant file analysis (Hybrid route)
@@ -123,7 +124,8 @@ Write `${DIRIGENT_RUN_DIR}/PLAN.json` with this exact format:
           "model": "sonnet",
           "effort": "medium",
           "test_level": "L1",
-          "convention_skills": ["ruby-code-writing", "form-builder"]
+          "convention_skills": ["ruby-code-writing", "form-builder"],
+          "relevant_req_ids": ["R3", "R7"]
         }
       ]
     }
@@ -147,6 +149,7 @@ Write `${DIRIGENT_RUN_DIR}/PLAN.json` with this exact format:
 10. **Plan for maintainability** — the agent executing these tasks is the long-term maintainer of the codebase. Task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies. Do not plan throwaway code.
 11. **Plan for real verification** — each phase will be reviewed with executable verification commands. Do not plan tasks that "work" only in the sense that they compile. The reviewer will hit real endpoints and run real test suites.
 12. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Be specific — a task creating a Ruby form object needs `["ruby-code-writing", "form-builder"]`, not the entire skill list. Empty array `[]` if no convention skills are relevant.
+13. **relevant_req_ids (spec coverage)**: If `${DIRIGENT_RUN_DIR}/SPEC.compact.json` exists, set `relevant_req_ids` on every task. The IDs come from the `requirements[].id` field of the compact spec (format `R\d+`). Together, all tasks must collectively reference every requirement at least once. Cross-cutting requirements (encryption, audit logging, GDPR) may be referenced by multiple tasks. Use the `category` field on each requirement as a hint: `data-model` reqs belong to schema/migration tasks, `ui` reqs to component tasks, `auth` reqs to permission/middleware tasks, etc. An empty array means "no specific requirement, this is mechanical work" and should be rare.
 
 ## Validation (MANDATORY)
 
