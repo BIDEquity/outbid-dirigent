@@ -44,11 +44,19 @@ class ContractManager:
         self.contracts_dir.mkdir(parents=True, exist_ok=True)
         self.reviews_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _normalize_phase_id(phase_id: str) -> str:
+        """Normalize phase ID to zero-padded two-digit format (1 -> 01, 01 -> 01)."""
+        try:
+            return str(int(phase_id)).zfill(2)
+        except (ValueError, TypeError):
+            return str(phase_id)
+
     def _contract_path(self, phase_id: str) -> Path:
-        return self.contracts_dir / f"phase-{phase_id}.json"
+        return self.contracts_dir / f"phase-{self._normalize_phase_id(phase_id)}.json"
 
     def _review_path(self, phase_id: str) -> Path:
-        return self.reviews_dir / f"phase-{phase_id}.json"
+        return self.reviews_dir / f"phase-{self._normalize_phase_id(phase_id)}.json"
 
     @staticmethod
     def _extract_raw_verdict(path: Path) -> Optional[str]:
