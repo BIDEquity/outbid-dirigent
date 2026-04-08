@@ -47,5 +47,7 @@ uv.lock
 
 # Dirigent output (these are created in target repos, not here)
 # .dirigent/
+# Dirigent onboarding scratch — safe to delete, must never land in PRs
+.dirigent-onboarding/
 .firecrawl/
 .worktrees/

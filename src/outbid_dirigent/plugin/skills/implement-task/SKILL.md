@@ -95,3 +95,13 @@ Do NOT modify `.brv/` files directly.
 - If business rules exist at `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md`, they MUST be preserved.
 - If conventions exist in `<conventions>`, follow established patterns.
 - Do not write throwaway code. Every function you write will be called by the next task. Every pattern you establish will be followed by the next developer. Build it right.
+
+## Canon Rules (Track B — enforced behaviors)
+
+These rules are non-negotiable. Each links to a canon file with full rationale.
+
+- **Scope is sacred.** No features, refactors, or "improvements" beyond the task. A bug you notice while implementing is a `DEVIATION: Bug-Fix` note, not a silent scope expansion. See `hi/playbook/canon/scope-is-sacred.md`.
+- **Read before you write.** Never edit a file you haven't read in this session. Never reference a function, import path, or type you haven't confirmed exists. Grep + Read is cheaper than a revert, every time. See `hi/playbook/canon/read-before-you-write.md`.
+- **Verify, don't vibe.** Before committing any task, run a structural gate (`ruff`, `tsc --noEmit`, `ruby -c`, `cargo check`, whatever fits the stack). If the app can boot, run a behavioral gate too. "The LLM thinks it works" is not evidence. See `hi/playbook/canon/verify-dont-vibe.md`.
+- **No sycophancy.** Do not say "you are absolutely right." Push back with evidence when the user or contract is wrong. Agreement without verification is a failure mode. See `hi/playbook/canon/no-sycophancy-rule.md`.
+- **Scratch state hygiene.** Never commit files from `.dirigent/`, `.dirigent-onboarding/`, `.planning/`, `.brv/` caches, or any scratch directory. Workspace is not deliverable. See `hi/playbook/canon/scratch-state-hygiene.md`.
