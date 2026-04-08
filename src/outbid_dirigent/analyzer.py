@@ -280,8 +280,8 @@ class Analyzer:
                 f"{len(runtime_analysis.services)} Services, Doppler: {runtime_analysis.uses_doppler}"
             )
 
-        # Route bestimmen
-        route, reason, confidence, legacy_signals, greenfield_signals = self._determine_route(
+        # Route bestimmen — LLM first, heuristic fallback
+        route, reason, confidence, legacy_signals, greenfield_signals = self._determine_route_with_llm(
             repo_analysis, spec_analysis
         )
 
@@ -846,6 +846,32 @@ class Analyzer:
             complexity=complexity,
             estimated_scope=scope,
         )
+
+    def _determine_route_with_llm(self, repo: RepoAnalysis, spec: SpecAnalysis) -> Tuple[str, str, str, int, int]:
+        """Try LLM routing first, fall back to heuristics on failure."""
+        from outbid_dirigent.llm_router import determine_route_llm
+        from outbid_dirigent.test_harness_schema import TestHarness
+
+        # Load test harness summary if available
+        dirigent_dir = self._dirigent_dir or (self.repo_path / ".dirigent")
+        harness = TestHarness.load(dirigent_dir / "test-harness.json")
+        harness_summary = harness.summary_for_reviewer() if harness else None
+
+        # Read spec content
+        spec_content = self.spec_path.read_text(encoding="utf-8")
+
+        decision = determine_route_llm(
+            spec_content=spec_content,
+            commit_count=repo.commit_count,
+            test_harness_summary=harness_summary,
+            dirigent_dir=dirigent_dir,
+        )
+
+        if decision:
+            return decision.route.value, decision.justification, decision.confidence, 0, 0
+
+        self.logger.info("LLM router failed, falling back to heuristics")
+        return self._determine_route(repo, spec)
 
     def _determine_route(self, repo: RepoAnalysis, spec: SpecAnalysis) -> Tuple[str, str, str, int, int]:
         """Bestimmt die optimale Route basierend auf der Analyse."""
