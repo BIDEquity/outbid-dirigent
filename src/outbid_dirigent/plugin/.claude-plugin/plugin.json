@@ -1,26 +1,5 @@
 {
   "name": "dirigent",
   "description": "Orchestration skills for Dirigent subprocesses: plan creation, phase contracts, review/fix cycles, init/test harness, progress reporting, testability analysis, entropy minimization, and session recall.",
-  "version": "1.3.0",
-  "commands": [
-    "./commands/find-edits.md",
-    "./commands/find-errors.md",
-    "./commands/query-data.md",
-    "./commands/search-memories.md",
-    "./commands/create-plan.md",
-    "./commands/create-contract.md",
-    "./commands/review-phase.md",
-    "./commands/fix-review.md",
-    "./commands/extract-business-rules.md",
-    "./commands/quick-scan.md",
-    "./commands/run-init.md",
-    "./commands/show-progress.md",
-    "./commands/show-plan.md",
-    "./commands/increase-testability.md",
-    "./commands/add-posthog.md",
-    "./commands/build-manifest.md",
-    "./commands/validate-manifest.md",
-    "./commands/entropy-minimization.md",
-    "./commands/generate-architecture.md"
-  ]
+  "version": "1.4.0"
 }

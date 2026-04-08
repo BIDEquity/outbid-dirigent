@@ -1,0 +1,325 @@
+#!/usr/bin/env python3
+"""
+Outbid Dirigent – Spec Compactor
+
+One-shot LLM call that converts a free-form markdown spec into a structured,
+token-efficient CompactSpec (requirements with stable IDs, glossary, entities,
+flows). The compacted form is injected into per-task prompts (filtered by
+relevant_req_ids) so coders see only the requirements relevant to their task,
+plus the full glossary/entities/flows as reference.
+"""
+
+from datetime import datetime
+from pathlib import Path
+from typing import Literal, Optional
+
+import anthropic
+from pydantic import BaseModel, Field
+
+from outbid_dirigent.logger import get_logger
+
+
+# ---------------------------------------------------------------------------
+# Pydantic schema
+# ---------------------------------------------------------------------------
+
+
+ReqCategory = Literal[
+    "data-model",
+    "api",
+    "ui",
+    "auth",
+    "integration",
+    "infra",
+    "policy",
+    "workflow",
+    "validation",
+    "other",
+]
+ReqPriority = Literal["must", "should", "may"]
+
+
+class Requirement(BaseModel):
+    id: str = Field(description="Stable ID like R1, R2, R3 in source order")
+    category: ReqCategory
+    priority: ReqPriority
+    text: str = Field(description="Single requirement, verbatim domain terms preserved")
+
+
+class GlossaryTerm(BaseModel):
+    name: str
+    definition: str = Field(
+        description="One-sentence definition. Write 'undefined in source' if not derivable from spec or universal knowledge."
+    )
+
+
+class EntityField(BaseModel):
+    name: str
+    type: str
+    required: bool = True
+    constraints: str = ""
+
+
+class Entity(BaseModel):
+    name: str
+    fields: list[EntityField] = Field(default_factory=list)
+
+
+class FlowStep(BaseModel):
+    n: int
+    action: str
+
+
+class Flow(BaseModel):
+    name: str
+    steps: list[FlowStep] = Field(default_factory=list)
+
+
+class CompactMeta(BaseModel):
+    title: str
+    scope: str = Field(description="One sentence: what this builds")
+    out_of_scope: list[str] = Field(default_factory=list)
+
+
+class CompactSpec(BaseModel):
+    """Structured, token-efficient representation of a markdown spec."""
+
+    meta: CompactMeta
+    glossary: list[GlossaryTerm] = Field(default_factory=list)
+    requirements: list[Requirement] = Field(default_factory=list)
+    entities: list[Entity] = Field(default_factory=list)
+    flows: list[Flow] = Field(default_factory=list)
+
+    def render_xml(self, only_req_ids: Optional[set[str]] = None) -> str:
+        """Render this compact spec as XML for injection into a task prompt.
+
+        Args:
+            only_req_ids: If provided, only requirements whose IDs are in this
+                set are emitted. Glossary, entities, and flows are ALWAYS
+                emitted in full — they are reference context.
+
+        Returns:
+            XML-tagged string suitable for inclusion in an LLM prompt.
+        """
+        lines: list[str] = ["<spec-compact>"]
+
+        # Meta
+        lines.append("  <meta>")
+        lines.append(f"    <title>{_esc(self.meta.title)}</title>")
+        lines.append(f"    <scope>{_esc(self.meta.scope)}</scope>")
+        if self.meta.out_of_scope:
+            lines.append("    <out-of-scope>")
+            for item in self.meta.out_of_scope:
+                lines.append(f"      <item>{_esc(item)}</item>")
+            lines.append("    </out-of-scope>")
+        lines.append("  </meta>")
+
+        # Glossary (always full)
+        if self.glossary:
+            lines.append("  <glossary>")
+            for term in self.glossary:
+                lines.append(
+                    f'    <term name="{_esc(term.name)}">{_esc(term.definition)}</term>'
+                )
+            lines.append("  </glossary>")
+
+        # Requirements (filtered if only_req_ids given)
+        if only_req_ids is None:
+            reqs = self.requirements
+        else:
+            reqs = [r for r in self.requirements if r.id in only_req_ids]
+        if reqs:
+            lines.append(
+                '  <must-satisfy hint="these are the requirements YOUR task must address">'
+            )
+            for r in reqs:
+                lines.append(
+                    f'    <req id="{_esc(r.id)}" category="{r.category}" priority="{r.priority}">{_esc(r.text)}</req>'
+                )
+            lines.append("  </must-satisfy>")
+
+        # Entities (always full)
+        if self.entities:
+            lines.append(
+                '  <entities hint="data model reference — implement only what your task requires, not all entities">'
+            )
+            for e in self.entities:
+                lines.append(f'    <entity name="{_esc(e.name)}">')
+                for f in e.fields:
+                    req_attr = "true" if f.required else "false"
+                    constraints = _esc(f.constraints) if f.constraints else ""
+                    lines.append(
+                        f'      <field name="{_esc(f.name)}" type="{_esc(f.type)}" required="{req_attr}">{constraints}</field>'
+                    )
+                lines.append("    </entity>")
+            lines.append("  </entities>")
+
+        # Flows (always full, with explicit "do not implement all" hint)
+        if self.flows:
+            lines.append(
+                '  <flows hint="workflow reference — DO NOT implement all flows, only the parts your task covers">'
+            )
+            for fl in self.flows:
+                lines.append(f'    <flow name="{_esc(fl.name)}">')
+                for st in fl.steps:
+                    lines.append(f'      <step n="{st.n}">{_esc(st.action)}</step>')
+                lines.append("    </flow>")
+            lines.append("  </flows>")
+
+        lines.append("</spec-compact>")
+        return "\n".join(lines)
+
+
+def _esc(s: str) -> str:
+    """Minimal XML escaping for text content and attributes."""
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+# ---------------------------------------------------------------------------
+# Compactor
+# ---------------------------------------------------------------------------
+
+
+COMPACTOR_SYSTEM_PROMPT = """\
+You are a spec compactor. Convert a free-form markdown spec into a structured,
+token-efficient CompactSpec that downstream coding agents can scan in
+O(requirements) instead of O(prose).
+
+## Hard rules
+
+1. **Lossless on requirements.** Every testable, implementable, or
+   behavior-defining statement in the source MUST appear as a Requirement.
+   When in doubt, include it. Better to over-include than to drop.
+
+2. **Lossy on prose only.** Strip narrative, motivation, background, and
+   rationale UNLESS they define behavior. Marketing language and history go.
+
+3. **Stable IDs.** Number requirements R1, R2, R3 ... in source order.
+
+4. **Verbatim domain terms.** Do NOT translate, paraphrase, or "clean up"
+   domain-specific terminology (legal terms, product names, regulatory codes,
+   proper nouns, foreign-language terms). Copy them exactly.
+
+5. **One requirement per Requirement.** If a sentence contains "X and Y and Z",
+   split into three reqs unless they are inseparable.
+
+6. **No invention. Zero tolerance.**
+   - Do NOT add requirements not in the source.
+   - Do NOT add fields, enum values, status names, or constraints not in source.
+   - Do NOT "complete" partial lists. "e.g., A, B, C" → emit exactly A, B, C.
+   - Do NOT infer requirements from absence.
+   - Do NOT normalize apparent typos in domain terms.
+   - For glossary definitions: write ONLY what is derivable from the spec or
+     universally known. If neither, set definition to "undefined in source".
+
+7. **Self-verification.** Before returning, re-scan your output and ask for
+   each Requirement: "Can I point to a specific sentence or table cell in the
+   source that states this?" If no, drop it.
+
+## Categories
+
+data-model, api, ui, auth, integration, infra, policy, workflow, validation, other
+
+## Glossary criteria
+
+Add a term for any keyword that is: a domain-specific abbreviation, a
+product/service name with non-obvious meaning, a foreign-language term, or a
+technical term with spec-specific meaning. Skip things any developer knows
+(PDF, API, UUID, HTTP).
+
+## Entities and flows
+
+Emit <entities> only if the spec defines data models, schemas, or enumerated
+types. Emit <flows> only if the spec defines step-by-step processes or state
+machines. Both are OPTIONAL — empty lists are fine.
+
+## Token budget
+
+Aim for 30-50% of source token count. Drop prose. Keep behavior.
+"""
+
+
+def compact_spec(
+    spec_content: str,
+    model: str = "claude-haiku-4-5",
+    dirigent_dir: Optional[Path] = None,
+) -> Optional[CompactSpec]:
+    """Compact a markdown spec into a structured CompactSpec via one LLM call.
+
+    Args:
+        spec_content: Full markdown spec text.
+        model: Model to use (haiku for speed/cost).
+        dirigent_dir: Where to save SPEC.compact.json. If None, no file is written.
+
+    Returns:
+        CompactSpec on success, None on API error or refusal.
+    """
+    logger = get_logger()
+
+    user_prompt = f"<spec>\n{spec_content}\n</spec>\n\nCompact this spec per the rules."
+
+    try:
+        client = anthropic.Anthropic()
+        start = datetime.now()
+
+        response = client.messages.parse(
+            model=model,
+            max_tokens=8000,
+            system=COMPACTOR_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+            output_format=CompactSpec,
+        )
+
+        duration_ms = int((datetime.now() - start).total_seconds() * 1000)
+        compact = response.parsed_output
+
+        if compact is None:
+            logger.error("Spec compactor: model refused to produce a compact spec")
+            return None
+
+        usage = response.usage
+        logger.api_usage(
+            component="spec_compactor",
+            model=model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+            cost_cents=int((usage.input_tokens * 1 + usage.output_tokens * 5) / 10000),
+            operation="compact_spec",
+            duration_ms=duration_ms,
+        )
+
+        logger.info(
+            f"Spec compacted: {len(compact.requirements)} reqs, "
+            f"{len(compact.glossary)} glossary terms, "
+            f"{len(compact.entities)} entities, "
+            f"{len(compact.flows)} flows"
+        )
+
+        if dirigent_dir is not None:
+            _save_compact_spec(dirigent_dir, compact)
+
+        return compact
+
+    except anthropic.APIError as e:
+        logger.error(f"Spec compactor API error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Spec compactor error: {e}")
+        return None
+
+
+def _save_compact_spec(dirigent_dir: Path, compact: CompactSpec) -> None:
+    """Persist CompactSpec to $DIRIGENT_RUN_DIR/SPEC.compact.json."""
+    dirigent_dir.mkdir(parents=True, exist_ok=True)
+    path = dirigent_dir / "SPEC.compact.json"
+    path.write_text(
+        compact.model_dump_json(indent=2),
+        encoding="utf-8",
+    )

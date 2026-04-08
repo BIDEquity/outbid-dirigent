@@ -13,7 +13,7 @@ description: Analyze the app and produce a PostHog tracking instrumentation plan
 <step id="5">Identify where user identification happens (login, signup, session creation) for posthog.identify().</step>
 <step id="6">Identify key pages/components for pageview and feature usage tracking.</step>
 <step id="7">Identify candidates for feature flags (new features, experimental UI, A/B tests).</step>
-<step id="8">Write `.dirigent/tracking-plan.json` with the exact schema below.</step>
+<step id="8">Write `${DIRIGENT_RUN_DIR}/tracking-plan.json` with the exact schema below.</step>
 </instructions>
 
 <discovery-hints>
@@ -34,7 +34,7 @@ Wrap new features in posthog.isFeatureEnabled('feature-name'). Use for gradual r
 </hint>
 </discovery-hints>
 
-<output file=".dirigent/tracking-plan.json">
+<output file="${DIRIGENT_RUN_DIR}/tracking-plan.json">
 {
   "framework": "next.js",
   "sdk": {
@@ -107,5 +107,5 @@ Wrap new features in posthog.isFeatureEnabled('feature-name'). Use for gradual r
 
 <constraints>
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
-<constraint>The file path MUST be .dirigent/tracking-plan.json</constraint>
+<constraint>The file path MUST be ${DIRIGENT_RUN_DIR}/tracking-plan.json</constraint>
 </constraints>

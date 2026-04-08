@@ -32,11 +32,12 @@ def slugify(text: str, max_length: int = 50) -> str:
 class Shipper:
     """Creates branch, pushes, and opens PR."""
 
-    def __init__(self, repo_path: Path, plan: Optional[Plan] = None, dry_run: bool = False):
+    def __init__(self, repo_path: Path, plan: Optional[Plan] = None, dry_run: bool = False, dirigent_dir: Optional[Path] = None):
         self.repo_path = repo_path
         self.plan = plan
         self.dry_run = dry_run
-        self.summaries_dir = repo_path / ".dirigent" / "summaries"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
+        self.summaries_dir = self.dirigent_dir / "summaries"
         self.branch_name: Optional[str] = None
         self.pr_url: Optional[str] = None
 
@@ -157,7 +158,7 @@ class Shipper:
 
     def _build_verification_section(self) -> str:
         """Build ## Verification section from InfraContext for PR body."""
-        ctx = InfraContext.load(self.repo_path / ".dirigent" / "infra-context.json")
+        ctx = InfraContext.load(self.dirigent_dir / "infra-context.json")
         if ctx is None:
             return ""
 
@@ -207,8 +208,8 @@ class Shipper:
     def _build_getting_started(self) -> str:
         """Build a Getting Started section from test-harness and runtime info."""
         parts = ["## Getting Started", ""]
-        harness_path = self.repo_path / ".dirigent" / "test-harness.json"
-        analysis_path = self.repo_path / ".dirigent" / "ANALYSIS.json"
+        harness_path = self.dirigent_dir / "test-harness.json"
+        analysis_path = self.dirigent_dir / "ANALYSIS.json"
 
         # Try runtime info from analysis
         if analysis_path.exists():

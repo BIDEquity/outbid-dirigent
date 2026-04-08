@@ -11,7 +11,7 @@ agent: infra-architect
 
 Check for an existing spec in this order:
 
-1. `.dirigent/SPEC.md` — written by the Dirigent CLI pipeline
+1. `${DIRIGENT_RUN_DIR}/SPEC.md` — written by the Dirigent CLI pipeline
 2. `SPEC.md` in repo root
 3. `.planning/SPEC.md`
 
@@ -28,7 +28,7 @@ Check `$ARGUMENTS` for a feature description and for `--yolo`.
 - `ARCHITECTURE.md` — understand the system structure
 - `README.md` — understand what the project does
 - `package.json` or `pyproject.toml` — understand the tech stack
-- `.dirigent/test-harness.json` — understand test infrastructure
+- `${DIRIGENT_RUN_DIR}/test-harness.json` — understand test infrastructure
 
 **Normal mode** (no `--yolo`):
 
@@ -52,7 +52,7 @@ Ask zero questions. Use the feature description and codebase context to make rea
 
 ### Write the Spec
 
-Write `.dirigent/SPEC.md`:
+Write `${DIRIGENT_RUN_DIR}/SPEC.md`:
 
 ```markdown
 # {Feature Title}
@@ -78,15 +78,17 @@ Keep it short — 20-40 lines max. The spec exists to give the planner enough co
 
 Read all available context files:
 
-1. **Required:** `.dirigent/SPEC.md` — the feature specification (just written or pre-existing)
-2. **Optional:** `.dirigent/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
-3. **Optional:** `.dirigent/CONTEXT.md` — relevant file analysis (Hybrid route)
-4. **Optional:** `.dirigent/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
+0. **Required if present:** `${DIRIGENT_RUN_DIR}/SPEC.compact.json` — pre-compacted requirements with stable IDs (R1, R2, …), glossary, entities, and flows. When this exists, you MUST tag every task in the plan with its `relevant_req_ids` (see Step 3 and Rule 13).
+1. **Required:** `${DIRIGENT_RUN_DIR}/SPEC.md` — the feature specification (just written or pre-existing)
+2. **Optional:** `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
+3. **Optional:** `${DIRIGENT_RUN_DIR}/CONTEXT.md` — relevant file analysis (Hybrid route)
+4. **Optional:** `${DIRIGENT_RUN_DIR}/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
 5. **Optional:** `ARCHITECTURE.md` — system architecture (if not already read in Step 0)
 6. **Optional:** `CONVENTIONS.md` — project coding conventions and patterns. If present, task descriptions MUST reference relevant conventions so coder instances follow established patterns.
 7. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
-8. **Optional:** `.dirigent/testing-strategy.md` — proposed test layers, frameworks, patterns (Greenfield route). Tasks must follow this strategy.
-9. **Optional:** `.dirigent/architecture-decisions.md` — proposed patterns, file organization, conventions (Greenfield route). Tasks must follow these decisions.
+8. **Optional:** `${DIRIGENT_RUN_DIR}/testing-strategy.md` — proposed test layers, frameworks, patterns (Greenfield route). Tasks must follow this strategy.
+9. **Optional:** `${DIRIGENT_RUN_DIR}/architecture-decisions.md` — proposed patterns, file organization, conventions (Greenfield route). Tasks must follow these decisions.
+10. **Optional:** `.brv/context-tree/` — if this directory exists and `brv` CLI is available, run `brv query "What are the key domain patterns, rules, and architectural decisions for this project?"` to gather domain knowledge. Incorporate relevant findings into task descriptions so coder instances have domain context.
 
 ## Step 2: Analyze the Repo
 
@@ -98,7 +100,7 @@ Explore the repository structure relevant to the feature. Understand:
 
 ## Step 3: Create the Plan
 
-Write `.dirigent/PLAN.json` with this exact format:
+Write `${DIRIGENT_RUN_DIR}/PLAN.json` with this exact format:
 
 ```json
 {
@@ -122,7 +124,8 @@ Write `.dirigent/PLAN.json` with this exact format:
           "model": "sonnet",
           "effort": "medium",
           "test_level": "L1",
-          "convention_skills": ["ruby-code-writing", "form-builder"]
+          "convention_skills": ["ruby-code-writing", "form-builder"],
+          "relevant_req_ids": ["R3", "R7"]
         }
       ]
     }
@@ -146,13 +149,14 @@ Write `.dirigent/PLAN.json` with this exact format:
 10. **Plan for maintainability** — the agent executing these tasks is the long-term maintainer of the codebase. Task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies. Do not plan throwaway code.
 11. **Plan for real verification** — each phase will be reviewed with executable verification commands. Do not plan tasks that "work" only in the sense that they compile. The reviewer will hit real endpoints and run real test suites.
 12. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Be specific — a task creating a Ruby form object needs `["ruby-code-writing", "form-builder"]`, not the entire skill list. Empty array `[]` if no convention skills are relevant.
+13. **relevant_req_ids (spec coverage)**: If `${DIRIGENT_RUN_DIR}/SPEC.compact.json` exists, set `relevant_req_ids` on every task. The IDs come from the `requirements[].id` field of the compact spec (format `R\d+`). Together, all tasks must collectively reference every requirement at least once. Cross-cutting requirements (encryption, audit logging, GDPR) may be referenced by multiple tasks. Use the `category` field on each requirement as a hint: `data-model` reqs belong to schema/migration tasks, `ui` reqs to component tasks, `auth` reqs to permission/middleware tasks, etc. An empty array means "no specific requirement, this is mechanical work" and should be rare.
 
 ## Validation (MANDATORY)
 
 After writing PLAN.json, validate it:
 
 ```bash
-python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/PLAN.json
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/PLAN.json
 ```
 
 If validation fails, fix the errors and re-run until it passes.

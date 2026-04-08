@@ -34,13 +34,16 @@ Before writing any code, discover what the codebase already provides to help you
 - If `.claude/CLAUDE.md` exists, read it — it has project instructions.
 - If `<conventions>` block is in your task prompt, follow those patterns exactly. Consistency with the existing codebase is more important than your preference.
 
+### Knowledge Store
+If `<knowledge-store>` is present, it has domain knowledge from `.brv/context-tree/`. Use `/dirigent:query-brv <question>` for deeper queries. After establishing new patterns, curate them via `/dirigent:query-brv`. Do not modify `.brv/` directly.
+
 ### Testing Strategy
 
-If `.dirigent/testing-strategy.md` exists, follow it. It defines the test approach agreed during scaffolding. If `.claude/skills/run-tests/` exists, use it to run tests — it has the exact command for THIS project.
+If `${DIRIGENT_RUN_DIR}/testing-strategy.md` exists, follow it. It defines the test approach agreed during scaffolding. If `.claude/skills/run-tests/` exists, use it to run tests — it has the exact command for THIS project.
 
 ## Output
 
-After completing your task, write `.dirigent/summaries/{task_id}-SUMMARY.md` with:
+After completing your task, write `${DIRIGENT_RUN_DIR}/summaries/{task_id}-SUMMARY.md` with:
 - What was done
 - Changed files
 - Deviations (if any): prefix with `DEVIATION: {type} - {description}`

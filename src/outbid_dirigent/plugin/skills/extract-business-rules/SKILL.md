@@ -9,7 +9,7 @@ Systematically analyze the codebase and extract all business rules.
 
 ## Output
 
-Create `.dirigent/BUSINESS_RULES.md`:
+Create `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md`:
 
 ```markdown
 # Business Rules — {PROJECT_NAME}

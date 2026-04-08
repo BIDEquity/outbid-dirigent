@@ -35,17 +35,17 @@ class ProgressRenderer:
         "contract_pending": "\U0001f4cb PENDING",
     }
 
-    def __init__(self, repo_path: str | Path):
+    def __init__(self, repo_path: str | Path, dirigent_dir: Optional[Path] = None):
         self.repo_path = Path(repo_path)
-        self.dirigent_dir = self.repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (self.repo_path / ".dirigent")
 
     def _load_data(self) -> tuple[Optional[Plan], dict, Optional[dict]]:
         """Load plan, state, and route data."""
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
-        state = load_state(str(self.repo_path)) or {
+        state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir) or {
             "completed_phases": [], "completed_tasks": [], "failed_tasks": [],
         }
-        route = load_route(str(self.repo_path))
+        route = load_route(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         return plan, state, route
 
     def _get_contract_status(self, phase_id: str) -> str:
@@ -272,9 +272,9 @@ class ProgressRenderer:
 class PlanRenderer:
     """Renders PLAN.json in console and text formats."""
 
-    def __init__(self, repo_path: str | Path):
+    def __init__(self, repo_path: str | Path, dirigent_dir: Optional[Path] = None):
         self.repo_path = Path(repo_path)
-        self.dirigent_dir = self.repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (self.repo_path / ".dirigent")
 
     def console(self) -> str:
         """Render full console plan display."""
@@ -355,9 +355,9 @@ class PlanRenderer:
         return json.loads(plan_file.read_text(encoding="utf-8"))
 
 
-def print_progress(repo_path: str, fmt: str = "console") -> str:
+def print_progress(repo_path: str, fmt: str = "console", dirigent_dir: Optional[Path] = None) -> str:
     """Print progress in the given format. Returns the formatted string."""
-    renderer = ProgressRenderer(repo_path)
+    renderer = ProgressRenderer(repo_path, dirigent_dir=dirigent_dir)
     if fmt == "json":
         return json.dumps(renderer.to_json(), indent=2, ensure_ascii=False)
     elif fmt == "text":
@@ -365,9 +365,9 @@ def print_progress(repo_path: str, fmt: str = "console") -> str:
     return renderer.console()
 
 
-def print_plan(repo_path: str, fmt: str = "console") -> str:
+def print_plan(repo_path: str, fmt: str = "console", dirigent_dir: Optional[Path] = None) -> str:
     """Print plan in the given format. Returns the formatted string."""
-    renderer = PlanRenderer(repo_path)
+    renderer = PlanRenderer(repo_path, dirigent_dir=dirigent_dir)
     if fmt == "json":
         return json.dumps(renderer.to_json(), indent=2, ensure_ascii=False)
     elif fmt == "text":

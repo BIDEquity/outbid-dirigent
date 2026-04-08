@@ -5,10 +5,13 @@ Uses pydantic for validation, serialization, and deserialization.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class Task(BaseModel):
@@ -23,6 +26,7 @@ class Task(BaseModel):
     effort: str = ""
     test_level: str = ""  # "", "L1", "L2"
     convention_skills: list[str] = Field(default_factory=list)  # e.g. ["ruby-code-writing", "form-builder"]
+    relevant_req_ids: list[str] = Field(default_factory=list)  # e.g. ["R3", "R7"] from SPEC.compact.json
 
 
 class Phase(BaseModel):
@@ -96,14 +100,25 @@ class Plan(BaseModel):
             return None
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-            # Normalize phase id field
+            # Normalize phase/task fields from common LLM output variations
             for p in raw.get("phases", []):
                 if "phase" in p and "id" not in p:
                     p["id"] = str(p.pop("phase"))
                 elif "id" in p:
                     p["id"] = str(p["id"])
+                for t in p.get("tasks", []):
+                    # title → name
+                    if "title" in t and "name" not in t:
+                        t["name"] = t.pop("title")
+                    # files → files_to_modify (conservative default)
+                    if "files" in t and "files_to_modify" not in t and "files_to_create" not in t:
+                        t["files_to_modify"] = t.pop("files")
             return cls.model_validate(raw)
-        except Exception:
+        except json.JSONDecodeError as e:
+            logger.error("PLAN.json is not valid JSON: %s", e)
+            return None
+        except Exception as e:
+            logger.error("PLAN.json validation failed: %s", e)
             return None
 
     @staticmethod
@@ -136,7 +151,8 @@ class Plan(BaseModel):
           "model": "sonnet|haiku|opus (welches Modell für diesen Task am besten ist)",
           "effort": "low|medium|high (wie viel Denkaufwand nötig ist)",
           "test_level": "L1|L2| (welches Test-Level nach diesem Task laufen soll, leer wenn kein Test nötig)",
-          "convention_skills": ["skill-name-1", "skill-name-2 (aus .opencode/skills/, leer wenn keine)"]
+          "convention_skills": ["skill-name-1", "skill-name-2 (aus .opencode/skills/, leer wenn keine)"],
+          "relevant_req_ids": ["R3", "R7 (IDs aus SPEC.compact.json — welche Requirements dieser Task adressiert)"]
         }
       ]
     }

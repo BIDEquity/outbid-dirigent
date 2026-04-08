@@ -44,12 +44,13 @@ Use these only when genuinely blocked, not routinely:
 - `/dirigent:find-edits <file>` — find previous changes to a file
 - `/dirigent:find-errors` — find known errors from past runs
 - `/dirigent:query-data <sql>` — ad-hoc DuckDB query on data files
+- `/dirigent:query-brv <question>` — query or curate domain knowledge from .brv/
 
 ## Completion
 
 1. Implement the task as described
 2. `git add -A && git commit -m "feat(TASK_ID): TASK_NAME"`
-3. Write `.dirigent/summaries/TASK_ID-SUMMARY.md`:
+3. Write `${DIRIGENT_RUN_DIR}/summaries/TASK_ID-SUMMARY.md`:
    - What was done
    - Files changed
    - Deviations (if any)
@@ -57,7 +58,7 @@ Use these only when genuinely blocked, not routinely:
 
 ## Contract Awareness
 
-Before starting implementation, read `.dirigent/contracts/phase-{PHASE_ID}.json` if it exists. Each acceptance criterion has:
+Before starting implementation, read `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` if it exists. Each acceptance criterion has:
 - `layer`: structural, behavioral, or boundary
 - `verification`: the exact command the REVIEWER will run to check your work
 
@@ -79,11 +80,18 @@ before writing a single line.
 
 When conventions specify a pattern (e.g. "forms use ActiveAttr with DelegateValidation"), use that pattern even if you know an alternative. Consistency with the existing codebase is more important than your preference.
 
+## Knowledge Store Awareness
+
+If a `<knowledge-store>` block is present, it contains domain knowledge from `.brv/context-tree/`.
+Use summaries as context. For deeper queries, run `/dirigent:query-brv <question>`.
+After establishing new patterns, save them with `/dirigent:query-brv` (curate mode).
+Do NOT modify `.brv/` files directly.
+
 ## Constraints
 
 - No questions. No waiting. Work through it and commit.
 - Stick to the task description. Do not add unrelated features.
 - Respect files_to_create and files_to_modify lists.
-- If business rules exist at `.dirigent/BUSINESS_RULES.md`, they MUST be preserved.
+- If business rules exist at `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md`, they MUST be preserved.
 - If conventions exist in `<conventions>`, follow established patterns.
 - Do not write throwaway code. Every function you write will be called by the next task. Every pattern you establish will be followed by the next developer. Build it right.

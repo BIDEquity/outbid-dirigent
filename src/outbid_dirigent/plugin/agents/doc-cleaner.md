@@ -28,7 +28,7 @@ You clean up the entropy introduced by multi-task execution. After several tasks
 
 ## Output
 
-Write `.dirigent/entropy-report.json` with:
+Write `${DIRIGENT_RUN_DIR}/entropy-report.json` with:
 ```json
 {
   "files_cleaned": ["list of files modified"],

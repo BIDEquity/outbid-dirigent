@@ -19,6 +19,7 @@ from loguru import logger
 from outbid_dirigent.analyzer import load_analysis
 from outbid_dirigent.contract import ContractManager
 from outbid_dirigent.init_phase import InitPhase
+from outbid_dirigent.brv_bridge import BrvBridge
 from outbid_dirigent.opencode_bridge import OpenCodeBridge
 from outbid_dirigent.oracle import Oracle, create_oracle
 from outbid_dirigent.plan_schema import Plan
@@ -28,6 +29,7 @@ from outbid_dirigent.proteus_integration import ProteusIntegration, create_prote
 from outbid_dirigent.contract_schema import Review
 from outbid_dirigent.infra_schema import InfraContext
 from outbid_dirigent.router import load_state, save_state, mark_step_complete
+from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.shipper import Shipper
 from outbid_dirigent.task_runner import TaskRunner, TaskResult
 from outbid_dirigent.test_harness_schema import TestHarness
@@ -120,22 +122,38 @@ class Executor:
         self.spec_path = Path(spec_path).resolve()
         self.use_proteus = use_proteus
         self.dry_run = dry_run
-        self.oracle = create_oracle(str(self.repo_path))
 
         # Portal connection info
         self.portal_url = portal_url
         self.execution_id = execution_id
         self.reporter_token = reporter_token
 
-        # Directories
-        self.dirigent_dir = self.repo_path / ".dirigent"
+        # Spec content
+        self.spec_content = self.spec_path.read_text(encoding="utf-8")
+
+        # Run directory — artifacts live in $HOME/.dirigent/runs/<id>/
+        existing = RunDir.load(self.repo_path)
+        if existing:
+            self.run_dir = existing
+        else:
+            self.run_dir = RunDir.create(self.repo_path, self.spec_content)
+
+        self.dirigent_dir = self.run_dir.path
+        self.oracle = create_oracle(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
 
-        # Spec content — also write to .dirigent/SPEC.md so plugin skills can read it
-        self.spec_content = self.spec_path.read_text(encoding="utf-8")
+        # Cache spec in run dir so plugin skills can read it via $DIRIGENT_RUN_DIR
         spec_cache = self.dirigent_dir / "SPEC.md"
         spec_cache.write_text(self.spec_content, encoding="utf-8")
+
+        # Compact spec — best-effort, never aborts the run.
+        # Writes $DIRIGENT_RUN_DIR/SPEC.compact.json which task_runner consumes.
+        from outbid_dirigent.spec_compactor import compact_spec
+        try:
+            compact_spec(self.spec_content, dirigent_dir=self.dirigent_dir)
+        except Exception as e:
+            logger.warning(f"Spec compaction failed (will fall back to full spec): {e}")
 
         # Compose modules
         self.runner = TaskRunner(
@@ -146,11 +164,13 @@ class Executor:
             portal_url=portal_url,
             execution_id=execution_id,
             reporter_token=reporter_token,
+            dirigent_dir=self.dirigent_dir,
         )
         self.planner = Planner(
             repo_path=self.repo_path,
             spec_content=self.spec_content,
             runner=self.runner,
+            dirigent_dir=self.dirigent_dir,
         )
 
         # OpenCode bridge — convert .opencode skills to Claude plugin format
@@ -162,14 +182,19 @@ class Executor:
                 self.runner.opencode_skill_catalog = bridge.skill_catalog()
                 self.runner.opencode_plugin_name = bridge.plugin_name()
 
+        # BRV context-tree — inject domain knowledge if .brv/ + brv CLI exist
+        brv = BrvBridge(self.repo_path)
+        if brv.available():
+            self.runner.brv_bridge = brv
+
         # Contract manager for review/fix iteration loop
-        self.contract_manager = ContractManager(self.repo_path, self.runner)
+        self.contract_manager = ContractManager(self.repo_path, self.runner, dirigent_dir=self.dirigent_dir)
 
         # Init phase handler
-        self.init_phase = InitPhase(self.repo_path, self.runner)
+        self.init_phase = InitPhase(self.repo_path, self.runner, dirigent_dir=self.dirigent_dir)
 
         # Progress renderer
-        self.progress = ProgressRenderer(self.repo_path)
+        self.progress = ProgressRenderer(self.repo_path, dirigent_dir=self.dirigent_dir)
 
         # Ship results (set by ship(), read by generate_summary())
         self.shipped_branch_name: Optional[str] = None
@@ -444,9 +469,13 @@ class Executor:
 
     def execute_plan(self) -> bool:
         """Execute all tasks in the plan sequentially."""
-        plan = Plan.load(self.dirigent_dir / "PLAN.json")
+        plan_path = self.dirigent_dir / "PLAN.json"
+        plan = Plan.load(plan_path)
         if not plan:
-            logger.error("No plan found")
+            if plan_path.exists():
+                logger.error("PLAN.json exists but failed validation — check logs above for details")
+            else:
+                logger.error("No PLAN.json found at %s", plan_path)
             return False
 
         state = self._load_or_init_state()
@@ -501,7 +530,7 @@ class Executor:
 
                 if result.success:
                     state["completed_tasks"].append(task.id)
-                    save_state(str(self.repo_path), state)
+                    save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
                     phase_tasks_completed += 1
                     phase_deviation_count += len(result.deviations)
                     if result.commit_hash:
@@ -515,7 +544,7 @@ class Executor:
                         "error": result.summary,
                         "attempts": result.attempts,
                     })
-                    save_state(str(self.repo_path), state)
+                    save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
                     logger.error(f"Task {task.id} failed after {result.attempts} attempts")
                     self._legacy_logger.stop(f"Task {task.id} fehlgeschlagen nach {result.attempts} Versuchen")
                     self._legacy_logger.run_complete(success=False)
@@ -524,14 +553,14 @@ class Executor:
             review_passed = self._review_phase(phase, plan)
             if not review_passed:
                 state.setdefault("failed_phases", []).append({"phase_id": phase.id, "reason": "review_failed"})
-                save_state(str(self.repo_path), state)
+                save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
                 logger.error(f"Phase {phase.id} review failed — halting execution. Fix issues and --resume to retry.")
                 self._legacy_logger.stop(f"Phase {phase.id} review failed")
                 self._legacy_logger.run_complete(success=False)
                 return False
 
             state.setdefault("completed_phases", []).append(phase.id)
-            save_state(str(self.repo_path), state)
+            save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
             self._legacy_logger.phase_complete(phase.id, phase.name, phase_tasks_completed, phase_deviation_count, phase_commit_count)
 
         # NOTE: run_complete() is called by finalize() after shipping, not here
@@ -542,7 +571,7 @@ class Executor:
         self._legacy_logger.run_complete(success=success)
 
     def _load_or_init_state(self) -> dict:
-        state = load_state(str(self.repo_path))
+        state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         if not state:
             state = {
                 "started_at": datetime.now().isoformat(),
@@ -552,7 +581,7 @@ class Executor:
         else:
             state.setdefault("completed_phases", [])
             state.setdefault("completed_tasks", [])
-        save_state(str(self.repo_path), state)
+        save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
         return state
 
     # ══════════════════════════════════════════
@@ -669,7 +698,7 @@ class Executor:
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
         self._legacy_logger.ship_start("dirigent/...")
 
-        shipper = Shipper(self.repo_path, plan, self.dry_run)
+        shipper = Shipper(self.repo_path, plan, self.dry_run, dirigent_dir=self.dirigent_dir)
         success = shipper.ship()
 
         self.shipped_branch_name = shipper.branch_name
@@ -745,7 +774,7 @@ class Executor:
         """
         try:
             # Load state to get execution start time
-            state = load_state(str(self.repo_path))
+            state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir)
             started_at = state.get("started_at") if state else None
 
             if started_at:
@@ -966,7 +995,7 @@ class Executor:
         usage_by_model: dict[str, dict] = {}  # model -> {input, output, cache_read, cache_write, cost}
 
         # Get execution start time from state
-        state = load_state(str(self.repo_path))
+        state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         started_at_str = state.get("started_at") if state else None
         started_at_ts = None
         if started_at_str:

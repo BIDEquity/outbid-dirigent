@@ -102,7 +102,7 @@ Check that references between files are valid:
 
 ## Output
 
-After fixing everything, write `.dirigent/entropy-report.json`:
+After fixing everything, write `${DIRIGENT_RUN_DIR}/entropy-report.json`:
 
 ```json
 {
@@ -147,7 +147,7 @@ If there are no issues to fix, do NOT create an empty commit. Report `issues_fix
 <rule>If a doc says "3 things" but there are actually 5, update the doc to say 5 — do not remove the 2 extra things from code</rule>
 <rule>When removing dead code, verify it is truly dead by searching for ALL references (including string references, dynamic dispatch, and test files)</rule>
 <rule>When fixing a doc, read the current code first — never assume you know what it says</rule>
-<rule>The report JSON must be valid JSON written to .dirigent/entropy-report.json</rule>
+<rule>The report JSON must be valid JSON written to ${DIRIGENT_RUN_DIR}/entropy-report.json</rule>
 <rule>If no issues found, exit cleanly with issues_fixed: 0. This is a success, not a failure.</rule>
 </rules>
 
@@ -155,6 +155,6 @@ If there are no issues to fix, do NOT create an empty commit. Report `issues_fix
 
 <constraints>
 <constraint>No behavior changes — only documentation, comments, dead code, and cross-references</constraint>
-<constraint>No new files except .dirigent/entropy-report.json</constraint>
+<constraint>No new files except ${DIRIGENT_RUN_DIR}/entropy-report.json</constraint>
 <constraint>Maximum 15 minutes — prioritize critical and medium issues over low</constraint>
 </constraints>

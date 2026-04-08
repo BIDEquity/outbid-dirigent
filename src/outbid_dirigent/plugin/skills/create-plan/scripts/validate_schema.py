@@ -121,6 +121,22 @@ def validate(path: str):
                 elif task["test_level"] not in VALID_TEST_LEVELS:
                     errors.append(f"{tprefix}.test_level: '{task['test_level']}' must be one of {sorted(VALID_TEST_LEVELS)}")
 
+            # Optional: relevant_req_ids
+            if "relevant_req_ids" in task:
+                rids = task["relevant_req_ids"]
+                if not isinstance(rids, list):
+                    errors.append(f"{tprefix}.relevant_req_ids: must be a list")
+                else:
+                    for rid in rids:
+                        if not isinstance(rid, str):
+                            errors.append(
+                                f"{tprefix}.relevant_req_ids: each item must be a string, got {type(rid).__name__}"
+                            )
+                        elif not re.fullmatch(r"R\d+", rid):
+                            errors.append(
+                                f"{tprefix}.relevant_req_ids: '{rid}' must match pattern R\\d+"
+                            )
+
             # Optional: depends_on
             if "depends_on" in task:
                 deps = task["depends_on"]

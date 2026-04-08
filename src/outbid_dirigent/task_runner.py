@@ -56,12 +56,13 @@ class TaskRunner:
         portal_url: str = "",
         execution_id: str = "",
         reporter_token: str = "",
+        dirigent_dir: Optional[Path] = None,
     ):
         self.repo_path = repo_path
         self.spec_content = spec_content
         self.default_model = default_model
         self.default_effort = default_effort
-        self.dirigent_dir = repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.summaries_dir.mkdir(parents=True, exist_ok=True)
         # Portal connection for hooks
@@ -75,6 +76,8 @@ class TaskRunner:
         self.opencode_plugin_dir: Optional[Path] = None
         self.opencode_skill_catalog: list[dict] = []
         self.opencode_plugin_name: str = ""
+        # BRV context-tree bridge — set by Executor if .brv/context-tree/ exists
+        self.brv_bridge = None
         # Discover spec images in .planning/assets/
         self.spec_images = self._discover_spec_images()
 
@@ -111,13 +114,20 @@ class TaskRunner:
         model = model or self.default_model
         effort = effort or self.default_effort
 
+        # Always tell the subprocess where artifacts live
+        run_dir_hint = (
+            f"DIRIGENT_RUN_DIR={self.dirigent_dir} — "
+            f"all dirigent artifacts (PLAN.json, SPEC.md, contracts/, reviews/, summaries/, test-harness.json) "
+            f"live here, NOT in .dirigent/ in the repo."
+        )
+        full_system_prompt = f"{run_dir_hint}\n\n{system_prompt}" if system_prompt else run_dir_hint
+
         cmd = ["claude", "--dangerously-skip-permissions"]
         if model:
             cmd.extend(["--model", model])
         if effort:
             cmd.extend(["--effort", effort])
-        if system_prompt:
-            cmd.extend(["--append-system-prompt", system_prompt])
+        cmd.extend(["--append-system-prompt", full_system_prompt])
 
         # Inject bundled plugin for session recall skills
         plugin_dir = Path(__file__).parent / "plugin"
@@ -154,8 +164,9 @@ class TaskRunner:
                 clean_env["OUTBID_CURRENT_PHASE"] = str(self._current_phase)
 
         # Set hook log directory to match where Executor looks for events
-        # This ensures hooks write to {repo}/.dirigent/hooks/events.jsonl
         clean_env["DIRIGENT_HOOK_LOG_DIR"] = str(self.dirigent_dir / "hooks")
+        # Tell skills where to find/write artifacts
+        clean_env["DIRIGENT_RUN_DIR"] = str(self.dirigent_dir)
 
         try:
             result = subprocess.run(
@@ -249,7 +260,7 @@ class TaskRunner:
             return ""
 
     def _get_run_file_list(self) -> str:
-        state = load_state(str(self.repo_path))
+        state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         if not state or not state.get("completed_tasks"):
             return ""
         try:
@@ -391,8 +402,28 @@ LIMIT 45;
         if plan.out_of_scope:
             sections.append("<out-of-scope>\n" + "\n".join(f"- {x}" for x in plan.out_of_scope) + "\n</out-of-scope>")
 
-        # Spec
-        sections.append(f"<spec>\n{self.spec_content}\n</spec>")
+        # Spec — prefer compacted form, fall back to full blob
+        spec_block: Optional[str] = None
+        compact_path = self.dirigent_dir / "SPEC.compact.json"
+        if compact_path.exists():
+            try:
+                from outbid_dirigent.spec_compactor import CompactSpec
+                compact = CompactSpec.model_validate_json(
+                    compact_path.read_text(encoding="utf-8")
+                )
+                # If task has no relevant_req_ids, inject ALL reqs (safe fallback
+                # so we never silently drop requirements when the planner forgot
+                # to tag a task).
+                relevant = set(task.relevant_req_ids) if task.relevant_req_ids else None
+                spec_block = compact.render_xml(only_req_ids=relevant)
+            except Exception as e:
+                logger.warning(
+                    f"Compact spec load failed, falling back to full spec: {e}"
+                )
+
+        if spec_block is None:
+            spec_block = f"<spec>\n{self.spec_content}\n</spec>"
+        sections.append(spec_block)
 
         # Reference spec images if available
         if self.spec_images:
@@ -445,6 +476,17 @@ LIMIT 45;
 {recall}
 </session-recall>""")
 
+        # BRV domain knowledge
+        if self.brv_bridge:
+            brv_ctx = self.brv_bridge.context_for_task(task)
+            if brv_ctx:
+                sections.append(
+                    '<knowledge-store hint="domain knowledge from .brv/context-tree/ '
+                    '— use /dirigent:query-brv for deeper queries">\n'
+                    f'{brv_ctx}\n'
+                    '</knowledge-store>'
+                )
+
         # Test harness context (e2e environment, auth, verification commands)
         from outbid_dirigent.test_harness_schema import TestHarness
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
@@ -471,7 +513,7 @@ LIMIT 45;
 
         # Summary format hint (deviation rules are in system prompt)
         sections.append(f"""<output-instructions>
-Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
+Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
 - Was wurde gemacht
 - Geaenderte Dateien
 - Deviations (falls vorhanden)
@@ -493,6 +535,47 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
     # ── Task execution ──
 
+    def _has_uncommitted_changes(self) -> bool:
+        """Check if the working tree has staged or unstaged changes."""
+        try:
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode != 0:
+                return False
+            # Filter out dirigent artifacts and untracked files in run dir
+            for line in result.stdout.splitlines():
+                path = line[3:].strip()
+                if not path.startswith(".dirigent/"):
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _auto_commit(self, task: Task) -> Optional[str]:
+        """Auto-commit uncommitted changes the agent forgot to commit."""
+        msg = f"feat({task.id}): {task.name}\n\n[auto-committed by dirigent — agent forgot to commit]"
+        return self._auto_commit_msg(msg)
+
+    def _auto_commit_msg(self, msg: str) -> Optional[str]:
+        """Auto-commit with a custom message. Returns new commit hash or None."""
+        try:
+            subprocess.run(
+                ["git", "add", "-A"],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+            )
+            result = subprocess.run(
+                ["git", "commit", "-m", msg],
+                cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                return self._get_latest_commit_hash()
+            return None
+        except Exception as e:
+            logger.warning(f"Auto-commit failed: {e}")
+            return None
+
     def run_task(self, task: Task, plan: Plan, phase_num: int | str = 1) -> TaskResult:
         """Execute a single task with retries."""
         start_time = datetime.now()
@@ -511,6 +594,8 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
             if attempt > 1:
                 logger.info(f"Task {task.id} retry {attempt}/{self.MAX_RETRIES}")
 
+            head_before = self._get_latest_commit_hash()
+
             success, stdout, stderr = self._run_claude(
                 prompt, model=task_model, effort=task_effort,
                 system_prompt=self.AGENT_SYSTEM_PROMPT,
@@ -518,6 +603,16 @@ Erstelle .dirigent/summaries/{task.id}-SUMMARY.md mit:
 
             if success:
                 commit_hash = self._get_latest_commit_hash()
+
+                # Agent forgot to commit — rescue uncommitted work
+                if commit_hash == head_before and self._has_uncommitted_changes():
+                    logger.warning(f"Task {task.id}: agent did not commit — auto-committing changes")
+                    auto_hash = self._auto_commit(task)
+                    if auto_hash:
+                        commit_hash = auto_hash
+                    else:
+                        logger.error(f"Task {task.id}: auto-commit failed, changes are uncommitted")
+
                 summary_file = self.summaries_dir / f"{task.id}-SUMMARY.md"
                 summary = summary_file.read_text(encoding="utf-8") if summary_file.exists() else ""
                 deviations = self._extract_deviations(summary)

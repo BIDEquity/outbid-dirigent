@@ -37,9 +37,9 @@ class InfraDetector:
 
     KNOWN_DEVBOX_SERVICE_PACKAGES = ["postgresql", "redis", "mysql", "mongodb", "rabbitmq"]
 
-    def __init__(self, repo_path: Path):
+    def __init__(self, repo_path: Path, dirigent_dir: Optional[Path] = None):
         self.repo_path = repo_path
-        self.dirigent_dir = repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
 
     def detect(self) -> InfraContext:
         """Run full detection pipeline and return InfraContext."""
@@ -360,10 +360,10 @@ class InitPhase:
     ]
     READINESS_TIMEOUT = 60  # seconds to wait for services after init script
 
-    def __init__(self, repo_path: Path, runner=None):
+    def __init__(self, repo_path: Path, runner=None, dirigent_dir: Optional[Path] = None):
         self.repo_path = repo_path
         self.runner = runner
-        self.dirigent_dir = repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
         self.dirigent_dir.mkdir(parents=True, exist_ok=True)
 
     def discover_init_script(self) -> Optional[Path]:
@@ -546,7 +546,7 @@ class InitPhase:
         logger.info("Starting init phase...")
 
         # NEW: run InfraDetector before anything else
-        detector = InfraDetector(self.repo_path)
+        detector = InfraDetector(self.repo_path, dirigent_dir=self.dirigent_dir)
         ctx = detector.detect()
         logger.info(f"Infra tier: {ctx.tier.value} | confidence: {ctx.confidence}")
 

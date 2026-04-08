@@ -14,6 +14,7 @@ All prompts use /dirigent: slash commands resolved natively by the subprocess.
 
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 from loguru import logger
 
@@ -33,10 +34,10 @@ class ContractManager:
 
     MAX_REVIEW_ITERATIONS = 3
 
-    def __init__(self, repo_path: Path, runner):
+    def __init__(self, repo_path: Path, runner, dirigent_dir: Optional[Path] = None):
         self.repo_path = repo_path
         self.runner = runner
-        self.dirigent_dir = repo_path / ".dirigent"
+        self.dirigent_dir = dirigent_dir or (repo_path / ".dirigent")
         self.contracts_dir = self.dirigent_dir / "contracts"
         self.reviews_dir = self.dirigent_dir / "reviews"
         self.contracts_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +72,9 @@ class ContractManager:
 
         prompt = (
             f"Use the contract-negotiator agent to create an acceptance criteria "
-            f"contract for phase {phase.id}. Pass it: phase_id={phase.id}"
+            f"contract for phase {phase.id}. Pass it: phase_id={phase.id}\n\n"
+            f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
+            f"(NOT in .dirigent/ in the repo). Read files from there and write output there."
         )
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
 
@@ -202,10 +205,12 @@ class ContractManager:
 
         prompt = (
             f"Use the reviewer agent to review phase {phase.id}. "
-            f"There are {commit_count} commits to review. This is iteration {iteration}."
+            f"There are {commit_count} commits to review. This is iteration {iteration}.\n\n"
+            f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
+            f"(NOT in .dirigent/ in the repo). Read contract/harness from there, write review there."
         )
 
-        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
+        success, _, stderr = self.runner._run_claude(prompt, timeout=1200)
 
         if not success:
             logger.warning(f"Phase {phase.id} review subprocess failed: {stderr[:200]}")
@@ -300,8 +305,11 @@ class ContractManager:
 
         prompt = (
             f"Use the implementer agent to fix review findings for phase {phase.id}. "
-            f"This is iteration {iteration}."
+            f"This is iteration {iteration}.\n\n"
+            f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
+            f"(NOT in .dirigent/ in the repo). Read review/contract from there."
         )
+        head_before = self.runner._get_latest_commit_hash()
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
         # Send portal event (import here to avoid circular dependency)
@@ -315,6 +323,14 @@ class ContractManager:
             )
 
         if success:
+            # Auto-commit if the fix agent forgot to commit
+            head_after = self.runner._get_latest_commit_hash()
+            if head_after == head_before and self.runner._has_uncommitted_changes():
+                logger.warning(f"Phase {phase.id} fix: agent did not commit — auto-committing")
+                self.runner._auto_commit_msg(
+                    f"fix(phase-{phase.id}): review fixes iteration {iteration}\n\n"
+                    f"[auto-committed by dirigent — agent forgot to commit]"
+                )
             logger.info(f"Phase {phase.id} fixes applied (iteration {iteration})")
             return True
 

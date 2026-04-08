@@ -18,12 +18,14 @@ import os
 import tempfile
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 # Eigene Module
 from outbid_dirigent.logger import init_logger, get_logger
 from outbid_dirigent.analyzer import Analyzer, load_analysis
 from outbid_dirigent.router import Router, Route, RouteType, StepType, load_route, load_state, mark_step_complete
 from outbid_dirigent.executor import Executor, create_executor
+from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.questioner import create_questioner, create_dummy_questioner
 from outbid_dirigent.portal_reporter import PortalReporter, create_portal_reporter
 
@@ -226,14 +228,14 @@ def resolve_spec(args, repo_path: Path) -> Path:
         return _generate_spec_interactive(repo_path, description)
 
 
-def run_analysis(repo_path: Path, spec_path: Path, force: bool = False):
+def run_analysis(repo_path: Path, spec_path: Path, force: bool = False, dirigent_dir: Optional[Path] = None):
     """Führt die Analyse durch."""
     logger = get_logger()
     reporter = get_portal_reporter()
 
     # Prüfe ob Analyse bereits existiert
     if not force:
-        existing = load_analysis(str(repo_path))
+        existing = load_analysis(str(repo_path), dirigent_dir=dirigent_dir)
         if existing:
             logger.info(f"Existierende Analyse gefunden (Route: {existing['route']})")
             # Send analysis result even for cached analysis
@@ -253,7 +255,7 @@ def run_analysis(repo_path: Path, spec_path: Path, force: bool = False):
         reporter.stage_start("analysis", "Analysiere Repository-Struktur und Spec")
 
     # Neue Analyse durchführen
-    analyzer = Analyzer(str(repo_path), str(spec_path))
+    analyzer = Analyzer(str(repo_path), str(spec_path), dirigent_dir=dirigent_dir)
     result = analyzer.analyze()
 
     # Send analysis result event
@@ -279,7 +281,7 @@ def run_analysis(repo_path: Path, spec_path: Path, force: bool = False):
     return result
 
 
-def run_routing(repo_path: Path, analysis) -> Route:
+def run_routing(repo_path: Path, analysis, dirigent_dir: Optional[Path] = None) -> Route:
     """Bestimmt und speichert die Route."""
     reporter = get_portal_reporter()
 
@@ -289,7 +291,7 @@ def run_routing(repo_path: Path, analysis) -> Route:
 
     router = Router(str(repo_path))
     route = router.determine_route(analysis)
-    router.save_route(route)
+    router.save_route(route, dirigent_dir=dirigent_dir)
 
     # Send route determined event
     if reporter:
@@ -334,7 +336,10 @@ def run_execution(
     )
     questioner = get_questioner()
 
-    state = load_state(str(repo_path)) or {"completed_steps": []}
+    # Use the run dir from executor for all artifact access
+    dirigent_dir = executor.dirigent_dir
+
+    state = load_state(str(repo_path), dirigent_dir=dirigent_dir) or {"completed_steps": []}
     completed_steps = state.get("completed_steps", [])
 
     for step in route.steps:
@@ -342,8 +347,17 @@ def run_execution(
 
         # Überspringe bereits abgeschlossene Schritte
         if step_name in completed_steps:
-            logger.skip(step_name, "bereits abgeschlossen")
-            continue
+            # For planning: verify PLAN.json actually exists before skipping
+            if step.step_type == StepType.PLANNING:
+                plan_file = dirigent_dir / "PLAN.json"
+                if not plan_file.exists():
+                    logger.info("Planung als abgeschlossen markiert aber PLAN.json fehlt — führe Planung erneut durch")
+                else:
+                    logger.skip(step_name, "bereits abgeschlossen")
+                    continue
+            else:
+                logger.skip(step_name, "bereits abgeschlossen")
+                continue
 
         success = False
 
@@ -391,7 +405,7 @@ def run_execution(
 
         elif step.step_type == StepType.PLANNING:
             # Skip planning if PLAN.json already exists (e.g. from --plan-only)
-            plan_file = repo_path / ".dirigent" / "PLAN.json"
+            plan_file = dirigent_dir / "PLAN.json"
             if plan_file.exists():
                 logger.info("Existierender Plan gefunden, überspringe Planung")
                 success = True
@@ -402,7 +416,7 @@ def run_execution(
 
             # plan_first: Nach Plan-Erstellung auf Genehmigung warten
             if success and execution_mode == "plan_first" and questioner and questioner.is_enabled():
-                plan_file = repo_path / ".dirigent" / "PLAN.json"
+                plan_file = dirigent_dir / "PLAN.json"
                 if plan_file.exists():
                     try:
                         with open(plan_file, encoding="utf-8") as f:
@@ -467,10 +481,10 @@ def run_execution(
             executor.finalize(success=success)
 
         if success:
-            mark_step_complete(str(repo_path), step_name)
+            mark_step_complete(str(repo_path), step_name, dirigent_dir=dirigent_dir)
         elif not step.required:
             logger.warn(f"Optionaler Schritt '{step.name}' fehlgeschlagen, fahre fort")
-            mark_step_complete(str(repo_path), step_name)
+            mark_step_complete(str(repo_path), step_name, dirigent_dir=dirigent_dir)
         else:
             logger.stop(f"Schritt '{step.name}' fehlgeschlagen")
             return False
@@ -482,8 +496,12 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
     """Setzt eine unterbrochene Ausführung fort."""
     logger = get_logger()
 
+    # Resolve run dir from manifest
+    run_dir = RunDir.load(repo_path)
+    dirigent_dir = run_dir.path if run_dir else None
+
     # Lade existierende Route
-    route_data = load_route(str(repo_path))
+    route_data = load_route(str(repo_path), dirigent_dir=dirigent_dir)
     if not route_data:
         logger.error("Keine existierende Route gefunden. Starte mit --phase all")
         return False
@@ -494,7 +512,7 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
 
     # Dummy-Analyse für Route-Bestimmung (wir haben ja schon die Route)
     from outbid_dirigent.analyzer import AnalysisResult, RepoAnalysis, SpecAnalysis
-    analysis = load_analysis(str(repo_path))
+    analysis = load_analysis(str(repo_path), dirigent_dir=dirigent_dir)
 
     if not analysis:
         logger.error("Keine Analyse gefunden. Starte mit --phase all")
@@ -517,7 +535,7 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
         repo_context_needed=route_data["repo_context_needed"],
     )
 
-    state = load_state(str(repo_path))
+    state = load_state(str(repo_path), dirigent_dir=dirigent_dir)
     if state and state.get("completed_tasks"):
         last_task = state["completed_tasks"][-1]
         logger.resume(last_task)
@@ -709,10 +727,14 @@ Beispiele:
     if not validate_inputs(spec_path, repo_path):
         sys.exit(1)
 
-    # Logger initialisieren
+    # Run directory — artifacts in $HOME/.dirigent/runs/<id>/
+    spec_content = spec_path.read_text(encoding="utf-8")
+    run_dir = RunDir.load(repo_path) or RunDir.create(repo_path, spec_content)
+
+    # Logger initialisieren (logs go to run dir)
     verbose = not args.quiet
     output_json = args.output == "json"
-    logger = init_logger(str(repo_path), verbose, output_json)
+    logger = init_logger(str(repo_path), verbose, output_json, dirigent_dir=run_dir.path)
     logger.start()
 
     # Portal Reporter initialisieren (für Events an Portal)
@@ -777,15 +799,15 @@ Beispiele:
 
         # Normale Ausführung
         if args.phase in ["analyze", "all"]:
-            analysis = run_analysis(repo_path, spec_path, args.force)
+            analysis = run_analysis(repo_path, spec_path, args.force, dirigent_dir=run_dir.path)
 
             if args.phase == "analyze":
                 logger.info("Analyse abgeschlossen. Beende.")
                 sys.exit(0)
 
         # Route bestimmen
-        analysis = run_analysis(repo_path, spec_path, force=False)
-        route = run_routing(repo_path, analysis)
+        analysis = run_analysis(repo_path, spec_path, force=False, dirigent_dir=run_dir.path)
+        route = run_routing(repo_path, analysis, dirigent_dir=run_dir.path)
 
         # Determine execution mode (--execution-mode takes precedence over --interactive)
         execution_mode = args.execution_mode
@@ -801,7 +823,7 @@ Beispiele:
             executor = create_executor(str(repo_path), str(spec_path), dry_run=False, use_proteus=args.use_proteus, model=args.model, effort=args.effort)
             success = executor.create_plan()
             if success:
-                plan_file = repo_path / ".dirigent" / "PLAN.json"
+                plan_file = executor.dirigent_dir / "PLAN.json"
                 logger.info(f"Plan erstellt: {plan_file}")
                 logger.info("Prüfe den Plan und starte dann mit: --phase execute")
             else:

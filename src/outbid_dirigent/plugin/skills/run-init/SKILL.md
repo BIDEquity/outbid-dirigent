@@ -16,7 +16,7 @@ agent: infra-architect
 <step id="6">Build verification commands — concrete curl/CLI commands the reviewer can run to test the running system.</step>
 <step id="7">Detect e2e framework (Playwright/Puppeteer/Cypress) and its run command.</step>
 <step id="8">Assess testability: score 0-10 based on what's available, write rationale, description, and gaps.</step>
-<step id="9">Write `.dirigent/test-harness.json` with the exact schema below.</step>
+<step id="9">Write `${DIRIGENT_RUN_DIR}/test-harness.json` with the exact schema below.</step>
 </instructions>
 
 <discovery-hints>
@@ -37,7 +37,7 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
 </hint>
 </discovery-hints>
 
-<output file=".dirigent/test-harness.json">
+<output file="${DIRIGENT_RUN_DIR}/test-harness.json">
 {
   "base_url": "http://localhost:3000",
   "port": 3000,
@@ -118,7 +118,7 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
 
 <constraints>
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
-<constraint>The file path MUST be .dirigent/test-harness.json</constraint>
+<constraint>The file path MUST be ${DIRIGENT_RUN_DIR}/test-harness.json</constraint>
 </constraints>
 
 ## Validation (MANDATORY)
@@ -126,7 +126,7 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
 After writing test-harness.json, validate it:
 
 ```bash
-python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/test-harness.json
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/test-harness.json
 ```
 
 If validation fails, fix the errors and re-run until it passes.

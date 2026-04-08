@@ -56,11 +56,11 @@ class DirigentLogger:
         "lint": "🔧",
     }
 
-    def __init__(self, repo_path: str, verbose: bool = True, output_json: bool = False):
+    def __init__(self, repo_path: str, verbose: bool = True, output_json: bool = False, dirigent_dir: Optional[Path] = None):
         self.repo_path = Path(repo_path)
         self.verbose = verbose
         self.output_json = output_json
-        self.log_dir = self.repo_path / ".dirigent" / "logs"
+        self.log_dir = (dirigent_dir or self.repo_path / ".dirigent") / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -557,10 +557,10 @@ class DirigentLogger:
 _logger_instance: Optional[DirigentLogger] = None
 
 
-def init_logger(repo_path: str, verbose: bool = True, output_json: bool = False) -> DirigentLogger:
+def init_logger(repo_path: str, verbose: bool = True, output_json: bool = False, dirigent_dir: Optional[Path] = None) -> DirigentLogger:
     """Initialisiert den globalen Logger."""
     global _logger_instance
-    _logger_instance = DirigentLogger(repo_path, verbose, output_json)
+    _logger_instance = DirigentLogger(repo_path, verbose, output_json, dirigent_dir=dirigent_dir)
     return _logger_instance
 
 

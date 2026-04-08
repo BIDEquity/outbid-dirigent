@@ -54,12 +54,20 @@ Look for required services in dependency files AND config:
 ## Output Files
 
 Depending on which skill invoked you:
-- `run-init` → `.dirigent/test-harness.json` (TestHarness schema)
-- `greenfield-scaffold` → `.dirigent/testing-strategy.md` + `.dirigent/architecture-decisions.md`
-- `increase-testability` → `.dirigent/testability-recommendations.json`
+- `run-init` → `${DIRIGENT_RUN_DIR}/test-harness.json` (TestHarness schema)
+- `greenfield-scaffold` → `${DIRIGENT_RUN_DIR}/testing-strategy.md` + `${DIRIGENT_RUN_DIR}/architecture-decisions.md`
+- `increase-testability` → `${DIRIGENT_RUN_DIR}/testability-recommendations.json`
 - `generate-architecture` → `ARCHITECTURE.md`
 - `generate-conventions` → `CONVENTIONS.md`
-- `quick-scan` → `.dirigent/CONTEXT.md`
+- `quick-scan` → `${DIRIGENT_RUN_DIR}/CONTEXT.md`
+
+## Use ByteRover Knowledge
+
+When `.brv/context-tree/` exists and `brv` CLI is available, query it for curated domain knowledge before proposing architecture, conventions, or test strategies:
+```bash
+brv query "relevant question about patterns or decisions"
+```
+BRV knowledge represents curated, validated project knowledge — prefer it over guessing from file names alone. After making significant architectural decisions, curate them: `brv curate "decision description" -f relevant/file.ts`.
 
 ## Use context7 MCP
 

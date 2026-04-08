@@ -133,9 +133,9 @@ These test CODE STRUCTURE, not USER BEHAVIOR. They are **forbidden** in behavior
 
 ## Step 1: Read Context
 
-1. **Required:** `.dirigent/PLAN.json` — find the phase matching `$ARGUMENTS` (the phase ID)
-2. **Required:** `.dirigent/SPEC.md` — understand what the user wants
-3. **Critical:** `.dirigent/test-harness.json` — if this exists, it tells you EXACTLY how to verify
+1. **Required:** `${DIRIGENT_RUN_DIR}/PLAN.json` — find the phase matching `$ARGUMENTS` (the phase ID)
+2. **Required:** `${DIRIGENT_RUN_DIR}/SPEC.md` — understand what the user wants
+3. **Critical:** `${DIRIGENT_RUN_DIR}/test-harness.json` — if this exists, it tells you EXACTLY how to verify
 
 ## Step 2: Build Verification Commands
 
@@ -189,7 +189,7 @@ assert len(resp.json()) > 0
 
 ## Step 3: Write the Contract
 
-Write `.dirigent/contracts/phase-{PHASE_ID}.json`:
+Write `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json`:
 
 ```json
 {
@@ -264,7 +264,7 @@ Write `.dirigent/contracts/phase-{PHASE_ID}.json`:
 
 <constraints>
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
-<constraint>File path MUST be .dirigent/contracts/phase-{PHASE_ID}.json</constraint>
+<constraint>File path MUST be ${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json</constraint>
 </constraints>
 
 ## Validation (MANDATORY)
@@ -272,7 +272,7 @@ Write `.dirigent/contracts/phase-{PHASE_ID}.json`:
 After writing the JSON file, validate it:
 
 ```bash
-python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py .dirigent/contracts/phase-$ARGUMENTS.json
+python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/contracts/phase-$ARGUMENTS.json
 ```
 
 If validation fails, read the error messages, fix the JSON, and re-run until it passes.
