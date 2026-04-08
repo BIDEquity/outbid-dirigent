@@ -73,8 +73,9 @@ class ContractManager:
         prompt = (
             f"Use the contract-negotiator agent to create an acceptance criteria "
             f"contract for phase {phase.id}. Pass it: phase_id={phase.id}\n\n"
-            f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
-            f"(NOT in .dirigent/ in the repo). Read files from there and write output there."
+            f"IMPORTANT: All dirigent artifacts are at {self.dirigent_dir} "
+            f"(NOT in .dirigent/ in the repo). Read files from there and write output there.\n"
+            f"Write the contract to: {contract_path}"
         )
         success, _, stderr = self.runner._run_claude(prompt, timeout=300)
 
@@ -203,11 +204,15 @@ class ContractManager:
         commit_count = len(phase.tasks)
         review_path = self._review_path(phase.id)
 
+        review_path_str = str(review_path)
+        contract_path_str = str(self._contract_path(phase.id))
         prompt = (
             f"Use the reviewer agent to review phase {phase.id}. "
             f"There are {commit_count} commits to review. This is iteration {iteration}.\n\n"
-            f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
-            f"(NOT in .dirigent/ in the repo). Read contract/harness from there, write review there."
+            f"IMPORTANT: All dirigent artifacts are at {self.dirigent_dir} "
+            f"(NOT in .dirigent/ in the repo).\n"
+            f"Read the contract from: {contract_path_str}\n"
+            f"Write the review to: {review_path_str}"
         )
 
         success, _, stderr = self.runner._run_claude(prompt, timeout=1200)
@@ -306,8 +311,10 @@ class ContractManager:
         prompt = (
             f"Use the implementer agent to fix review findings for phase {phase.id}. "
             f"This is iteration {iteration}.\n\n"
-            f"IMPORTANT: All dirigent artifacts are at $DIRIGENT_RUN_DIR={self.dirigent_dir} "
-            f"(NOT in .dirigent/ in the repo). Read review/contract from there."
+            f"IMPORTANT: All dirigent artifacts are at {self.dirigent_dir} "
+            f"(NOT in .dirigent/ in the repo).\n"
+            f"Read the review from: {str(self._review_path(phase.id))}\n"
+            f"Read the contract from: {str(self._contract_path(phase.id))}"
         )
         head_before = self.runner._get_latest_commit_hash()
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)

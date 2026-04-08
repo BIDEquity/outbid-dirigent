@@ -99,6 +99,7 @@ agent: reviewer
 <constraint>Du bist NUR Reviewer. Aendere KEINEN Code.</constraint>
 <constraint>Output ONLY the JSON file — no markdown, no commentary</constraint>
 <constraint>The file path MUST be ${DIRIGENT_RUN_DIR}/reviews/phase-{PHASE_ID}.json</constraint>
+<constraint>Do NOT spawn sub-agents or call the Agent tool. You are a single-pass reviewer — write the review file, validate it, and stop. Do NOT launch another reviewer for "iteration 2" or any other reason.</constraint>
 <constraint>Infrastructure failures (health check down) are INFO findings, not CRITICAL — don't fail a review because a service is temporarily unavailable</constraint>
 <constraint>A "pass" verdict without evidence for behavioral/boundary criteria is INVALID — the orchestrator will reject it. Structural criteria may pass based on build/lint results alone.</constraint>
 </constraints>
