@@ -243,7 +243,31 @@ Read the spec and decide which patterns apply. Only propose patterns the feature
 and why. E.g. "ORM choice deferred — need to see query complexity in tasks"}
 ```
 
-## Step 5: Validate
+## Step 5: Scaffold Command
+
+For greenfield projects, the architecture-decisions.md MUST include a **scaffold command** that the planner's first task will execute. Do NOT plan to create project files manually — use the framework's official scaffolder:
+
+| Framework | Scaffold Command |
+|-----------|-----------------|
+| Next.js | `npx create-next-app@latest . --ts --tailwind --eslint --app --src-dir --no-git --yes` |
+| Vite (React) | `npm create vite@latest . -- --template react-ts` |
+| Nuxt | `npx nuxi init . --no-git` |
+| SvelteKit | `npx sv create . --template minimal --types ts` |
+| Remix | `npx create-remix@latest . --no-git-init` |
+| Django | `django-admin startproject config .` |
+| FastAPI | manual (no official scaffolder — document minimal file structure) |
+| Rails | `rails new . --skip-git` |
+| Go | `go mod init {module}` |
+| Rust | `cargo init .` |
+| Flutter | `flutter create .` |
+
+**Why:** Scaffolders generate config files (e.g. `next.config.mjs`, `vite.config.ts`) that match the installed framework version. Writing these files manually leads to version mismatches — e.g. creating `next.config.ts` when the installed Next.js only supports `.js` or `.mjs`.
+
+If the repo already has a `package.json` or framework config, skip scaffolding and work with what exists.
+
+Include the chosen scaffold command in architecture-decisions.md under a `## Project Bootstrap` section so the planner puts it as the very first task.
+
+## Step 6: Validate
 
 Before writing:
 
@@ -252,7 +276,7 @@ Before writing:
 3. **Every pattern must be justified** by the spec requirements — don't propose Repository pattern for a 2-endpoint feature
 4. **Keep it proportional** — a small feature needs 1 page, not 10. Scale recommendations to scope.
 
-## Step 6: Commit
+## Step 7: Commit
 
 ```bash
 git add ${DIRIGENT_RUN_DIR}/testing-strategy.md ${DIRIGENT_RUN_DIR}/architecture-decisions.md
@@ -269,6 +293,7 @@ git commit -m "docs: greenfield testing strategy and architecture decisions"
 <rule>Test strategy must be executable — commands, not concepts. "Run pytest" not "ensure adequate coverage"</rule>
 <rule>Architecture patterns must include code skeletons — show the shape, not just the name</rule>
 <rule>Do not over-engineer — if the spec describes 3 endpoints, don't propose a microservice architecture</rule>
+<rule>NEVER plan to write framework config files manually (next.config.*, vite.config.*, etc.) — always use the official scaffolder which generates version-correct configs</rule>
 <rule>Acknowledge what you don't know — if a decision depends on requirements not in the spec, say so in "Decisions NOT Made"</rule>
 </rules>
 
