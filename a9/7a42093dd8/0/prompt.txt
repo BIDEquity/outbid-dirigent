@@ -1,0 +1,61 @@
+research eval libraries for llms in 2026
+
+---
+
+sorry, do on
+
+---
+
+can i use langfuse locally for just eval-ing our llm router?
+
+---
+
+when the spec is large, we sometimes lose information along the way.
+
+---
+
+please do.
+
+---
+
+ok, i see that the spec gets actually written in the initial prompt.
+
+---
+
+ok, i see that the spec gets actually written in the initial prompt for the implementer. that is good. however, this is a large markdown blob of text.
+
+---
+
+can you propose a prompt to strucuture (any) markdown spec into requirements xml-tagged as proposed above with the gola to a) reduce tokens and b) keep all requireemnts intact and c) also add <explanations> for keywords ? test this prompt on example-spec.md. the output must be xml-tagged markdow.
+
+---
+
+can you emit the compressed spec once?
+
+---
+
+is this volume well handleable for a llm?
+
+---
+
+build this. Adapt all schemas. inject the whole glossary into each prompt but only the relevant req ids. do not implement the oracle part.
+
+---
+
+give me a script (test-compaction.py) to test the compaction prompt on arbitrary inputs (e.g. echo "eine quiz-app" | python test-compaction.py > spec.compact.xml
+
+---
+
+logger nicht initialisiert
+
+---
+
+make a pr for this
+
+---
+
+increase the review phse timeout to 20 minutes and add to the pr
+
+---
+
+did you commit our llm-based router?
