@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "b05305286ef6",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 5,
+  "files_touched": [
+    ".gitignore",
+    "src/outbid_dirigent/plugin/commands/hi.md",
+    "src/outbid_dirigent/plugin/commands/start.md",
+    "src/outbid_dirigent/plugin/skills/fix-review/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/hi/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/hi/lanes/coach.md",
+    "src/outbid_dirigent/plugin/skills/hi/lanes/plan-mine.md",
+    "src/outbid_dirigent/plugin/skills/hi/lanes/routes.md",
+    "src/outbid_dirigent/plugin/skills/hi/lanes/watch.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/CLAUDE.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/asking-well.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/atomic-commits-per-task.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/claude-code-daily-habits.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/domain-context-beats-orchestration.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/git-the-bare-minimum.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/no-sycophancy-rule.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/read-before-you-write.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/scope-is-sacred.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/scratch-state-hygiene.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/spec-first-or-suffer.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/terminal-survival-kit.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/tmux-for-long-runs.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/ultrathink-as-a-ritual.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/verify-dont-vibe.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/when-not-to-use-dirigent.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/index.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/reading-list.md",
+    "src/outbid_dirigent/plugin/skills/implement-task/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/review-phase/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b0/5305286ef6/0/metadata.json",
+      "transcript": "/b0/5305286ef6/0/full.jsonl",
+      "content_hash": "/b0/5305286ef6/0/content_hash.txt",
+      "prompt": "/b0/5305286ef6/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 3621,
+    "cache_creation_tokens": 834993,
+    "cache_read_tokens": 18037153,
+    "output_tokens": 112882,
+    "api_call_count": 132
+  }
+}
