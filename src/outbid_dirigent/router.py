@@ -18,6 +18,7 @@ from outbid_dirigent.logger import get_logger
 
 
 class RouteType(Enum):
+    QUICK = "quick"
     GREENFIELD = "greenfield"
     LEGACY = "legacy"
     HYBRID = "hybrid"
@@ -80,6 +81,24 @@ class Router:
     """Bestimmt den Ausführungspfad basierend auf der Analyse."""
 
     # Definitionen der Pfade
+    QUICK_STEPS = [
+        RouteStep(
+            step_type=StepType.PLANNING,
+            name="Planung",
+            description="Kurze Analyse und Ausführungsplan für kleine Änderung",
+        ),
+        RouteStep(
+            step_type=StepType.EXECUTION,
+            name="Ausführung",
+            description="Änderung in einem Durchlauf umsetzen",
+        ),
+        RouteStep(
+            step_type=StepType.SHIP,
+            name="Shipping",
+            description="Branch erstellen, Push, PR erstellen",
+        ),
+    ]
+
     GREENFIELD_STEPS = [
         RouteStep(
             step_type=StepType.INIT,
@@ -315,6 +334,7 @@ class Router:
         route_type = RouteType(route_str)
 
         steps_map = {
+            RouteType.QUICK: self.QUICK_STEPS,
             RouteType.GREENFIELD: self.GREENFIELD_STEPS,
             RouteType.LEGACY: self.LEGACY_STEPS,
             RouteType.HYBRID: self.HYBRID_STEPS,

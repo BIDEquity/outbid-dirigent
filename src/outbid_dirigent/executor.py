@@ -147,6 +147,14 @@ class Executor:
         spec_cache = self.dirigent_dir / "SPEC.md"
         spec_cache.write_text(self.spec_content, encoding="utf-8")
 
+        # Compact spec — best-effort, never aborts the run.
+        # Writes $DIRIGENT_RUN_DIR/SPEC.compact.json which task_runner consumes.
+        from outbid_dirigent.spec_compactor import compact_spec
+        try:
+            compact_spec(self.spec_content, dirigent_dir=self.dirigent_dir)
+        except Exception as e:
+            logger.warning(f"Spec compaction failed (will fall back to full spec): {e}")
+
         # Compose modules
         self.runner = TaskRunner(
             repo_path=self.repo_path,

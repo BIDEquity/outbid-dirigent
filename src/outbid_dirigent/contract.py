@@ -199,7 +199,7 @@ class ContractManager:
             f"(NOT in .dirigent/ in the repo). Read contract/harness from there, write review there."
         )
 
-        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
+        success, _, stderr = self.runner._run_claude(prompt, timeout=1200)
 
         if not success:
             logger.warning(f"Phase {phase.id} review subprocess failed: {stderr[:200]}")
