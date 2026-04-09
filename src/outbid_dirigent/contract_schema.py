@@ -225,6 +225,20 @@ class Review(BaseModel):
             if r.verdict == CriterionVerdict.PASS and not r.evidence
         ]
 
+    @property
+    def warned_criteria(self) -> list[CriterionResult]:
+        """Criteria that could not be verified due to infrastructure constraints."""
+        return [r for r in self.criteria_results if r.verdict == CriterionVerdict.WARN]
+
+    @property
+    def infra_constrained_only(self) -> bool:
+        """True when all failures are infra-constrained (WARN) with no real code failures."""
+        return (
+            not self.failed_criteria
+            and self.critical_count == 0
+            and bool(self.warned_criteria)
+        )
+
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
