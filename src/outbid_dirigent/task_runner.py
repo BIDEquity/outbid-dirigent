@@ -201,6 +201,18 @@ class TaskRunner:
         rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
         return rules_file.read_text(encoding="utf-8") if rules_file.exists() else None
 
+    def _compact_spec_has_rules(self) -> bool:
+        """Check if the CompactSpec already contains business rules."""
+        compact_path = self.dirigent_dir / "SPEC.compact.json"
+        if not compact_path.exists():
+            return False
+        try:
+            import json
+            data = json.loads(compact_path.read_text(encoding="utf-8"))
+            return bool(data.get("business_rules"))
+        except Exception:
+            return False
+
     def _build_convention_skills_block(self, task: "Task") -> Optional[str]:
         """Build <convention-skills> block telling the agent which skills to load.
 
@@ -469,8 +481,9 @@ LIMIT 45;
             if section:
                 sections.append(f"<{tag} hint=\"{hint}\">\n{section}\n</{tag}>")
 
-        # Business rules
-        if business_rules:
+        # Business rules — only inject separately if CompactSpec doesn't contain them
+        # (CompactSpec now includes business_rules from Proteus extraction)
+        if business_rules and not self._compact_spec_has_rules():
             sections.append(f"<business-rules hint=\"MUESSEN erhalten bleiben!\">\n{business_rules[:2000]}\n</business-rules>")
 
         # Session recall — lessons from past runs
