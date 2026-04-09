@@ -635,6 +635,13 @@ Beispiele:
     )
 
     parser.add_argument(
+        "--route",
+        choices=["quick", "greenfield", "legacy", "hybrid", "testability", "tracking"],
+        default=None,
+        help="Route manuell festlegen (überschreibt LLM/Heuristic-Router). Bei 'legacy' wird --use-proteus automatisch aktiviert.",
+    )
+
+    parser.add_argument(
         "--output",
         choices=["json"],
         default=None,
@@ -805,9 +812,37 @@ Beispiele:
                 logger.info("Analyse abgeschlossen. Beende.")
                 sys.exit(0)
 
-        # Route bestimmen
+        # Auto-enable proteus for legacy route
+        if args.route == "legacy" and not args.use_proteus:
+            args.use_proteus = True
+            logger.info("Legacy-Route gewählt — Proteus automatisch aktiviert")
+
+        # Route bestimmen (oder Override nutzen)
         analysis = run_analysis(repo_path, spec_path, force=False, dirigent_dir=run_dir.path)
-        route = run_routing(repo_path, analysis, dirigent_dir=run_dir.path)
+        if args.route:
+            from outbid_dirigent.router import Router, RouteType
+            router = Router(str(repo_path))
+            route_type = RouteType(args.route)
+            steps_map = {
+                RouteType.QUICK: router.QUICK_STEPS,
+                RouteType.GREENFIELD: router.GREENFIELD_STEPS,
+                RouteType.LEGACY: router.LEGACY_STEPS,
+                RouteType.HYBRID: router.HYBRID_STEPS,
+                RouteType.TESTABILITY: router.TESTABILITY_STEPS,
+                RouteType.TRACKING: router.TRACKING_STEPS,
+            }
+            from outbid_dirigent.router import Route
+            route = Route(
+                route_type=route_type,
+                reason=f"Manuell festgelegt via --route {args.route}",
+                confidence="override",
+                steps=steps_map[route_type],
+                estimated_tasks=0,
+            )
+            router.save_route(route, dirigent_dir=run_dir.path)
+            logger.info(f"Route manuell gesetzt: {args.route} ({len(route.steps)} Schritte)")
+        else:
+            route = run_routing(repo_path, analysis, dirigent_dir=run_dir.path)
 
         # Determine execution mode (--execution-mode takes precedence over --interactive)
         execution_mode = args.execution_mode
