@@ -1,0 +1,79 @@
+in one legacy refactor, we observed: 1) the llm chose greenield as path
+
+---
+
+in one legacy refactor, we observed: 1) the llm chose greenield as path 2) die Arhcitecture.md und das test-harness enthielten falcshe Infos über den Login-Endpunkt, due dann downstream geuztzt wurden und zu einer komplett falsch refactorten app gefpühr haben. Wäre das in der legacy-route auch passiert? wird dort auch arhcitecture.md geschribene?
+
+---
+
+in one legacy refactor, we observed: 1) the llm chose greenield as path 2) die Arhcitecture.md und das test-harness enthielten falcshe Infos über den Login-Endpunkt, due dann downstream geuztzt wurden und zu einer komplett falsch refactorten app gefpühr haben. Wäre das in der legacy-route auch passiert? wird dort auch arhcitecture.md geschribene? und wenn ha wann
+
+---
+
+/superpowers:brainstorm welche lösungen gäbe es noch? ein llm-verification step wöre auch immer dumm
+
+---
+
+go on
+
+---
+
+commit
+
+---
+
+give me a list of all files that the dirigent reads and outputs.
+
+---
+
+ok. contracts, reviews and summaries are fine. manifest, route, analysis state also. all other stuff is WILD and confusing. 
+
+1. why does init output three files? arch, conventions and test harness should be one file.
+
+2. legacy route uses proteus to store business rules in sqlite database. it should read rules from there and create compacted spec (and then plan etc.) and not a MD file
+
+Wild mix of json and md. get the idea that output consumed by humans should be markdiwn (readable, compilable to pdf etc.). But who actually ready conventions.md
+
+---
+
+was ist init-exports-env und dieser inits-log?
+
+---
+
+Wofür ist das denn gedacht?
+
+---
+
+Ich glaube, das ist zu Artsy. Die Init-Phase (eigentlich doch "verstehe dieses Repo", falls du es noch nicht kennst, oder?) sollte ein maschinenlesbars format erstellen (JSON), oder sehr umfassend beschriebenes Markdown mit Sektionen (Komponenten, Tech Stack, Data Flows, Umgebung (Env-Vars, Stages), How to run this locally)
+
+---
+
+nun ergibt sich als folgefrage: wie können wir _trotzdem_ sichergehen, dass wir am ende sichtbare und testbare ergebnisse produzieren? Das ist abhänging von der route. für greenfield bedeutet das bspw., dass architektur gewöhlt werden muss, die testbarkeit sicherstellt.
+
+---
+
+nun ergibt sich als folgefrage: wie können wir _trotzdem_ sichergehen, dass wir am ende sichtbare und testbare ergebnisse produzieren? Das ist abhänging von der route. für greenfield bedeutet das bspw., dass architektur gewöhlt werden muss, die testbarkeit sicherstellt. für hybrid, dass die architektur verstanden werden bzw. auch grenzen ihrer automatischen testbarkeit gekannt werden muss.
+
+---
+
+hast du einen skill zum diksutieren soilcher entscheidungen?
+
+---
+
+ja.
+
+---
+
+baue! nutze statt pydantic ai lieber claude code direkt (kann man dort ein outputschema mitgeben)?
+
+---
+
+oder noch besser: test-harness aus ARCHITECTURE.md generieren.
+
+---
+
+ja. weitermachen.
+
+---
+
+aufräumen.
