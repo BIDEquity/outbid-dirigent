@@ -18,14 +18,12 @@ If no init script exists, the skill still inspects the repo to build
 a best-effort test harness from config files and package.json.
 """
 
-import json
-import os
 import subprocess
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import anthropic
 from loguru import logger
 
 from outbid_dirigent.infra_schema import InfraContext, InfraTier, ServiceGap, SeedInfo
@@ -400,16 +398,8 @@ class InitPhase:
         try:
             script_path.chmod(0o755)
 
-            # Run the init script. Use a subshell that sources the script
-            # so exported env vars are captured in a sidecar file.
-            env_capture = self.dirigent_dir / "init-exports.env"
-            wrapper = (
-                f'set -e; source "{script_path}" 2>&1; '
-                f'env > "{env_capture}"'
-            )
-
             proc = subprocess.run(
-                ["bash", "-c", wrapper],
+                ["bash", "-c", f'set -e; source "{script_path}" 2>&1'],
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
@@ -440,91 +430,7 @@ class InitPhase:
                 result["produced_harness"] = True
                 logger.info("Init script produced test-harness.json directly")
 
-        # Save raw output for the skill to analyze if needed
-        log_file = self.dirigent_dir / "init-output.log"
-        log_file.write_text(
-            f"=== Init Script: {script_path} ===\n"
-            f"=== Exit Code: {proc.returncode if proc else 'N/A'} ===\n\n"
-            f"--- STDOUT ---\n{result['output']}\n\n"
-            f"--- STDERR ---\n{result['error']}\n",
-            encoding="utf-8",
-        )
-
-        # Save exported environment (from the init script's perspective)
-        if env_capture.exists():
-            self._extract_env_diff(env_capture)
-
         return result
-
-    def _extract_env_diff(self, env_file: Path):
-        """Compare init script's exported env with current env.
-
-        Saves new/changed vars to .dirigent/init-new-env.json.
-        Only saves var NAMES for security — never values (except for
-        non-sensitive ones like URLs and ports).
-        """
-        try:
-            current_env = dict(os.environ)
-            init_env = {}
-            for line in env_file.read_text(encoding="utf-8").splitlines():
-                if "=" in line:
-                    key, val = line.split("=", 1)
-                    init_env[key] = val
-
-            # Find vars that are new or changed
-            safe_value_patterns = ["URL", "PORT", "HOST", "BASE", "ADDR"]
-            new_vars = {}
-            for key, val in init_env.items():
-                if key not in current_env or current_env[key] != val:
-                    # Only expose values for URL/PORT-like vars, redact the rest
-                    if any(p in key.upper() for p in safe_value_patterns):
-                        new_vars[key] = val
-                    else:
-                        new_vars[key] = "(set by init)"
-
-            if new_vars:
-                out = self.dirigent_dir / "init-new-env.json"
-                out.write_text(json.dumps(new_vars, indent=2), encoding="utf-8")
-                logger.info(f"Init script exported {len(new_vars)} new/changed env vars")
-
-        except Exception as e:
-            logger.debug(f"Failed to extract env diff: {e}")
-
-    def wait_for_readiness(self, harness: TestHarness) -> bool:
-        """Wait for health checks in the test harness to pass."""
-        if not harness.health_checks:
-            return True
-
-        logger.info(f"Waiting for {len(harness.health_checks)} health checks...")
-        all_passed = True
-
-        for check in harness.health_checks:
-            timeout = min(check.timeout_seconds, self.READINESS_TIMEOUT)
-            deadline = time.time() + timeout
-            passed = False
-
-            while time.time() < deadline:
-                try:
-                    proc = subprocess.run(
-                        ["bash", "-c", check.command],
-                        cwd=self.repo_path,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                    if proc.returncode == 0:
-                        logger.info(f"  Health check passed: {check.name}")
-                        passed = True
-                        break
-                except (subprocess.TimeoutExpired, Exception):
-                    pass
-                time.sleep(2)
-
-            if not passed:
-                logger.warning(f"  Health check failed: {check.name} (timeout {timeout}s)")
-                all_passed = False
-
-        return all_passed
 
     # ══════════════════════════════════════════
     # MAIN ENTRY POINT
@@ -535,20 +441,13 @@ class InitPhase:
 
         Flow:
         1. Discover and run init script (if exists)
-        2. If init script produced test-harness.json → validate and use it
-        3. If not → invoke /dirigent:run-init skill to inspect the repo
-           and build a best-effort harness
-        4. Wait for health checks in the harness to pass
-        5. Harness is available for planner, executor, and reviewer
+        2. If init script produced test-harness.json → use it
+        3. Generate ARCHITECTURE.md if it doesn't exist
+        4. Generate test-harness.json from ARCHITECTURE.md via structured output
 
         Returns True always (non-blocking — best effort).
         """
         logger.info("Starting init phase...")
-
-        # NEW: run InfraDetector before anything else
-        detector = InfraDetector(self.repo_path, dirigent_dir=self.dirigent_dir)
-        ctx = detector.detect()
-        logger.info(f"Infra tier: {ctx.tier.value} | confidence: {ctx.confidence}")
 
         script = self.discover_init_script()
         harness_path = self.dirigent_dir / "test-harness.json"
@@ -566,19 +465,7 @@ class InitPhase:
         # Step 2: Check if the script produced the harness
         harness = TestHarness.load(harness_path)
 
-        # Step 3: If no harness yet, have the skill build one
-        if harness is None and self.runner:
-            logger.info("No test-harness.json — invoking /dirigent:run-init to build one")
-            success, _, stderr = self.runner._run_claude(
-                "Run /dirigent:run-init", timeout=300,
-            )
-            if success:
-                harness = TestHarness.load(harness_path)
-
-        if harness is None:
-            logger.warning("No test harness produced — reviewer will only do static analysis")
-
-        # Step 3b: Generate ARCHITECTURE.md if it doesn't exist
+        # Step 3: Generate ARCHITECTURE.md if it doesn't exist
         arch_path = self.repo_path / "ARCHITECTURE.md"
         if not arch_path.exists() and self.runner:
             logger.info("No ARCHITECTURE.md found — generating one")
@@ -586,32 +473,104 @@ class InitPhase:
         elif arch_path.exists():
             logger.info("ARCHITECTURE.md exists — skipping generation")
 
-        # Step 3c: Generate CONVENTIONS.md if no .opencode skills and no existing file
-        has_opencode = (self.repo_path / ".opencode" / "skills").is_dir()
-        conv_path = self.repo_path / "CONVENTIONS.md"
-        if has_opencode:
-            logger.info(".opencode/skills/ detected — skipping CONVENTIONS.md (bridge handles this)")
-        elif not conv_path.exists() and self.runner:
-            logger.info("No .opencode skills or CONVENTIONS.md — generating conventions")
-            self.runner._run_claude("Run /dirigent:generate-conventions", timeout=600)
-        elif conv_path.exists():
-            logger.info("CONVENTIONS.md exists — skipping generation")
+        # Step 4: Generate test-harness.json from ARCHITECTURE.md
+        if harness is None and arch_path.exists():
+            logger.info("Generating test-harness.json from ARCHITECTURE.md...")
+            harness = generate_harness_from_architecture(arch_path, harness_path)
 
         if harness is None:
-            return True
-
-        # Step 4: Wait for health checks
-        logger.info(f"Test harness: {harness.base_url}, auth={harness.auth.method.value}, "
-                    f"{len(harness.verification_commands)} verification commands")
-
-        if harness.health_checks:
-            ready = self.wait_for_readiness(harness)
-            if ready:
-                logger.info("All health checks passed — environment is ready")
-            else:
-                harness.status = "partial"
-                harness.notes = "Some health checks failed"
-                harness.save(harness_path)
-                logger.warning("Some health checks failed — harness marked as partial")
+            logger.warning("No test harness produced — reviewer will only do static analysis")
+        else:
+            cmds = ", ".join(harness.commands.keys())
+            logger.info(f"Test harness: commands=[{cmds}]")
 
         return True
+
+
+HARNESS_SYSTEM_PROMPT = """\
+You extract a structured test harness from an ARCHITECTURE.md file.
+
+The harness contains ONLY deterministic, runnable commands found in the architecture doc.
+Do NOT invent commands — only extract what is documented.
+
+## Rules
+- commands.build: the build command from the Development Workflow or Testing section
+- commands.test: the test command (unit tests)
+- commands.e2e: the e2e test command (if documented)
+- commands.seed: the seed/data command (if documented)
+- commands.dev: the dev server command
+- Omit command keys that aren't documented
+- env_vars: extract from the Configuration section
+- portal: extract dev server command and port from Development Workflow
+- _sources: for each value, cite the ARCHITECTURE.md section where you found it
+- notes: anything important that doesn't fit the schema
+"""
+
+
+def generate_harness_from_architecture(
+    arch_path: Path,
+    harness_path: Path,
+    model: str = "claude-haiku-4-5",
+) -> Optional[TestHarness]:
+    """Generate test-harness.json from ARCHITECTURE.md via structured output.
+
+    Reads the architecture doc and extracts commands, env vars, and portal config
+    into a strict TestHarness schema. The LLM fills fields but cannot invent new ones.
+    """
+    arch_content = arch_path.read_text(encoding="utf-8")
+    if not arch_content.strip():
+        logger.warning("ARCHITECTURE.md is empty — cannot generate harness")
+        return None
+
+    user_prompt = (
+        f"<architecture>\n{arch_content}\n</architecture>\n\n"
+        f"Extract the test harness from this architecture document."
+    )
+
+    try:
+        client = anthropic.Anthropic()
+        start = datetime.now()
+
+        response = client.messages.parse(
+            model=model,
+            max_tokens=4000,
+            system=HARNESS_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+            output_format=TestHarness,
+        )
+
+        duration_ms = int((datetime.now() - start).total_seconds() * 1000)
+        harness = response.parsed_output
+
+        if harness is None:
+            logger.error("Harness generation: model refused to produce output")
+            return None
+
+        usage = response.usage
+        try:
+            from outbid_dirigent.logger import get_logger
+            dlogger = get_logger()
+            dlogger.api_usage(
+                component="harness_generator",
+                model=model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
+                cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
+                cost_cents=int((usage.input_tokens * 1 + usage.output_tokens * 5) / 10000),
+                operation="generate_harness",
+                duration_ms=duration_ms,
+            )
+        except RuntimeError:
+            pass  # Logger not initialized (e.g. standalone call)
+
+        harness.save(harness_path)
+        logger.info(f"Test harness generated from ARCHITECTURE.md ({duration_ms}ms)")
+        return harness
+
+    except anthropic.APIError as e:
+        logger.error(f"Harness generation API error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Harness generation error: {e}")
+        return None

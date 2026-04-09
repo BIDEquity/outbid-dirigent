@@ -639,30 +639,24 @@ class Executor:
     # ══════════════════════════════════════════
 
     def run_tests(self) -> bool:
-        """Run verification commands from the test harness. Returns True if passed or no harness."""
+        """Run build and test commands from the test harness. Returns True if passed or no harness."""
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
-        if not harness or not harness.verification_commands:
-            logger.info("No test harness or verification commands, skipping test step")
+        if not harness or not harness.commands:
+            logger.info("No test harness or commands, skipping test step")
             return True
 
-        logger.info(f"Running {len(harness.verification_commands)} verification commands...")
         all_passed = True
 
-        for cmd in harness.verification_commands:
-            if not self._run_verification_cmd(cmd.command, cmd.name, timeout=120):
-                all_passed = False
-
-        if harness.e2e_framework.run_command and harness.e2e_framework.framework != "none":
-            logger.info(f"Running e2e suite: {harness.e2e_framework.run_command}")
-            if not self._run_verification_cmd(harness.e2e_framework.run_command, "e2e suite", timeout=600):
-                all_passed = False
+        # Run build, test, and e2e commands in order
+        for key in ("build", "test", "e2e"):
+            if key in harness.commands:
+                cmd = harness.commands[key]
+                logger.info(f"Running {key}: {cmd.command}")
+                timeout = 600 if key == "e2e" else 120
+                if not self._run_verification_cmd(cmd.command, key, timeout=timeout):
+                    all_passed = False
 
         logger.info("All verification commands passed") if all_passed else logger.error("Verification failed — blocking ship")
-
-        # Log infra confidence tier
-        infra_ctx = InfraContext.load(self.dirigent_dir / "infra-context.json")
-        if infra_ctx:
-            logger.info(f"Test confidence: {infra_ctx.confidence} (tier: {infra_ctx.tier.value})")
 
         # Notify portal that testing is complete
         from outbid_dirigent.dirigent import get_portal_reporter
