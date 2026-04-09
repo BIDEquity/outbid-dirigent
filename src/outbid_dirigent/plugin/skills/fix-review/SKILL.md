@@ -12,7 +12,7 @@ agent: implementer
 <step id="2">Read `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` to understand which acceptance criteria failed.</step>
 <step id="2b">If `.brv/context-tree/` exists, run `brv query` with the finding descriptions to check for domain context that helps inform the fix approach.</step>
 <step id="3">Fix all findings with severity "critical" first, then "warn". Skip "info" unless trivial.</step>
-<step id="4">For each failed acceptance criterion (verdict "fail" in criteria_results), address the root cause noted in the "notes" field.</step>
+<step id="4">For each failed acceptance criterion (verdict "fail" — NOT "warn" — in criteria_results), address the root cause noted in the "notes" field. SKIP "warn" criteria entirely — they represent infrastructure constraints, not code bugs.</step>
 <step id="5">Commit: `git add -A && git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"`</step>
 </instructions>
 
@@ -22,6 +22,7 @@ agent: implementer
 <rule>No new features — only fix what the reviewer found</rule>
 <rule>If no critical or warn findings exist, do nothing</rule>
 <rule>Reference the ac_id when fixing a criterion-related issue</rule>
+<rule>SKIP criteria with verdict "warn" — these are infra-constrained, not code bugs. Do not attempt to fix missing env vars, unavailable services, or unreachable endpoints.</rule>
 </rules>
 
 <constraints>

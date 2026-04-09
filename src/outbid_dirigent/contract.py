@@ -288,6 +288,21 @@ class ContractManager:
             review.verdict = Verdict.FAIL
             review.save(review_path)
 
+        # Promote to PASS when all failures are infra-constrained (WARN only)
+        if review.verdict == Verdict.FAIL and review.infra_constrained_only:
+            warned = review.warned_criteria
+            logger.info(
+                f"Phase {phase.id} review: all {len(warned)} failing criteria are "
+                f"infra-constrained (WARN) — promoting to PASS with caveat"
+            )
+            review.verdict = Verdict.PASS
+            if not review.caveat:
+                review.caveat = (
+                    f"{len(warned)} criteria could not be verified due to infrastructure "
+                    f"constraints: {', '.join(r.ac_id for r in warned)}"
+                )
+            review.save(review_path)
+
         # Log structured results
         failed = review.failed_criteria
         critical = review.critical_count
@@ -349,6 +364,13 @@ class ContractManager:
             f"Read the review from: {str(self._review_path(phase.id))}\n"
             f"Read the contract from: {str(self._contract_path(phase.id))}"
         )
+        warned_ids = [r.ac_id for r in review.warned_criteria]
+        if warned_ids:
+            prompt += (
+                f"\n\nDO NOT attempt to fix these infra-constrained criteria "
+                f"(they failed due to missing environment/services, not code bugs): "
+                f"{', '.join(warned_ids)}"
+            )
         head_before = self.runner._get_latest_commit_hash()
         success, _, stderr = self.runner._run_claude(prompt, timeout=600)
 
