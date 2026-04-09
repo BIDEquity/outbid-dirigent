@@ -3,7 +3,7 @@
   "checkpoint_id": "96d50a6eb410",
   "strategy": "manual-commit",
   "branch": "fix/090426",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "src/outbid_dirigent/contract.py",
     "src/outbid_dirigent/contract_schema.py",
@@ -17,13 +17,19 @@
       "transcript": "/96/d50a6eb410/0/full.jsonl",
       "content_hash": "/96/d50a6eb410/0/content_hash.txt",
       "prompt": "/96/d50a6eb410/0/prompt.txt"
+    },
+    {
+      "metadata": "/96/d50a6eb410/1/metadata.json",
+      "transcript": "/96/d50a6eb410/1/full.jsonl",
+      "content_hash": "/96/d50a6eb410/1/content_hash.txt",
+      "prompt": "/96/d50a6eb410/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 36,
-    "cache_creation_tokens": 54385,
-    "cache_read_tokens": 1428567,
-    "output_tokens": 8655,
-    "api_call_count": 26
+    "input_tokens": 50,
+    "cache_creation_tokens": 108072,
+    "cache_read_tokens": 1796684,
+    "output_tokens": 10601,
+    "api_call_count": 35
   }
 }
