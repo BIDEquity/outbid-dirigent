@@ -34,6 +34,7 @@ ReqCategory = Literal[
     "policy",
     "workflow",
     "validation",
+    "testing",
     "other",
 ]
 ReqPriority = Literal["must", "should", "may"]
@@ -274,7 +275,7 @@ O(requirements) instead of O(prose).
 
 ## Categories
 
-data-model, api, ui, auth, integration, infra, policy, workflow, validation, other
+data-model, api, ui, auth, integration, infra, policy, workflow, validation, testing, other
 
 ## Glossary criteria
 
