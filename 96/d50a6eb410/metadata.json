@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "96d50a6eb410",
+  "strategy": "manual-commit",
+  "branch": "fix/090426",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outbid_dirigent/contract.py",
+    "src/outbid_dirigent/contract_schema.py",
+    "src/outbid_dirigent/plugin/agents/reviewer.md",
+    "src/outbid_dirigent/plugin/skills/fix-review/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/review-phase/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/96/d50a6eb410/0/metadata.json",
+      "transcript": "/96/d50a6eb410/0/full.jsonl",
+      "content_hash": "/96/d50a6eb410/0/content_hash.txt",
+      "prompt": "/96/d50a6eb410/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 54385,
+    "cache_read_tokens": 1428567,
+    "output_tokens": 8655,
+    "api_call_count": 26
+  }
+}
