@@ -77,5 +77,12 @@ DO NOT add: `phase_name`, `review_date`, `overall_status`, `sign_off`, `recommen
 ## Verdict Rules
 
 - `"verdict": "pass"` — ALL criteria pass with evidence, no critical findings
-- `"verdict": "fail"` — any criterion fails, OR critical finding, OR pass without evidence
+- `"verdict": "fail"` — any criterion has verdict "fail", OR critical finding, OR pass without evidence
 - The value must be lowercase: `"pass"` or `"fail"` — NOT `"PASS"`, `"Pass"`, `"approved"`
+
+### Criterion Verdict Rules
+
+- `"pass"` — criterion verified with evidence
+- `"fail"` — criterion NOT met due to a **code defect** (evidence shows wrong behavior from working infrastructure)
+- `"warn"` — criterion CANNOT be verified due to **infrastructure/environment constraints** (service not running, env var missing, port not accessible, connection refused). Evidence MUST show the infra failure. Structural criteria (`layer: "structural"`) MUST NEVER be `"warn"`.
+- When ALL non-pass criteria are `"warn"` (zero `"fail"`, zero critical findings), set overall verdict to `"pass"` and explain in `"caveat"` what could not be verified.
