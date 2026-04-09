@@ -16,7 +16,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuthMethod(str, Enum):
@@ -92,6 +92,8 @@ class TestHarness(BaseModel):
     Produced by init.sh (or init phase), consumed by the reviewer.
     Lives at .dirigent/test-harness.json.
     """
+    model_config = ConfigDict(populate_by_name=True)
+
     # Where is the app?
     base_url: str = Field(..., description="e.g. http://localhost:3000")
     port: int = 3000
@@ -142,9 +144,16 @@ class TestHarness(BaseModel):
     notes: str = ""
     infra_tier: str = "7_none"  # InfraTier value set by InfraDetector
 
+    # Citation map: field path → file:line where the value was found
+    sources: dict[str, str] = Field(
+        default_factory=dict,
+        alias="_sources",
+        description="Citation map: field path → file:line where the value was found"
+    )
+
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        path.write_text(self.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
 
     @classmethod
     def load(cls, path: Path) -> Optional["TestHarness"]:
