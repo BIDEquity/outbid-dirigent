@@ -1,11 +1,19 @@
 ---
 name: generate-conventions
-description: Generate CONVENTIONS.md for the target repository — codified patterns, idioms, and conventions that agents must follow when writing code
+description: "DEPRECATED: Conventions are now part of ARCHITECTURE.md <key-patterns> section. Use /dirigent:generate-architecture instead."
 context: fork
 agent: infra-architect
 ---
 
-# Generate Conventions
+# Generate Conventions — DEPRECATED
+
+**This skill is deprecated.** Conventions are now written as the `<key-patterns>` section of ARCHITECTURE.md by the `/dirigent:generate-architecture` skill.
+
+If invoked, redirect to: `Run /dirigent:generate-architecture --update`
+
+---
+
+_Original description below for reference:_
 
 You produce `CONVENTIONS.md` — a focused file that tells any coding agent exactly **how** this codebase writes code. Not what it does (that's ARCHITECTURE.md), but how to write code that fits.
 
