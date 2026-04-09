@@ -1,0 +1,158 @@
+{
+  "phase_id": "quick",
+  "iteration": 1,
+  "verdict": "fail",
+  "confidence": "executed",
+  "infra_tier": "7_none",
+  "tests_run": 38,
+  "criteria_results": [
+    {
+      "ac_id": "QF-01",
+      "verdict": "pass",
+      "notes": "All 9 planned files are present: src/mcp/package.json, src/mcp/tsconfig.json, src/mcp/vitest.config.ts, src/mcp/src/client.ts, src/mcp/src/server.ts, src/mcp/src/cli.ts, src/mcp/src/__tests__/client.test.ts, src/mcp/src/__tests__/server.test.ts, src/mcp/src/__tests__/cli.test.ts, plus the modified src/app/api/repos/[repoId]/route.ts and root package.json scripts.",
+      "evidence": [
+        {
+          "command": "ls /Users/jk/projects/outbit-portal/src/mcp/src/ && ls /Users/jk/projects/outbit-portal/src/mcp/src/__tests__/ && ls /Users/jk/projects/outbit-portal/src/app/api/repos/",
+          "exit_code": 0,
+          "stdout_snippet": "__tests__/  cli.ts  client.ts  server.ts\ncli.test.ts  client.test.ts  server.test.ts\n[repoId]/",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-02",
+      "verdict": "pass",
+      "notes": "tsc -p src/mcp/tsconfig.json exited 0 with no output — clean compile.",
+      "evidence": [
+        {
+          "command": "npm run mcp:build",
+          "exit_code": 0,
+          "stdout_snippet": "> tsc -p src/mcp/tsconfig.json",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-03",
+      "verdict": "pass",
+      "notes": "All 38 tests across 3 files passed. Duration 534ms.",
+      "evidence": [
+        {
+          "command": "npm run mcp:test",
+          "exit_code": 0,
+          "stdout_snippet": "Test Files  3 passed (3)\n     Tests  38 passed (38)\n  Start at  13:02:23\n  Duration  534ms",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-04",
+      "verdict": "pass",
+      "notes": "client.test.ts has 18 tests covering all 6 client functions plus error/fallback paths. server.test.ts has 11 tests exercising all 6 MCP tools via InMemoryTransport. cli.test.ts has 9 tests covering all 6 subcommands.",
+      "evidence": [
+        {
+          "command": "npm run mcp:test",
+          "exit_code": 0,
+          "stdout_snippet": "✓ src/__tests__/client.test.ts (18 tests)\n✓ src/__tests__/cli.test.ts (9 tests)\n✓ src/__tests__/server.test.ts (11 tests)",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-05",
+      "verdict": "pass",
+      "notes": "src/app/api/repos/[repoId]/route.ts exists. It checks for X-Reporter-Token header (returns 401 if absent), validates the token against execution_logs.reporter_token, then verifies the execution's feature request is linked to the requested repoId before returning repo data.",
+      "evidence": [
+        {
+          "command": "ls /Users/jk/projects/outbit-portal/src/app/api/repos/\\[repoId\\]/route.ts",
+          "exit_code": 0,
+          "stdout_snippet": "route.ts",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-06",
+      "verdict": "pass",
+      "notes": "server.ts registers exactly 6 tools via server.tool(): get_feature_request, send_execution_event, get_execution_status, poll_answer, acknowledge_execution, get_repo.",
+      "evidence": [
+        {
+          "command": "grep -c \"server.tool(\" /Users/jk/projects/outbit-portal/src/mcp/src/server.ts",
+          "exit_code": 0,
+          "stdout_snippet": "6",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-07",
+      "verdict": "pass",
+      "notes": "cli.ts registers 6 subcommands: get-feature-request, send-event, get-status, poll-answer, acknowledge, get-repo. Each maps 1-to-1 to a client function and a MCP tool.",
+      "evidence": [
+        {
+          "command": "grep -c \".command(\" /Users/jk/projects/outbit-portal/src/mcp/src/cli.ts",
+          "exit_code": 0,
+          "stdout_snippet": "6",
+          "stderr_snippet": ""
+        }
+      ]
+    },
+    {
+      "ac_id": "QF-08",
+      "verdict": "fail",
+      "notes": "The branch introduces 9 new lint errors (1153 total vs 1144 on master), all @typescript-eslint/no-explicit-any violations in the new test files. Specifically: cli.test.ts lines 39, 76, 93, 120, 150, 164 and server.test.ts lines 44, 88, 170 all use 'as any' casts. The project's ESLint config treats no-explicit-any as an error. The pre-existing lint failures are on master and are not this branch's responsibility, but the net new errors introduced here are.",
+      "evidence": [
+        {
+          "command": "npm run lint 2>&1 | grep 'mcp.*any'",
+          "exit_code": 1,
+          "stdout_snippet": "/Users/jk/projects/outbit-portal/src/mcp/src/__tests__/cli.test.ts\n   39:68  error  Unexpected any.\n   76:13  error  Unexpected any.\n   93:69  error  Unexpected any.\n  120:13  error  Unexpected any.\n  150:58  error  Unexpected any.\n  164:13  error  Unexpected any.\n/Users/jk/projects/outbit-portal/src/mcp/src/__tests__/server.test.ts\n   44:68  error  Unexpected any.\n   88:69  error  Unexpected any.\n  170:58  error  Unexpected any.",
+          "stderr_snippet": ""
+        },
+        {
+          "command": "# master: 1144 problems (179 errors); feat/mcp: 1153 problems (188 errors) — delta: +9 errors",
+          "exit_code": 0,
+          "stdout_snippet": "master: 179 errors | feat/mcp: 188 errors | new errors: 9",
+          "stderr_snippet": ""
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "severity": "error",
+      "file": "src/mcp/src/__tests__/cli.test.ts",
+      "line": 39,
+      "description": "Six uses of 'as any' cast on mock return values (lines 39, 76, 93, 120, 150, 164). ESLint @typescript-eslint/no-explicit-any is configured as error.",
+      "suggestion": "Replace 'as any' with typed return values matching the actual function return types (e.g., 'as PendingExecutionResponse', 'as ExecutionStatusResponse', etc.) imported from client.ts."
+    },
+    {
+      "severity": "error",
+      "file": "src/mcp/src/__tests__/server.test.ts",
+      "line": 44,
+      "description": "Three uses of 'as any' cast on vi.mocked return values (lines 44, 88, 170). Same no-explicit-any violation.",
+      "suggestion": "Use the concrete return types from client.ts. For example, line 44: mockResolvedValue(mockData as PendingExecutionResponse)."
+    },
+    {
+      "severity": "warn",
+      "file": "src/mcp/src/__tests__/cli.test.ts",
+      "line": 75,
+      "description": "process.exit mock uses 'as any' to cast the mock implementation (lines 76, 120, 164). This is the same no-explicit-any rule.",
+      "suggestion": "Type the mock as 'never': mockImplementation((() => { throw new Error('process.exit called') }) as (...args: Parameters<typeof process.exit>) => never)."
+    },
+    {
+      "severity": "warn",
+      "file": "src/app/api/repos/[repoId]/route.ts",
+      "line": 13,
+      "description": "Error messages are in German ('X-Reporter-Token ist erforderlich', 'Ungültiger Token', etc.) while the rest of the API routes use English. This is an inconsistency in convention.",
+      "suggestion": "Align language with other routes or establish an explicit convention. Not a blocker."
+    },
+    {
+      "severity": "info",
+      "file": "src/mcp/src/server.ts",
+      "line": 121,
+      "description": "The isMainModule guard checks for process.argv[1] ending with /server.ts in addition to /server.js. After compilation, only /server.js will ever be present at runtime; the .ts check is dead code.",
+      "suggestion": "Remove the .ts suffix check from the isMainModule condition. Minor cosmetic issue."
+    }
+  ],
+  "summary": "7 of 8 criteria pass. All planned files exist, mcp:build compiles cleanly, all 38 tests pass (18 client + 11 server + 9 CLI), the repos/[repoId] route has correct X-Reporter-Token auth, all 6 MCP tools are registered, and all 6 CLI subcommands are present. QF-08 fails: the branch introduces 9 net-new @typescript-eslint/no-explicit-any lint errors (6 in cli.test.ts, 3 in server.test.ts) against a project config that treats this rule as an error. These are fixable with typed casts using the existing return types from client.ts."
+}

@@ -1,0 +1,3 @@
+[2026-04-07 17:33:08] ❌ Spec compactor error: 1 validation error for CompactSpec
+  Invalid JSON: EOF while parsing a string at line 1 column 29965 [type=json_invalid, input_value='{"meta":{"title":"Steuer...e":"DateTime","required', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid
