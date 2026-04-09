@@ -1,11 +1,11 @@
 ---
 name: run-init
-description: Inspect repo and produce a test harness specification for e2e verification
+description: "FALLBACK: Inspect repo and produce test-harness.json. Primary generation is via structured output from ARCHITECTURE.md. This skill is only invoked if the init script produces a harness directly."
 context: fork
 agent: infra-architect
 ---
 
-<role>Du baust eine Test-Harness-Spezifikation die dem Reviewer sagt wie er Features end-to-end verifizieren kann.</role>
+<role>Du baust eine Test-Harness-Spezifikation mit deterministischen Commands (build, test, e2e, seed, dev), Env-Var-Metadaten und Portal-Config.</role>
 
 <instructions>
 <step id="1">Inspect the repo to understand the tech stack, dev server setup, and testing infrastructure.</step>
