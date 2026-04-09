@@ -325,6 +325,7 @@ def run_execution(
     portal_url: str = "",
     execution_id: str = "",
     reporter_token: str = "",
+    force_continue: bool = False,
 ) -> bool:
     """Führt alle Schritte basierend auf der Route aus."""
     import json
@@ -334,6 +335,7 @@ def run_execution(
         str(repo_path), str(spec_path), dry_run, use_proteus, model, effort,
         portal_url=portal_url, execution_id=execution_id, reporter_token=reporter_token,
     )
+    executor.force_continue = force_continue
     questioner = get_questioner()
 
     # Use the run dir from executor for all artifact access
@@ -642,6 +644,12 @@ Beispiele:
     )
 
     parser.add_argument(
+        "--force-continue",
+        action="store_true",
+        help="Bei fehlgeschlagenem Phase-Review trotzdem weiter machen (nicht stoppen). Ergebnisse können unvollständig sein.",
+    )
+
+    parser.add_argument(
         "--output",
         choices=["json"],
         default=None,
@@ -879,6 +887,7 @@ Beispiele:
                     portal_url=args.portal_url or "",
                     execution_id=args.execution_id or "",
                     reporter_token=args.reporter_token or "",
+                    force_continue=args.force_continue,
                 )
                 if not success:
                     sys.exit(1)

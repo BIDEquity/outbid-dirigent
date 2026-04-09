@@ -122,6 +122,7 @@ class Executor:
         self.spec_path = Path(spec_path).resolve()
         self.use_proteus = use_proteus
         self.dry_run = dry_run
+        self.force_continue = False  # Set externally: continue past failed reviews
 
         # Portal connection info
         self.portal_url = portal_url
@@ -554,10 +555,13 @@ class Executor:
             if not review_passed:
                 state.setdefault("failed_phases", []).append({"phase_id": phase.id, "reason": "review_failed"})
                 save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
-                logger.error(f"Phase {phase.id} review failed — halting execution. Fix issues and --resume to retry.")
-                self._legacy_logger.stop(f"Phase {phase.id} review failed")
-                self._legacy_logger.run_complete(success=False)
-                return False
+                if self.force_continue:
+                    logger.warning(f"Phase {phase.id} review failed — continuing anyway (--force-continue)")
+                else:
+                    logger.error(f"Phase {phase.id} review failed — halting execution. Fix issues and --resume to retry.")
+                    self._legacy_logger.stop(f"Phase {phase.id} review failed")
+                    self._legacy_logger.run_complete(success=False)
+                    return False
 
             state.setdefault("completed_phases", []).append(phase.id)
             save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
