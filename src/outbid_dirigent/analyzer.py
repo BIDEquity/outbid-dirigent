@@ -855,7 +855,7 @@ class Analyzer:
         # Load test harness summary if available
         dirigent_dir = self._dirigent_dir or (self.repo_path / ".dirigent")
         harness = TestHarness.load(dirigent_dir / "test-harness.json")
-        harness_summary = harness.summary_for_reviewer() if harness else None
+        harness_summary = harness.summary_for_prompt() if harness else None
 
         # Read spec content
         spec_content = self.spec_path.read_text(encoding="utf-8")

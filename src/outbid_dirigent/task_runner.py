@@ -487,13 +487,13 @@ LIMIT 45;
                     '</knowledge-store>'
                 )
 
-        # Test harness context (e2e environment, auth, verification commands)
+        # Test harness context (build/test/dev commands, env vars)
         from outbid_dirigent.test_harness_schema import TestHarness
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
         if harness:
             sections.append(
-                f"<test-harness hint=\"running e2e environment — use for verification\">\n"
-                f"{harness.summary_for_reviewer()}\n"
+                f"<test-harness hint=\"project commands and environment\">\n"
+                f"{harness.summary_for_prompt()}\n"
                 f"</test-harness>"
             )
 
