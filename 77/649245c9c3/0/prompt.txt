@@ -69,3 +69,7 @@ baue! nutze statt pydantic ai lieber claude code direkt (kann man dort ein outpu
 ---
 
 oder noch besser: test-harness aus ARCHITECTURE.md generieren.
+
+---
+
+ja. weitermachen.
