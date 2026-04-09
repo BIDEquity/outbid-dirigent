@@ -1,0 +1,17 @@
+in one legacy refactor, we observed: 1) the llm chose greenield as path
+
+---
+
+in one legacy refactor, we observed: 1) the llm chose greenield as path 2) die Arhcitecture.md und das test-harness enthielten falcshe Infos über den Login-Endpunkt, due dann downstream geuztzt wurden und zu einer komplett falsch refactorten app gefpühr haben. Wäre das in der legacy-route auch passiert? wird dort auch arhcitecture.md geschribene?
+
+---
+
+in one legacy refactor, we observed: 1) the llm chose greenield as path 2) die Arhcitecture.md und das test-harness enthielten falcshe Infos über den Login-Endpunkt, due dann downstream geuztzt wurden und zu einer komplett falsch refactorten app gefpühr haben. Wäre das in der legacy-route auch passiert? wird dort auch arhcitecture.md geschribene? und wenn ha wann
+
+---
+
+/superpowers:brainstorm welche lösungen gäbe es noch? ein llm-verification step wöre auch immer dumm
+
+---
+
+go on
