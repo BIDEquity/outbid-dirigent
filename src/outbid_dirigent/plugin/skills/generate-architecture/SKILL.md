@@ -116,10 +116,13 @@ project/
 
 ## Entry Points
 
-{List every way execution enters the system. For each, state:
-- What triggers it (HTTP request, CLI command, cron, queue message)
-- Where the code lives (file path)
-- What it does in one sentence}
+{List every way execution enters the system as a table. Cite the source file+line for each.}
+
+| Trigger | Code | Purpose |
+|---------|------|---------|
+| `POST /api/auth/login` | `src/app/api/auth/login/route.ts:14` | Password login, returns JWT |
+| `GET /api/users` | `src/app/api/users/route.ts:8` | List users (admin only) |
+| CLI: `npm run seed` | `scripts/seed.ts:1` | Populate dev database |
 
 ## Module Architecture
 
@@ -140,10 +143,10 @@ For each entity, list the 3-5 most important fields, not every column.}
 - Show one concrete example (file path + brief code reference)
 - Explain when to use it (so the agent follows the pattern for new code)}
 
-Example patterns:
-- "All API routes use the `withAuth` middleware for authentication"
-- "Database queries go through repository classes, never direct Prisma calls in routes"
-- "Background jobs extend the `BaseJob` class and are registered in `jobs/index.ts`"
+Example patterns (each must cite a concrete source):
+- "All API routes use the `withAuth` middleware for authentication" [source: src/middleware.ts:23]
+- "Database queries go through repository classes, never direct Prisma calls in routes" [source: src/lib/repositories/userRepo.ts:1]
+- "Background jobs extend the `BaseJob` class and are registered in `jobs/index.ts`" [source: src/jobs/index.ts:5]
 
 ## API Surface
 
@@ -152,20 +155,20 @@ For libraries: list the public API functions/classes.
 For CLI tools: list the commands and subcommands.
 Don't list every endpoint — group them.}
 
-| Route Group | Purpose | Auth |
-|-------------|---------|------|
-| `/api/auth/*` | Authentication (login, register, session) | Public |
-| `/api/users/*` | User management | Admin |
-| `/api/projects/*` | Project CRUD and collaboration | User |
+| Route Group | Purpose | Auth | Source |
+|-------------|---------|------|--------|
+| `/api/auth/*` | Authentication (login, register, session) | Public | `src/app/api/auth/` |
+| `/api/users/*` | User management | Admin | `src/app/api/users/` |
+| `/api/projects/*` | Project CRUD and collaboration | User | `src/app/api/projects/` |
 
 ## Configuration
 
 {Where config lives, what env vars are required, and how config flows into the app.}
 
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key | Yes |
+| Variable | Purpose | Required | Source |
+|----------|---------|----------|--------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes | `src/lib/db.ts:5` |
+| `NEXTAUTH_SECRET` | Session encryption key | Yes | `src/auth.config.ts:12` |
 
 ## External Dependencies
 
@@ -198,7 +201,8 @@ Don't list every endpoint — group them.}
 After writing, verify:
 
 1. **Every file path mentioned exists** — grep for each path you cited
-2. **Every module/class/function mentioned exists** — they may have been renamed
+2. **Every line number is accurate** — read the cited line and verify it supports the claim
+3. **Every module/class/function mentioned exists** — they may have been renamed
 3. **Mermaid diagrams render** — check syntax is valid
 4. **Tech stack matches reality** — versions match package.json/pyproject.toml
 5. **Entry points are complete** — no missing route files, CLI commands, or workers
@@ -228,6 +232,7 @@ When `--update` is passed:
 ## Rules
 
 <rules>
+<rule>Every factual claim must cite its source: endpoint paths, auth methods, config vars, patterns, entry points. Use inline format: `[source: relative/path/to/file.ext:LINE]` or put the source in a table column. If you cannot find a source for a claim, do not make the claim.</rule>
 <rule>Every claim must be verified against the actual code — never guess or assume</rule>
 <rule>File paths must be checked with ls or glob before writing them into the doc</rule>
 <rule>Prefer showing 5 important things over listing 50 things exhaustively</rule>
