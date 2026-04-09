@@ -139,24 +139,10 @@ class PortalReporter:
         })
 
     def testing_complete(self, success: bool, dirigent_dir: Optional[Path] = None) -> bool:
-        """Send testing completion with infra context details."""
-        from outbid_dirigent.infra_schema import InfraContext
-
-        details = {}
-        if dirigent_dir:
-            infra_ctx = InfraContext.load(dirigent_dir / "infra-context.json")
-            if infra_ctx:
-                details["confidence"] = infra_ctx.confidence
-                details["infra_tier"] = infra_ctx.tier.value
-
-        if not details:
-            details["confidence"] = "unknown"
-            details["infra_tier"] = "7_none"
-
+        """Send testing completion."""
         return self.stage_complete(
             "testing",
             result="Tests passed" if success else "Tests failed",
-            details=details,
         )
 
     # ══════════════════════════════════════════

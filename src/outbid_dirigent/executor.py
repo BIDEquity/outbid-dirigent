@@ -27,7 +27,7 @@ from outbid_dirigent.planner import Planner
 from outbid_dirigent.progress import ProgressRenderer
 from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
 from outbid_dirigent.contract_schema import Review
-from outbid_dirigent.infra_schema import InfraContext
+
 from outbid_dirigent.router import load_state, save_state, mark_step_complete
 from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.shipper import Shipper
