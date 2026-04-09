@@ -835,9 +835,10 @@ Beispiele:
             route = Route(
                 route_type=route_type,
                 reason=f"Manuell festgelegt via --route {args.route}",
-                confidence="override",
                 steps=steps_map[route_type],
                 estimated_tasks=0,
+                oracle_needed=route_type in (RouteType.LEGACY, RouteType.HYBRID),
+                repo_context_needed=route_type != RouteType.QUICK,
             )
             router.save_route(route, dirigent_dir=run_dir.path)
             logger.info(f"Route manuell gesetzt: {args.route} ({len(route.steps)} Schritte)")
