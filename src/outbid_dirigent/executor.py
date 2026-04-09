@@ -246,19 +246,13 @@ class Executor:
             logger.error(f"Greenfield scaffold failed: {stderr[:200]}")
             return False
 
-        strategy = self.dirigent_dir / "testing-strategy.md"
-        decisions = self.dirigent_dir / "architecture-decisions.md"
-        produced = []
-        if strategy.exists():
-            produced.append("testing-strategy.md")
-        if decisions.exists():
-            produced.append("architecture-decisions.md")
-
-        if produced:
-            logger.info(f"Greenfield scaffold produced: {', '.join(produced)}")
+        # Scaffold writes into ARCHITECTURE.md sections
+        arch_path = self.repo_path / "ARCHITECTURE.md"
+        if arch_path.exists():
+            logger.info("Greenfield scaffold updated ARCHITECTURE.md")
             return True
 
-        logger.warning("Greenfield scaffold produced no artifacts")
+        logger.warning("Greenfield scaffold: ARCHITECTURE.md not found")
         return False
 
     # ══════════════════════════════════════════
