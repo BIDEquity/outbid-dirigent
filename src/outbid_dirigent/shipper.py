@@ -243,12 +243,14 @@ class Shipper:
         if harness_path.exists():
             from outbid_dirigent.test_harness_schema import TestHarness
             harness = TestHarness.load(harness_path)
-            if harness and harness.verification_commands:
+            if harness and harness.commands:
                 parts.append("### Verify")
                 parts.append("```bash")
-                for cmd in harness.verification_commands:
-                    parts.append(f"# {cmd.name}")
-                    parts.append(cmd.command)
+                for key in ("build", "test", "e2e"):
+                    if key in harness.commands:
+                        cmd = harness.commands[key]
+                        parts.append(f"# {key}: {cmd.explanation}")
+                        parts.append(cmd.command)
                 parts.append("```")
                 parts.append("")
 
