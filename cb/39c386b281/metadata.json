@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "cb39c386b281",
+  "strategy": "manual-commit",
+  "branch": "fix/090426",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outbid_dirigent/executor.py",
+    "src/outbid_dirigent/task_runner.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cb/39c386b281/0/metadata.json",
+      "transcript": "/cb/39c386b281/0/full.jsonl",
+      "content_hash": "/cb/39c386b281/0/content_hash.txt",
+      "prompt": "/cb/39c386b281/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2579,
+    "cache_creation_tokens": 584356,
+    "cache_read_tokens": 38627307,
+    "output_tokens": 91177,
+    "api_call_count": 243
+  }
+}
