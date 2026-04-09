@@ -1,17 +1,15 @@
 ---
 name: greenfield-scaffold
-description: For greenfield projects, propose a test setup and architecture best practices before planning. Produces ${DIRIGENT_RUN_DIR}/testing-strategy.md and ${DIRIGENT_RUN_DIR}/architecture-decisions.md consumed by the planner.
+description: For greenfield projects, propose a test setup and architecture best practices before planning. Writes testing-verification, architecture-decisions, and key-patterns sections into ARCHITECTURE.md.
 context: fork
 agent: infra-architect
 ---
 
 # Greenfield Scaffold
 
-You analyze a greenfield project and produce two artifacts that guide every downstream task:
-1. **Testing strategy** — what to test, how, with what tools
-2. **Architecture decisions** — patterns, module structure, conventions to establish
+You analyze a greenfield project and write the `<testing-verification>`, `<architecture-decisions>`, and `<key-patterns>` sections of ARCHITECTURE.md. These sections guide every downstream task — the planner, executor, and reviewer all read them.
 
-These artifacts become the project's engineering DNA. Every task the planner creates will reference them. Every coder instance will follow them. Get them right and the entire feature ships clean. Get them wrong and every task fights the architecture.
+Get them right and the entire feature ships clean. Get them wrong and every task fights the architecture.
 
 ## When This Runs
 
@@ -158,89 +156,87 @@ Read the spec and decide which patterns apply. Only propose patterns the feature
 4. **Configuration as data** — env vars → typed config object at startup. No `process.env.X` scattered through business logic.
 5. **Naming is documentation** — `getUserById(id)` needs no JSDoc. `process(data)` needs a rewrite.
 
-## Step 4: Write the Artifacts
+## Step 4: Write Into ARCHITECTURE.md
 
-### Artifact 1: `${DIRIGENT_RUN_DIR}/testing-strategy.md`
+Read the existing ARCHITECTURE.md (generated during init). Update these three sections with your findings. Preserve all other sections unchanged.
+
+### Section: `<testing-verification>`
+
+Replace the placeholder content with your concrete strategy:
 
 ```markdown
-# Testing Strategy
+<testing-verification>
+## Testing & Verification
 
-## Layers
+### Build
+{build command}                [source: package.json:X]
 
-{For each layer you chose, describe:}
+### Test Suite
+{test command}                 [source: package.json:X]
+Framework: {Vitest/pytest/etc.} — {why this one}
+Location: {test directory pattern}
+Covers: {what gets tested}
+Does NOT cover: {what's excluded and why}
 
-### {Layer Name} (e.g. "Unit Tests")
-- **Scope**: What gets tested at this layer
-- **Framework**: {specific tool} — {why this one}
-- **Location**: `{test directory pattern}` (e.g. `tests/unit/`, `__tests__/`, co-located `*.test.ts`)
-- **Run command**: `{exact command}` (e.g. `npm run test:unit`, `pytest tests/unit/`)
-- **Key patterns**:
-  - {pattern 1, e.g. "Use factories for test data, not raw objects"}
-  - {pattern 2, e.g. "One assertion per test — name describes the behavior"}
+### E2E Tests
+{e2e command if applicable}    [source: playwright.config.ts:X]
+Framework: {Playwright/Cypress} — {why}
+Requires: {running server, seed data, etc.}
 
-## Test Data
+### Seed Data
+{seed command}                 [source: package.json:X]
+Strategy: {factories / fixtures / seed script}
+Database: {real DB / SQLite-in-memory / etc.}
 
-- **Strategy**: {factories / fixtures / seed script / inline}
-- **Database**: {real DB in Docker / SQLite-in-memory / shared test DB}
-- **Cleanup**: {transaction rollback / truncate between tests / isolated DB per suite}
+### Dev Server
+{dev command}                  [source: package.json:X]
+Port: {port}                   [source: .env:X]
 
-## CI Integration
-
-- **When**: {on every push / on PR / nightly}
-- **Parallelization**: {split by file / split by layer / single sequential run}
-- **Required to pass**: {which layers block merge}
-
-## What NOT to Test
-
-- {e.g. "Third-party library internals — trust the library"}
-- {e.g. "CSS styling — use visual review, not snapshot tests"}
-- {e.g. "Generated code — test the generator, not the output"}
+### How to Verify Manually
+1. {step-by-step for a human}
+</testing-verification>
 ```
 
-### Artifact 2: `${DIRIGENT_RUN_DIR}/architecture-decisions.md`
+### Section: `<architecture-decisions>`
 
 ```markdown
-# Architecture Decisions
-
-## Patterns
-
-{For each pattern you chose, describe:}
+<architecture-decisions>
+## Architecture Decisions
 
 ### {Pattern Name} (e.g. "Repository Pattern for Data Access")
-- **When to use**: {exact trigger condition}
-- **Structure**:
-```{lang}
-{3-8 line code skeleton showing the pattern}
-```
-- **Example file**: `{path}` (if one exists in the repo already)
-- **Rationale**: {one sentence why}
+- **When to use**: {trigger condition}
+- **Rationale**: {why}
+- **Structure**: {3-8 line code skeleton}
 
-## File Organization
+### Project Bootstrap
+Scaffold command: `{e.g. npx create-next-app@latest . --ts --tailwind --app}`
 
+### File Organization
 ```
-{proposed directory tree for the new feature, 10-15 lines max}
+{proposed directory tree, 10-15 lines}
 ```
 
-## Conventions
-
-| Area | Convention |
-|------|-----------|
-| File naming | {e.g. kebab-case for files, PascalCase for components} |
-| Exports | {e.g. named exports, no default exports} |
-| Error handling | {e.g. typed errors with codes, no generic catch} |
-| Config access | {e.g. injected config object, no process.env in business logic} |
-| Logging | {e.g. structured JSON logs via pino/structlog} |
-
-## Dependencies to Add
-
+### Dependencies to Add
 | Package | Purpose | Why this one |
 |---------|---------|-------------|
-| {package} | {what it does} | {why not alternatives} |
+| {pkg} | {what} | {why not alternatives} |
 
-## Decisions NOT Made
+### Decisions NOT Made
+{What's deliberately left open and why}
+</architecture-decisions>
+```
 
-{List things you deliberately left open for the planner/coder to decide,
-and why. E.g. "ORM choice deferred — need to see query complexity in tasks"}
+### Section: `<key-patterns>`
+
+```markdown
+<key-patterns>
+## Key Patterns
+
+- {Naming}: {convention} [source: file:line or "scaffold decision"]
+- {Error handling}: {pattern} [source: file:line or "scaffold decision"]
+- {Config access}: {pattern} [source: file:line or "scaffold decision"]
+- {Exports}: {convention} [source: file:line or "scaffold decision"]
+</key-patterns>
 ```
 
 ## Step 5: Scaffold Command
@@ -279,8 +275,8 @@ Before writing:
 ## Step 7: Commit
 
 ```bash
-git add ${DIRIGENT_RUN_DIR}/testing-strategy.md ${DIRIGENT_RUN_DIR}/architecture-decisions.md
-git commit -m "docs: greenfield testing strategy and architecture decisions"
+git add ARCHITECTURE.md
+git commit -m "docs: greenfield scaffold — testing strategy, architecture decisions, key patterns"
 ```
 
 ## Rules
@@ -298,7 +294,7 @@ git commit -m "docs: greenfield testing strategy and architecture decisions"
 </rules>
 
 <constraints>
-<constraint>Output: ${DIRIGENT_RUN_DIR}/testing-strategy.md + ${DIRIGENT_RUN_DIR}/architecture-decisions.md</constraint>
+<constraint>Output: Update <testing-verification>, <architecture-decisions>, and <key-patterns> sections in ARCHITECTURE.md</constraint>
 <constraint>Maximum 15 minutes</constraint>
 <constraint>Both artifacts combined should be under 300 lines — these get consumed by the planner, not published as docs</constraint>
 </constraints>
