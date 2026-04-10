@@ -140,13 +140,14 @@ class RunDir:
             return None
 
         run_id = manifest.get("run_id", "")
-        run_dir_str = manifest.get("run_dir", "")
 
-        if not run_id or not run_dir_str:
-            logger.error("manifest.json missing run_id or run_dir")
+        if not run_id:
+            logger.error("manifest.json missing run_id")
             return None
 
-        run_path = Path(run_dir_str)
+        # Reconstruct from current home — never trust stored absolute paths
+        # (manifest may have been written on a different machine)
+        run_path = _get_runs_root() / run_id
         if not run_path.exists():
             logger.warning(f"Run dir {run_path} does not exist — creating fresh")
             run_path.mkdir(parents=True, exist_ok=True)
