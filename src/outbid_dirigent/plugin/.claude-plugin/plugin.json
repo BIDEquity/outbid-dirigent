@@ -1,7 +1,7 @@
 {
   "name": "dirigent",
   "description": "Orchestration skills for Dirigent subprocesses: plan creation, phase contracts, review/fix cycles, init/test harness, progress reporting, testability analysis, entropy minimization, and session recall.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "statusLine": {
     "type": "command",
     "command": "${CLAUDE_PLUGIN_ROOT}/hooks/dirigent-statusline.sh"
