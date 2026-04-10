@@ -71,36 +71,57 @@ Look for recurring patterns the codebase uses:
 
 Use this exact structure. Every section is required. If a section doesn't apply, include it with a note explaining why.
 
+**IMPORTANT: Use the EXACT section order and XML tags below. Do NOT add, remove, or reorder sections.**
+
 ```markdown
 # {Project Name} — Architecture
 
+<system-overview>
 > {One sentence: what this system does and for whom}
 
-## System Overview
-
 {Mermaid diagram showing the high-level components and how they connect.
-For web apps: client → API → services → database.
-For CLI tools: input → processing pipeline → output.
-For libraries: public API → internal modules.
 Keep it to 5-10 boxes max — this is the 30-second orientation.}
+</system-overview>
 
+<testing-verification>
+## Testing & Verification
+
+### Build
+{build command}                [source: file:line]
+
+### Test Suite
+{test command}                 [source: file:line]
+{What tests cover and what they don't}
+
+### E2E Tests
+{e2e command if applicable}    [source: file:line]
+{Requirements: running server, seed data, etc. Omit section if no e2e.}
+
+### Dev Server
+{dev command}                  [source: file:line]
+Port: {port}                   [source: file:line]
+
+### How to Verify Manually
+1. {step-by-step instructions for a human to verify the app works}
+</testing-verification>
+
+<tech-stack>
 ## Tech Stack
 
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| Language | {e.g. TypeScript 5.x} | |
-| Framework | {e.g. Next.js 14 (App Router)} | |
-| Database | {e.g. PostgreSQL via Prisma} | |
-| Cache | {e.g. Redis} | {if applicable} |
-| Auth | {e.g. NextAuth.js / Clerk / custom JWT} | |
-| Testing | {e.g. Vitest + Playwright} | |
-| Deployment | {e.g. Vercel / Docker / AWS} | |
-| Package Manager | {e.g. pnpm / uv / cargo} | |
+| Layer | Technology | Source |
+|-------|-----------|--------|
+| Language | {e.g. TypeScript 5.x} | `package.json:3` |
+| Framework | {e.g. Next.js 14} | `package.json:5` |
+| Database | {e.g. PostgreSQL via Prisma} | `prisma/schema.prisma:1` |
+| Auth | {e.g. NextAuth.js} | `src/auth.config.ts:1` |
+| Testing | {e.g. Vitest + Playwright} | `package.json:12` |
+| Package Manager | {e.g. pnpm} | `pnpm-lock.yaml` |
+</tech-stack>
 
+<directory-structure>
 ## Directory Structure
 
-{Show the top 2 levels of meaningful directories. Annotate each with its purpose.
-Skip node_modules, .git, __pycache__, etc.}
+{Top 2 levels with purpose annotations. Skip node_modules, .git, __pycache__.}
 
 ```
 project/
@@ -108,78 +129,89 @@ project/
 │   ├── app/           # Next.js App Router pages
 │   ├── components/    # React components
 │   ├── lib/           # Shared utilities and clients
-│   └── server/        # Server-side logic (API routes, services)
+│   └── server/        # Server-side logic
 ├── prisma/            # Database schema and migrations
 ├── tests/             # Test suites
 └── scripts/           # Developer tooling
 ```
+</directory-structure>
 
+<entry-points>
 ## Entry Points
 
-{List every way execution enters the system. For each, state:
-- What triggers it (HTTP request, CLI command, cron, queue message)
-- Where the code lives (file path)
-- What it does in one sentence}
+| Trigger | Code | Purpose |
+|---------|------|---------|
+| `POST /api/auth/login` | `src/app/api/auth/login/route.ts:14` | Password login, returns JWT |
+| `GET /api/users` | `src/app/api/users/route.ts:8` | List users (admin only) |
+| CLI: `npm run seed` | `scripts/seed.ts:1` | Populate dev database |
+</entry-points>
 
+<module-architecture>
 ## Module Architecture
 
 {Mermaid diagram showing how internal modules depend on each other.
-Group by layer (API/Routes → Services/Business Logic → Data/Infrastructure).
-Show the direction of dependencies — dependencies should point downward.}
+Group by layer. Dependencies should point downward.}
+</module-architecture>
 
+<data-model>
 ## Data Model
 
-{If the project has a database, show the key entities and their relationships.
-Use a mermaid ERD or class diagram. Only include the 5-10 most important entities.
-For each entity, list the 3-5 most important fields, not every column.}
+{Mermaid ERD or class diagram. 5-10 most important entities only.
+3-5 fields per entity. If no database, write "No database — stateless service."}
+</data-model>
 
+<key-patterns>
 ## Key Patterns
 
-{Describe 3-5 patterns that recur throughout the codebase. For each:
-- Name the pattern
-- Show one concrete example (file path + brief code reference)
-- Explain when to use it (so the agent follows the pattern for new code)}
+{3-5 patterns that recur throughout the codebase. Each MUST cite a source.
+This section replaces CONVENTIONS.md — include naming conventions, auth patterns,
+data access patterns, error handling patterns.}
 
-Example patterns:
-- "All API routes use the `withAuth` middleware for authentication"
-- "Database queries go through repository classes, never direct Prisma calls in routes"
-- "Background jobs extend the `BaseJob` class and are registered in `jobs/index.ts`"
+- {Pattern name}: {description} [source: file:line]
+- {Pattern name}: {description} [source: file:line]
+</key-patterns>
 
+<api-surface>
 ## API Surface
 
-{For web apps: list the main API route groups with their purpose.
-For libraries: list the public API functions/classes.
-For CLI tools: list the commands and subcommands.
-Don't list every endpoint — group them.}
+{Route groups for web apps, public API for libraries, commands for CLI tools.}
 
-| Route Group | Purpose | Auth |
-|-------------|---------|------|
-| `/api/auth/*` | Authentication (login, register, session) | Public |
-| `/api/users/*` | User management | Admin |
-| `/api/projects/*` | Project CRUD and collaboration | User |
+| Route Group | Purpose | Auth | Source |
+|-------------|---------|------|--------|
+| `/api/auth/*` | Authentication | Public | `src/app/api/auth/` |
+| `/api/users/*` | User management | Admin | `src/app/api/users/` |
+</api-surface>
 
+<configuration>
 ## Configuration
 
-{Where config lives, what env vars are required, and how config flows into the app.}
+| Variable | Purpose | Required | Source |
+|----------|---------|----------|--------|
+| `DATABASE_URL` | PostgreSQL connection | Yes | `src/lib/db.ts:5` |
+| `NEXTAUTH_SECRET` | Session encryption | Yes | `src/auth.config.ts:12` |
+</configuration>
 
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key | Yes |
-
+<external-dependencies>
 ## External Dependencies
-
-{Services this system talks to. For each: what, why, and what happens if it's down.}
 
 | Service | Purpose | Failure Mode |
 |---------|---------|-------------|
 | PostgreSQL | Primary data store | App down |
-| Redis | Session cache, rate limiting | Degraded (falls back to DB) |
-| Stripe | Payment processing | Payments fail, app continues |
+| Redis | Session cache | Degraded (falls back to DB) |
+</external-dependencies>
 
+<architecture-decisions>
+## Architecture Decisions
+
+{Key design decisions and their rationale. For greenfield projects, document
+choices made during scaffold. For existing projects, document discovered patterns.
+If none, write "No notable architecture decisions documented."}
+
+- {Decision}: {rationale} [source: file:line]
+</architecture-decisions>
+
+<development-workflow>
 ## Development Workflow
-
-{How to go from a fresh clone to a running system. Be specific — exact commands.}
 
 ```bash
 # Setup
@@ -191,6 +223,7 @@ Don't list every endpoint — group them.}
 # Test
 {exact commands}
 ```
+</development-workflow>
 ```
 
 ## Step 3: Validate
@@ -198,7 +231,8 @@ Don't list every endpoint — group them.}
 After writing, verify:
 
 1. **Every file path mentioned exists** — grep for each path you cited
-2. **Every module/class/function mentioned exists** — they may have been renamed
+2. **Every line number is accurate** — read the cited line and verify it supports the claim
+3. **Every module/class/function mentioned exists** — they may have been renamed
 3. **Mermaid diagrams render** — check syntax is valid
 4. **Tech stack matches reality** — versions match package.json/pyproject.toml
 5. **Entry points are complete** — no missing route files, CLI commands, or workers
@@ -228,6 +262,7 @@ When `--update` is passed:
 ## Rules
 
 <rules>
+<rule>Every factual claim must cite its source: endpoint paths, auth methods, config vars, patterns, entry points. Use inline format: `[source: relative/path/to/file.ext:LINE]` or put the source in a table column. If you cannot find a source for a claim, do not make the claim.</rule>
 <rule>Every claim must be verified against the actual code — never guess or assume</rule>
 <rule>File paths must be checked with ls or glob before writing them into the doc</rule>
 <rule>Prefer showing 5 important things over listing 50 things exhaustively</rule>

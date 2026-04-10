@@ -1,6 +1,6 @@
 [project]
 name = "outbid-dirigent"
-version = "1.5.0"
+version = "1.6.0"
 description = "Headless autonomous coding agent controller"
 readme = "README.md"
 license = "MIT"
@@ -35,7 +35,7 @@ packages = ["src/outbid_dirigent"]
 "src/outbid_dirigent/plugin" = "outbid_dirigent/plugin"
 
 [tool.bumpversion]
-current_version = "1.5.0"
+current_version = "1.6.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"
@@ -51,6 +51,16 @@ replace = 'version = "{new_version}"'
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+]
+
+# ══════════════════════════════════════════
+# TY (type checker) — exclude self-contained
+# uv-script files that declare their own deps
+# inline and are not part of the main package.
+# ══════════════════════════════════════════
+[tool.ty.src]
+exclude = [
+    "src/outbid_dirigent/plugin/mcp/",
 ]
 
 # ══════════════════════════════════════════

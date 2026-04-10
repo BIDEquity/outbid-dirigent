@@ -14,7 +14,7 @@ from typing import Optional
 
 from loguru import logger
 
-from outbid_dirigent.infra_schema import InfraContext
+from outbid_dirigent.test_harness_schema import TestHarness
 from outbid_dirigent.plan_schema import Plan
 
 
@@ -157,24 +157,25 @@ class Shipper:
         )
 
     def _build_verification_section(self) -> str:
-        """Build ## Verification section from InfraContext for PR body."""
-        ctx = InfraContext.load(self.dirigent_dir / "infra-context.json")
-        if ctx is None:
+        """Build ## Verification section from TestHarness for PR body."""
+        harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
+        if harness is None or not harness.commands:
             return ""
 
-        confidence_emoji = {"e2e": "✅", "integration": "✅", "unit": "✅", "mocked": "⚠️", "static": "⚠️", "none": "❌"}
-        emoji = confidence_emoji.get(ctx.confidence, "⚠️")
+        lines = ["## Verification", "```bash"]
+        for key in ("build", "test", "e2e"):
+            if key in harness.commands:
+                cmd = harness.commands[key]
+                lines.append(f"# {key}: {cmd.explanation}")
+                lines.append(cmd.command)
+        lines.append("```")
 
-        lines = ["## Verification", f"{emoji} Tests passed — {ctx.confidence} confidence ({ctx.tier.value})"]
-        if ctx.tests_run > 0 or ctx.tests_skipped_infra > 0:
-            lines.append(f"   {ctx.tests_run} tests run, {ctx.tests_skipped_infra} skipped due to missing infra")
-        if ctx.caveat:
-            lines.append(f"   _{ctx.caveat}_")
-        if ctx.gaps:
+        if harness.portal:
             lines.append("")
-            lines.append("**To verify at higher confidence:**")
-            for gap in ctx.gaps:
-                lines.append(f"- {gap.suggested_fix}")
+            lines.append("### Live Preview")
+            lines.append(f"```bash\n{harness.portal.start_command}\n```")
+            lines.append(f"→ `localhost:{harness.portal.port}{harness.portal.url_after_start}`")
+
         return "\n".join(lines) + "\n\n"
 
     def _is_greenfield_project(self) -> bool:
@@ -243,12 +244,14 @@ class Shipper:
         if harness_path.exists():
             from outbid_dirigent.test_harness_schema import TestHarness
             harness = TestHarness.load(harness_path)
-            if harness and harness.verification_commands:
+            if harness and harness.commands:
                 parts.append("### Verify")
                 parts.append("```bash")
-                for cmd in harness.verification_commands:
-                    parts.append(f"# {cmd.name}")
-                    parts.append(cmd.command)
+                for key in ("build", "test", "e2e"):
+                    if key in harness.commands:
+                        cmd = harness.commands[key]
+                        parts.append(f"# {key}: {cmd.explanation}")
+                        parts.append(cmd.command)
                 parts.append("```")
                 parts.append("")
 

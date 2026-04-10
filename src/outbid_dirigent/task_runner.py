@@ -201,6 +201,18 @@ class TaskRunner:
         rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
         return rules_file.read_text(encoding="utf-8") if rules_file.exists() else None
 
+    def _compact_spec_has_rules(self) -> bool:
+        """Check if the CompactSpec already contains business rules."""
+        compact_path = self.dirigent_dir / "SPEC.compact.json"
+        if not compact_path.exists():
+            return False
+        try:
+            import json
+            data = json.loads(compact_path.read_text(encoding="utf-8"))
+            return bool(data.get("business_rules"))
+        except Exception:
+            return False
+
     def _build_convention_skills_block(self, task: "Task") -> Optional[str]:
         """Build <convention-skills> block telling the agent which skills to load.
 
@@ -236,15 +248,20 @@ class TaskRunner:
         lines.append("</convention-skills>")
         return "\n".join(lines)
 
-    def _load_conventions(self, max_chars: int = 6000) -> Optional[str]:
-        """Load CONVENTIONS.md from repo root. Capped to stay within prompt budget."""
-        conv_file = self.repo_path / "CONVENTIONS.md"
-        if not conv_file.exists():
+    def _load_architecture_section(self, tag: str, max_chars: int = 6000) -> Optional[str]:
+        """Extract an XML-tagged section from ARCHITECTURE.md."""
+        arch_file = self.repo_path / "ARCHITECTURE.md"
+        if not arch_file.exists():
             return None
-        content = conv_file.read_text(encoding="utf-8")
-        if len(content) > max_chars:
-            content = content[:max_chars] + "\n... (truncated)"
-        return content
+        content = arch_file.read_text(encoding="utf-8")
+        import re
+        match = re.search(rf"<{tag}>(.*?)</{tag}>", content, re.DOTALL)
+        if not match:
+            return None
+        section = match.group(1).strip()
+        if len(section) > max_chars:
+            section = section[:max_chars] + "\n... (truncated)"
+        return section
 
     def _get_recent_diff(self, max_commits: int = 3, max_chars: int = 4000) -> str:
         try:
@@ -450,23 +467,23 @@ LIMIT 45;
         if skill_block:
             sections.append(skill_block)
         else:
-            # Fallback: inject CONVENTIONS.md directly if no OpenCode skills
-            conventions = self._load_conventions()
-            if conventions:
-                sections.append(f"<conventions hint=\"follow these patterns when writing code\">\n{conventions}\n</conventions>")
+            # Fallback: inject <key-patterns> from ARCHITECTURE.md
+            patterns = self._load_architecture_section("key-patterns")
+            if patterns:
+                sections.append(f"<key-patterns hint=\"follow these patterns when writing code\">\n{patterns}\n</key-patterns>")
 
-        # Greenfield scaffold context (testing strategy + architecture decisions)
-        for artifact, tag, hint in [
-            ("testing-strategy.md", "testing-strategy", "follow this test strategy"),
-            ("architecture-decisions.md", "architecture-decisions", "follow these architecture patterns"),
+        # Architecture context — testing strategy + architecture decisions from ARCHITECTURE.md
+        for tag, hint in [
+            ("testing-verification", "follow this test strategy"),
+            ("architecture-decisions", "follow these architecture patterns"),
         ]:
-            artifact_path = self.dirigent_dir / artifact
-            if artifact_path.exists():
-                content = artifact_path.read_text(encoding="utf-8")[:3000]
-                sections.append(f"<{tag} hint=\"{hint}\">\n{content}\n</{tag}>")
+            section = self._load_architecture_section(tag, max_chars=3000)
+            if section:
+                sections.append(f"<{tag} hint=\"{hint}\">\n{section}\n</{tag}>")
 
-        # Business rules
-        if business_rules:
+        # Business rules — only inject separately if CompactSpec doesn't contain them
+        # (CompactSpec now includes business_rules from Proteus extraction)
+        if business_rules and not self._compact_spec_has_rules():
             sections.append(f"<business-rules hint=\"MUESSEN erhalten bleiben!\">\n{business_rules[:2000]}\n</business-rules>")
 
         # Session recall — lessons from past runs
@@ -487,13 +504,13 @@ LIMIT 45;
                     '</knowledge-store>'
                 )
 
-        # Test harness context (e2e environment, auth, verification commands)
+        # Test harness context (build/test/dev commands, env vars)
         from outbid_dirigent.test_harness_schema import TestHarness
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
         if harness:
             sections.append(
-                f"<test-harness hint=\"running e2e environment — use for verification\">\n"
-                f"{harness.summary_for_reviewer()}\n"
+                f"<test-harness hint=\"project commands and environment\">\n"
+                f"{harness.summary_for_prompt()}\n"
                 f"</test-harness>"
             )
 

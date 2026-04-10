@@ -34,6 +34,7 @@ ReqCategory = Literal[
     "policy",
     "workflow",
     "validation",
+    "testing",
     "other",
 ]
 ReqPriority = Literal["must", "should", "may"]
@@ -81,6 +82,24 @@ class CompactMeta(BaseModel):
     out_of_scope: list[str] = Field(default_factory=list)
 
 
+class BusinessRule(BaseModel):
+    """A business rule extracted from the existing codebase (Legacy route)."""
+    id: str = Field(description="Stable ID like BR1, BR2, BR3")
+    text: str = Field(description="The business rule as found in the codebase")
+    source: str = Field("", description="File:line where this rule is implemented")
+    related_reqs: list[str] = Field(
+        default_factory=list,
+        description="Requirement IDs (R1, R2, ...) that this rule constrains or implements",
+    )
+
+
+class TestingConsideration(BaseModel):
+    """A testing consideration for the implementation."""
+    aspect: str = Field(description="What needs testing (e.g. 'auth flow', 'data migration')")
+    approach: str = Field(description="How to test it (e.g. 'integration test with real DB')")
+    risk: str = Field("", description="What could go wrong if not tested")
+
+
 class CompactSpec(BaseModel):
     """Structured, token-efficient representation of a markdown spec."""
 
@@ -89,6 +108,14 @@ class CompactSpec(BaseModel):
     requirements: list[Requirement] = Field(default_factory=list)
     entities: list[Entity] = Field(default_factory=list)
     flows: list[Flow] = Field(default_factory=list)
+    business_rules: list[BusinessRule] = Field(
+        default_factory=list,
+        description="Business rules from existing codebase (Legacy route only)",
+    )
+    testing: list[TestingConsideration] = Field(
+        default_factory=list,
+        description="Testing considerations for the implementation",
+    )
 
     def render_xml(self, only_req_ids: Optional[set[str]] = None) -> str:
         """Render this compact spec as XML for injection into a task prompt.
@@ -166,6 +193,31 @@ class CompactSpec(BaseModel):
                 lines.append("    </flow>")
             lines.append("  </flows>")
 
+        # Business rules (always full — these MUST be preserved)
+        if self.business_rules:
+            lines.append(
+                '  <business-rules hint="these rules exist in the codebase and MUST be preserved">'
+            )
+            for br in self.business_rules:
+                related = f' related-reqs="{",".join(br.related_reqs)}"' if br.related_reqs else ""
+                source = f' source="{_esc(br.source)}"' if br.source else ""
+                lines.append(
+                    f'    <rule id="{_esc(br.id)}"{related}{source}>{_esc(br.text)}</rule>'
+                )
+            lines.append("  </business-rules>")
+
+        # Testing considerations
+        if self.testing:
+            lines.append(
+                '  <testing hint="testing strategy for this implementation">'
+            )
+            for t in self.testing:
+                risk = f' risk="{_esc(t.risk)}"' if t.risk else ""
+                lines.append(
+                    f'    <consideration aspect="{_esc(t.aspect)}"{risk}>{_esc(t.approach)}</consideration>'
+                )
+            lines.append("  </testing>")
+
         lines.append("</spec-compact>")
         return "\n".join(lines)
 
@@ -223,7 +275,7 @@ O(requirements) instead of O(prose).
 
 ## Categories
 
-data-model, api, ui, auth, integration, infra, policy, workflow, validation, other
+data-model, api, ui, auth, integration, infra, policy, workflow, validation, testing, other
 
 ## Glossary criteria
 
@@ -238,6 +290,21 @@ Emit <entities> only if the spec defines data models, schemas, or enumerated
 types. Emit <flows> only if the spec defines step-by-step processes or state
 machines. Both are OPTIONAL — empty lists are fine.
 
+## Business rules (Legacy route)
+
+If business rules are provided (from Proteus extraction of an existing codebase):
+- Create a BusinessRule for each rule with a stable ID (BR1, BR2, ...)
+- Link each rule to the requirements it constrains via `related_reqs`
+- Preserve the source file:line reference
+- These rules represent EXISTING behavior that MUST be preserved during refactoring
+
+## Testing considerations
+
+Always emit testing considerations. For each major area of the spec, identify:
+- What needs testing and how (integration, unit, e2e)
+- What could go wrong if not tested
+- This helps downstream agents write tests alongside implementation
+
 ## Token budget
 
 Aim for 30-50% of source token count. Drop prose. Keep behavior.
@@ -248,6 +315,7 @@ def compact_spec(
     spec_content: str,
     model: str = "claude-haiku-4-5",
     dirigent_dir: Optional[Path] = None,
+    business_rules: Optional[str] = None,
 ) -> Optional[CompactSpec]:
     """Compact a markdown spec into a structured CompactSpec via one LLM call.
 
@@ -255,13 +323,20 @@ def compact_spec(
         spec_content: Full markdown spec text.
         model: Model to use (haiku for speed/cost).
         dirigent_dir: Where to save SPEC.compact.json. If None, no file is written.
+        business_rules: Proteus-extracted business rules as JSON string (Legacy route).
+            When provided, the compactor links rules to requirements and includes
+            them in the CompactSpec.
 
     Returns:
         CompactSpec on success, None on API error or refusal.
     """
     logger = get_logger()
 
-    user_prompt = f"<spec>\n{spec_content}\n</spec>\n\nCompact this spec per the rules."
+    parts = [f"<spec>\n{spec_content}\n</spec>"]
+    if business_rules:
+        parts.append(f"\n<business-rules-input>\n{business_rules}\n</business-rules-input>")
+    parts.append("\n\nCompact this spec per the rules.")
+    user_prompt = "".join(parts)
 
     try:
         client = anthropic.Anthropic()

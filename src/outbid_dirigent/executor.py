@@ -27,7 +27,7 @@ from outbid_dirigent.planner import Planner
 from outbid_dirigent.progress import ProgressRenderer
 from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
 from outbid_dirigent.contract_schema import Review
-from outbid_dirigent.infra_schema import InfraContext
+
 from outbid_dirigent.router import load_state, save_state, mark_step_complete
 from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.shipper import Shipper
@@ -246,19 +246,13 @@ class Executor:
             logger.error(f"Greenfield scaffold failed: {stderr[:200]}")
             return False
 
-        strategy = self.dirigent_dir / "testing-strategy.md"
-        decisions = self.dirigent_dir / "architecture-decisions.md"
-        produced = []
-        if strategy.exists():
-            produced.append("testing-strategy.md")
-        if decisions.exists():
-            produced.append("architecture-decisions.md")
-
-        if produced:
-            logger.info(f"Greenfield scaffold produced: {', '.join(produced)}")
+        # Scaffold writes into ARCHITECTURE.md sections
+        arch_path = self.repo_path / "ARCHITECTURE.md"
+        if arch_path.exists():
+            logger.info("Greenfield scaffold updated ARCHITECTURE.md")
             return True
 
-        logger.warning("Greenfield scaffold produced no artifacts")
+        logger.warning("Greenfield scaffold: ARCHITECTURE.md not found")
         return False
 
     # ══════════════════════════════════════════
@@ -346,40 +340,9 @@ class Executor:
     # ══════════════════════════════════════════
 
     def extract_business_rules(self) -> bool:
-        """Extract business rules from the codebase (Legacy route)."""
+        """Extract business rules via Proteus, then re-compact spec with rules."""
         self._legacy_logger.extract_start()
 
-        if self.use_proteus:
-            return self._extract_with_proteus()
-
-        # Primary language from analysis
-        analysis_file = self.dirigent_dir / "ANALYSIS.json"
-        language = "unbekannt"
-        if analysis_file.exists():
-            with open(analysis_file, encoding="utf-8") as f:
-                language = json.load(f).get("primary_language", "unbekannt")
-
-        # Invoke the skill natively — it reads context from disk
-        prompt = f"Run /dirigent:extract-business-rules {language}"
-
-        success, _, stderr = self.runner._run_claude(prompt, timeout=900)
-        if not success:
-            logger.error(f"Business Rule extraction failed: {stderr}")
-            return False
-
-        rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
-        if rules_file.exists():
-            content = rules_file.read_text(encoding="utf-8")
-            rule_count = content.count("- ") + content.count("* ")
-            self._legacy_logger.extract_done(rule_count)
-            logger.info(f"Business Rules extracted ({rule_count} rules)")
-            return True
-
-        logger.error("BUSINESS_RULES.md was not created")
-        return False
-
-    def _extract_with_proteus(self) -> bool:
-        """Use Proteus for deep domain extraction."""
         logger.info("Using Proteus for domain extraction...")
         proteus = create_proteus_integration(str(self.repo_path), self.dry_run)
 
@@ -394,34 +357,38 @@ class Executor:
             f"{summary['events_count']} Events, "
             f"{summary['dependencies_count']} Dependencies"
         )
-        self._create_business_rules_from_proteus(proteus)
+        self._legacy_logger.extract_done(summary["rules_count"])
+
+        # Re-compact spec with business rules from Proteus
+        proteus_rules = self._load_proteus_rules_json()
+        if proteus_rules:
+            logger.info("Re-compacting spec with Proteus business rules...")
+            from outbid_dirigent.spec_compactor import compact_spec
+            try:
+                compact_spec(
+                    self.spec_content,
+                    dirigent_dir=self.dirigent_dir,
+                    business_rules=proteus_rules,
+                )
+            except Exception as e:
+                logger.warning(f"Re-compaction with rules failed: {e}")
+
         return True
 
-    def _create_business_rules_from_proteus(self, proteus: ProteusIntegration):
-        """Create BUSINESS_RULES.md from Proteus data."""
+    def _load_proteus_rules_json(self) -> Optional[str]:
+        """Load Proteus extraction data as JSON string for the compactor."""
         proteus_dir = self.repo_path / ".proteus"
-        parts = [f"# Business Rules – {self.repo_path.name}\n", "*Extracted via Proteus*\n"]
-
-        arch_file = proteus_dir / "arch.md"
-        if arch_file.exists():
-            parts.extend(["## Architektur\n", arch_file.read_text(encoding="utf-8")[:3000], "\n"])
-
-        for name, section in [("rules.json", "Business Rules"), ("events.json", "Domain Events")]:
+        parts = {}
+        for name in ("rules.json", "fields.json", "events.json", "dependencies.json"):
             fpath = proteus_dir / name
             if fpath.exists():
                 try:
-                    with open(fpath) as f:
-                        data = json.load(f)
-                    key = "rules" if "rules" in name else "events"
-                    parts.append(f"\n## {section}\n")
-                    for item in data.get(key, []):
-                        parts.append(f"- **{item.get('name', 'Unknown')}**: {item.get('description', item.get('trigger', ''))}\n")
+                    parts[name] = json.loads(fpath.read_text(encoding="utf-8"))
                 except Exception:
                     pass
-
-        rules_file = self.dirigent_dir / "BUSINESS_RULES.md"
-        rules_file.write_text("".join(parts), encoding="utf-8")
-        logger.info("BUSINESS_RULES.md created from Proteus data")
+        if not parts:
+            return None
+        return json.dumps(parts, indent=2)
 
     # ══════════════════════════════════════════
     # QUICK SCAN (Hybrid Route)
@@ -639,30 +606,24 @@ class Executor:
     # ══════════════════════════════════════════
 
     def run_tests(self) -> bool:
-        """Run verification commands from the test harness. Returns True if passed or no harness."""
+        """Run build and test commands from the test harness. Returns True if passed or no harness."""
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
-        if not harness or not harness.verification_commands:
-            logger.info("No test harness or verification commands, skipping test step")
+        if not harness or not harness.commands:
+            logger.info("No test harness or commands, skipping test step")
             return True
 
-        logger.info(f"Running {len(harness.verification_commands)} verification commands...")
         all_passed = True
 
-        for cmd in harness.verification_commands:
-            if not self._run_verification_cmd(cmd.command, cmd.name, timeout=120):
-                all_passed = False
-
-        if harness.e2e_framework.run_command and harness.e2e_framework.framework != "none":
-            logger.info(f"Running e2e suite: {harness.e2e_framework.run_command}")
-            if not self._run_verification_cmd(harness.e2e_framework.run_command, "e2e suite", timeout=600):
-                all_passed = False
+        # Run build, test, and e2e commands in order
+        for key in ("build", "test", "e2e"):
+            if key in harness.commands:
+                cmd = harness.commands[key]
+                logger.info(f"Running {key}: {cmd.command}")
+                timeout = 600 if key == "e2e" else 120
+                if not self._run_verification_cmd(cmd.command, key, timeout=timeout):
+                    all_passed = False
 
         logger.info("All verification commands passed") if all_passed else logger.error("Verification failed — blocking ship")
-
-        # Log infra confidence tier
-        infra_ctx = InfraContext.load(self.dirigent_dir / "infra-context.json")
-        if infra_ctx:
-            logger.info(f"Test confidence: {infra_ctx.confidence} (tier: {infra_ctx.tier.value})")
 
         # Notify portal that testing is complete
         from outbid_dirigent.dirigent import get_portal_reporter

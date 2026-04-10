@@ -1,11 +1,11 @@
 ---
 name: run-init
-description: Inspect repo and produce a test harness specification for e2e verification
+description: "FALLBACK: Inspect repo and produce test-harness.json. Primary generation is via structured output from ARCHITECTURE.md. This skill is only invoked if the init script produces a harness directly."
 context: fork
 agent: infra-architect
 ---
 
-<role>Du baust eine Test-Harness-Spezifikation die dem Reviewer sagt wie er Features end-to-end verifizieren kann.</role>
+<role>Du baust eine Test-Harness-Spezifikation mit deterministischen Commands (build, test, e2e, seed, dev), Env-Var-Metadaten und Portal-Config.</role>
 
 <instructions>
 <step id="1">Inspect the repo to understand the tech stack, dev server setup, and testing infrastructure.</step>
@@ -16,6 +16,7 @@ agent: infra-architect
 <step id="6">Build verification commands — concrete curl/CLI commands the reviewer can run to test the running system.</step>
 <step id="7">Detect e2e framework (Playwright/Puppeteer/Cypress) and its run command.</step>
 <step id="8">Assess testability: score 0-10 based on what's available, write rationale, description, and gaps.</step>
+<step id="8b">For every value you write into the harness, record the source file and line where you found it. Store these in the `_sources` field as a flat key-value map.</step>
 <step id="9">Write `${DIRIGENT_RUN_DIR}/test-harness.json` with the exact schema below.</step>
 </instructions>
 
@@ -93,7 +94,16 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
     "e.g. No e2e auth setup — reviewer can only test public endpoints"
   ],
   "status": "ready",
-  "notes": ""
+  "notes": "",
+  "_sources": {
+    "base_url": ".env:3",
+    "port": "package.json:7 (dev script --port flag)",
+    "auth.method": "src/app/api/auth/[...nextauth]/route.ts:1",
+    "auth.login_command": "src/app/api/auth/login/route.ts:14",
+    "seed.seed_command": "package.json:12 (scripts.seed)",
+    "health_checks[0]": "src/app/api/health/route.ts:1",
+    "verification_commands[0]": "src/app/api/users/route.ts:8"
+  }
 }
 </output>
 
@@ -114,6 +124,7 @@ Playwright: playwright.config.ts + "npx playwright test". Cypress: cypress.confi
 <rule>The login_command must be a complete curl command the reviewer can copy-paste</rule>
 <rule>If no auth is needed (public API), set method to "none"</rule>
 <rule>If a prior test-harness.json exists, read it for context on previous init runs</rule>
+<rule>Every harness value must have a corresponding entry in `_sources` citing the file:line where the claim originates. If you cannot find a source, set the value to empty string and note the gap in `_sources` as "NOT_FOUND: searched X, Y, Z".</rule>
 </rules>
 
 <constraints>

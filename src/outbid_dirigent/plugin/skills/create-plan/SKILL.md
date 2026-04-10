@@ -83,11 +83,11 @@ Read all available context files:
 2. **Optional:** `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
 3. **Optional:** `${DIRIGENT_RUN_DIR}/CONTEXT.md` — relevant file analysis (Hybrid route)
 4. **Optional:** `${DIRIGENT_RUN_DIR}/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
-5. **Optional:** `ARCHITECTURE.md` — system architecture (if not already read in Step 0)
-6. **Optional:** `CONVENTIONS.md` — project coding conventions and patterns. If present, task descriptions MUST reference relevant conventions so coder instances follow established patterns.
-7. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
-8. **Optional:** `${DIRIGENT_RUN_DIR}/testing-strategy.md` — proposed test layers, frameworks, patterns (Greenfield route). Tasks must follow this strategy.
-9. **Optional:** `${DIRIGENT_RUN_DIR}/architecture-decisions.md` — proposed patterns, file organization, conventions (Greenfield route). Tasks must follow these decisions.
+5. **Optional:** `ARCHITECTURE.md` — system architecture with XML-tagged sections. Key sections for planning:
+   - `<testing-verification>` — build/test/e2e commands, test strategy. Tasks must follow this.
+   - `<architecture-decisions>` — patterns, file organization, scaffold decisions. Tasks must follow these.
+   - `<key-patterns>` — coding conventions and patterns. Task descriptions MUST reference relevant patterns.
+6. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
 10. **Optional:** `.brv/context-tree/` — if this directory exists and `brv` CLI is available, run `brv query "What are the key domain patterns, rules, and architectural decisions for this project?"` to gather domain knowledge. Incorporate relevant findings into task descriptions so coder instances have domain context.
 
 ## Step 2: Analyze the Repo
