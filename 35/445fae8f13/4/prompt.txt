@@ -1,0 +1,50 @@
+fix uv run kzbg.py
+
+---
+
+can you run tslp on the dirigent? Wanna undersand how rich the output os
+
+---
+
+please run it on /Users/jk/projects/fmv-refactor/ios
+
+---
+
+and all that in short time and no llm calls? how "large" would the entire output be?
+
+---
+
+can you generate the compact version and output it as .txt file in this repo?
+
+what other functions does tslp have?
+
+---
+
+try guessing the auth flow from just looking at the output? does the output encode interdependencies between files?
+
+---
+
+and ast grep? i also have this tool installed
+
+---
+
+cool. use this interplay to get all database interactions in the ios codebase (everything that read/updates/deletes data in databases/apis) and understand their data flows.
+
+---
+
+describe the flow you have used quickly (tslp for mapping, ast-grep for structure). 
+
+
+wouldnt it be best practice to do the map as xml?
+
+---
+
+what other format for llms would you have in mind?
+
+---
+
+i would personally prefer parsing the filemap (tslp output) as xml and the iterate from there for more specific questions
+
+---
+
+describe the flow one more time for another llm
