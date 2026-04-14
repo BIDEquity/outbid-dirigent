@@ -1,0 +1,1 @@
+Calculate the AI readiness score for the project. AI Readiness Score is a number between 0 and 10 that indicates how ready the project is to be developed by AI.
