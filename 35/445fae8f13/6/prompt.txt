@@ -1,0 +1,1 @@
+improve the prompts in a.py and output the scaffolding script more cleanly. in scaffolding-improvements.txt name three ideas to make the scaffolding step more test- and reliable. make the scaffold script __technology agnostic__ (use append-system-prompt) and add the technology to refactor to as prompt.
