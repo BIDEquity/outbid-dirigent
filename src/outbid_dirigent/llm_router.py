@@ -15,6 +15,7 @@ import anthropic
 from pydantic import BaseModel, Field
 
 from outbid_dirigent.logger import get_logger
+from outbid_dirigent.utils import strict_json_schema
 
 
 class RouteChoice(str, Enum):
@@ -97,14 +98,15 @@ def determine_route_llm(
             max_tokens=500,
             system=ROUTE_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": "\n\n".join(user_parts)}],
-            output_format=RouteDecision,
+            output_config={"format": {"type": "json_schema", "schema": strict_json_schema(RouteDecision.model_json_schema())}},
         )
 
         duration_ms = int((datetime.now() - start).total_seconds() * 1000)
-        decision = response.parsed_output
 
-        if decision is None:
-            logger.error("LLM router: model refused to produce a route decision")
+        try:
+            decision = RouteDecision.model_validate_json(response.content[0].text)
+        except Exception as e:
+            logger.error(f"LLM router: failed to parse route decision: {e}")
             return None
 
         # Log usage

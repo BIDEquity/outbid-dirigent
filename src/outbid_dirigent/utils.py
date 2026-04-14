@@ -63,3 +63,22 @@ def extract_phase_number(phase_id: Union[str, int]) -> int:
         return int(match.group(1))
 
     raise ValueError(f"Cannot extract phase number from '{phase_id}'")
+
+
+def strict_json_schema(schema: dict) -> dict:
+    """Recursively add additionalProperties: false to all object-type schemas.
+
+    The Anthropic API requires this when using output_config.format.schema.
+    Pydantic's model_json_schema() does not add it by default.
+    """
+    schema = dict(schema)
+    if schema.get("type") == "object" and "additionalProperties" not in schema:
+        schema["additionalProperties"] = False
+    for key in ("properties", "definitions", "$defs"):
+        if key in schema:
+            schema[key] = {k: strict_json_schema(v) for k, v in schema[key].items()}
+    if "items" in schema:
+        schema["items"] = strict_json_schema(schema["items"])
+    if "anyOf" in schema:
+        schema["anyOf"] = [strict_json_schema(s) for s in schema["anyOf"]]
+    return schema

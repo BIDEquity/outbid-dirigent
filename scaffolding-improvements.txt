@@ -1,0 +1,22 @@
+Three ideas to make the scaffolding step more testable and reliable
+====================================================================
+
+1. Wire step_check_command as the idempotency guard, not just a post-hoc probe
+   Before running step_command, evaluate step_check_command first. If it exits 0,
+   skip the step entirely and log "already satisfied". This turns the plan into a
+   fully re-runnable script safe for CI reruns, partial failures, and developer
+   machines that may already have some steps done — without any extra schema fields.
+
+2. Emit scaffold.sh with set -euo pipefail and per-step verify gates
+   Serialise the steps into a standalone script: run step_command, immediately run
+   step_check_command, abort on non-zero. Pipe stdout/stderr per step to a timestamped
+   log file. A standalone script is version-controllable, reviewable in a PR, and
+   trivially runnable in CI — unlike an interactive printout that must be copy-pasted.
+
+3. Dry-run validation before any execution
+   Before running a single command, parse every step_check_command through
+   `bash -n` to catch syntax errors. Flag steps whose check command is empty,
+   contains placeholder text (e.g. "<YOUR_APP>"), or is identical to step_command
+   (a common LLM mistake that turns the verify gate into a no-op). Abort and surface
+   the full list of invalid steps so the user can fix or re-prompt before any
+   real work begins.

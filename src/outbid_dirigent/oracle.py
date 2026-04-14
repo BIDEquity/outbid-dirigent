@@ -5,16 +5,26 @@ Architektur-Entscheidungen via Claude API direkt.
 Cached alle Entscheidungen in DECISIONS.json.
 """
 
-import os
+import asyncio
 import json
 import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-import anthropic
+from pydantic import BaseModel
+
+from claude_agent_sdk import query as sdk_query
+from claude_agent_sdk.types import ClaudeAgentOptions, ResultMessage
 
 from outbid_dirigent.logger import get_logger
+from outbid_dirigent.utils import strict_json_schema
+
+
+class OracleDecision(BaseModel):
+    decision: str
+    reason: str
+    confidence: str  # "high" | "medium" | "low"
 
 
 def _get_questioner():
@@ -32,11 +42,10 @@ class Oracle:
     Nutzt Claude API direkt (nicht Claude Code) für schnelle Antworten.
     """
 
-    def __init__(self, repo_path: str, model: str = "claude-sonnet-4-20250514", dirigent_dir: Optional[Path] = None):
+    def __init__(self, repo_path: str, model: str = "claude-sonnet-4-6", dirigent_dir: Optional[Path] = None):
         self.repo_path = Path(repo_path)
         self.model = model
         self.logger = get_logger()
-        self.client = anthropic.Anthropic()
         self._dirigent_dir = dirigent_dir or (self.repo_path / ".dirigent")
 
         # Lade oder initialisiere Decision Cache
@@ -135,6 +144,21 @@ class Oracle:
 
         return "\n\n".join(context_parts)
 
+    async def _aquery(self, prompt: str) -> Optional["OracleDecision"]:
+        """Run oracle query via claude_agent_sdk. Returns parsed OracleDecision or None."""
+        options = ClaudeAgentOptions(
+            model=self.model or None,
+            cwd=str(self.repo_path),
+            allowed_tools=[],
+            permission_mode="bypassPermissions",
+            output_format={"type": "json_schema", "schema": strict_json_schema(OracleDecision.model_json_schema())},
+        )
+        async for message in sdk_query(prompt=prompt, options=options):
+            if isinstance(message, ResultMessage) and not message.is_error:
+                if message.structured_output:
+                    return OracleDecision.model_validate(message.structured_output)
+        return None
+
     def query(
         self,
         question: str,
@@ -179,70 +203,25 @@ class Oracle:
 <question>{question}</question>
 {options_text}
 
-<output-format>
-Antworte als JSON:
-{{
-    "decision": "Deine Entscheidung (kurz und praezise)",
-    "reason": "Begruendung (1-2 Saetze)",
-    "confidence": "high|medium|low"
-}}
-</output-format>
-
 <rules>
 <rule>Entscheide basierend auf dem Kontext</rule>
 <rule>Sei praezise und praktisch</rule>
 <rule>Bei Unsicherheit waehle die sicherere Option</rule>
-<rule>Antworte NUR mit dem JSON, kein anderer Text</rule>
 </rules>
 """
 
-        # API-Aufruf
+        # Agent SDK query
         try:
             start_time = datetime.now()
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=500,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            result = asyncio.run(self._aquery(prompt))
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
-            # Token Usage extrahieren und loggen
-            usage = response.usage
-            input_tokens = usage.input_tokens
-            output_tokens = usage.output_tokens
-            cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
-            cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+            if result is None:
+                raise Exception("Oracle SDK produced no structured output")
 
-            # Kosten berechnen (Sonnet 4.x: $3/M input, $15/M output)
-            cost_cents = int((input_tokens * 3 + output_tokens * 15) / 10000)
-
-            # API Usage Event emittieren
-            self.logger.api_usage(
-                component="oracle",
-                model=self.model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cache_read_tokens=cache_read,
-                cache_write_tokens=cache_write,
-                cost_cents=cost_cents,
-                operation="decision",
-                duration_ms=duration_ms,
-            )
-
-            # Response parsen
-            response_text = response.content[0].text.strip()
-
-            # JSON extrahieren (falls mit Markdown umgeben)
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0].strip()
-
-            result = json.loads(response_text)
-
-            decision = result.get("decision", "Keine Entscheidung")
-            reason = result.get("reason", "Keine Begründung")
-            confidence = result.get("confidence", "medium")
+            decision = result.decision
+            reason = result.reason
+            confidence = result.confidence
 
             # In Cache speichern
             self.decisions["decisions"].append({
@@ -252,12 +231,7 @@ Antworte als JSON:
                 "decision": decision,
                 "reason": reason,
                 "confidence": confidence,
-                "tokens": {
-                    "input": input_tokens,
-                    "output": output_tokens,
-                    "cache_read": cache_read,
-                    "cost_cents": cost_cents,
-                },
+                "duration_ms": duration_ms,
                 "timestamp": datetime.now().isoformat(),
             })
             self._save_decisions()
@@ -266,18 +240,11 @@ Antworte als JSON:
 
             return {"decision": decision, "reason": reason, "confidence": confidence}
 
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Oracle JSON Parse Error: {e}")
+        except Exception as e:
+            self.logger.error(f"Oracle error: {e}")
             return {
-                "decision": "Parsing Error",
-                "reason": f"Konnte Oracle-Antwort nicht parsen: {e}",
-                "confidence": "low",
-            }
-        except anthropic.APIError as e:
-            self.logger.error(f"Oracle API Error: {e}")
-            return {
-                "decision": "API Error",
-                "reason": f"Oracle API Fehler: {e}",
+                "decision": "Error",
+                "reason": str(e),
                 "confidence": "low",
             }
 
@@ -440,6 +407,6 @@ Antworte als JSON:
         self.logger.info("Oracle Cache gelöscht")
 
 
-def create_oracle(repo_path: str, model: str = "claude-sonnet-4-20250514", dirigent_dir: Optional[Path] = None) -> Oracle:
+def create_oracle(repo_path: str, model: str = "claude-sonnet-4-6", dirigent_dir: Optional[Path] = None) -> Oracle:
     """Factory-Funktion für Oracle-Instanz."""
     return Oracle(repo_path, model, dirigent_dir=dirigent_dir)
