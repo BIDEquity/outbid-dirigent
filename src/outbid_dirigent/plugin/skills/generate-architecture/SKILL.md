@@ -71,19 +71,16 @@ Look for recurring patterns the codebase uses:
 
 Use this exact structure. Every section is required. If a section doesn't apply, include it with a note explaining why.
 
-**IMPORTANT: Use the EXACT section order and XML tags below. Do NOT add, remove, or reorder sections.**
+**IMPORTANT: Use the EXACT section order below. Do NOT add, remove, or reorder sections.**
 
 ```markdown
 # {Project Name} — Architecture
 
-<system-overview>
 > {One sentence: what this system does and for whom}
 
 {Mermaid diagram showing the high-level components and how they connect.
 Keep it to 5-10 boxes max — this is the 30-second orientation.}
-</system-overview>
 
-<testing-verification>
 ## Testing & Verification
 
 ### Build
@@ -103,9 +100,7 @@ Port: {port}                   [source: file:line]
 
 ### How to Verify Manually
 1. {step-by-step instructions for a human to verify the app works}
-</testing-verification>
 
-<tech-stack>
 ## Tech Stack
 
 | Layer | Technology | Source |
@@ -116,9 +111,7 @@ Port: {port}                   [source: file:line]
 | Auth | {e.g. NextAuth.js} | `src/auth.config.ts:1` |
 | Testing | {e.g. Vitest + Playwright} | `package.json:12` |
 | Package Manager | {e.g. pnpm} | `pnpm-lock.yaml` |
-</tech-stack>
 
-<directory-structure>
 ## Directory Structure
 
 {Top 2 levels with purpose annotations. Skip node_modules, .git, __pycache__.}
@@ -134,9 +127,7 @@ project/
 ├── tests/             # Test suites
 └── scripts/           # Developer tooling
 ```
-</directory-structure>
 
-<entry-points>
 ## Entry Points
 
 | Trigger | Code | Purpose |
@@ -144,23 +135,17 @@ project/
 | `POST /api/auth/login` | `src/app/api/auth/login/route.ts:14` | Password login, returns JWT |
 | `GET /api/users` | `src/app/api/users/route.ts:8` | List users (admin only) |
 | CLI: `npm run seed` | `scripts/seed.ts:1` | Populate dev database |
-</entry-points>
 
-<module-architecture>
 ## Module Architecture
 
 {Mermaid diagram showing how internal modules depend on each other.
 Group by layer. Dependencies should point downward.}
-</module-architecture>
 
-<data-model>
 ## Data Model
 
 {Mermaid ERD or class diagram. 5-10 most important entities only.
 3-5 fields per entity. If no database, write "No database — stateless service."}
-</data-model>
 
-<key-patterns>
 ## Key Patterns
 
 {3-5 patterns that recur throughout the codebase. Each MUST cite a source.
@@ -169,9 +154,7 @@ data access patterns, error handling patterns.}
 
 - {Pattern name}: {description} [source: file:line]
 - {Pattern name}: {description} [source: file:line]
-</key-patterns>
 
-<api-surface>
 ## API Surface
 
 {Route groups for web apps, public API for libraries, commands for CLI tools.}
@@ -180,27 +163,21 @@ data access patterns, error handling patterns.}
 |-------------|---------|------|--------|
 | `/api/auth/*` | Authentication | Public | `src/app/api/auth/` |
 | `/api/users/*` | User management | Admin | `src/app/api/users/` |
-</api-surface>
 
-<configuration>
 ## Configuration
 
 | Variable | Purpose | Required | Source |
 |----------|---------|----------|--------|
 | `DATABASE_URL` | PostgreSQL connection | Yes | `src/lib/db.ts:5` |
 | `NEXTAUTH_SECRET` | Session encryption | Yes | `src/auth.config.ts:12` |
-</configuration>
 
-<external-dependencies>
 ## External Dependencies
 
 | Service | Purpose | Failure Mode |
 |---------|---------|-------------|
 | PostgreSQL | Primary data store | App down |
 | Redis | Session cache | Degraded (falls back to DB) |
-</external-dependencies>
 
-<architecture-decisions>
 ## Architecture Decisions
 
 {Key design decisions and their rationale. For greenfield projects, document
@@ -208,9 +185,7 @@ choices made during scaffold. For existing projects, document discovered pattern
 If none, write "No notable architecture decisions documented."}
 
 - {Decision}: {rationale} [source: file:line]
-</architecture-decisions>
 
-<development-workflow>
 ## Development Workflow
 
 ```bash
@@ -223,7 +198,6 @@ If none, write "No notable architecture decisions documented."}
 # Test
 {exact commands}
 ```
-</development-workflow>
 ```
 
 ## Step 3: Validate
