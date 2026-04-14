@@ -69,6 +69,11 @@ brv query "relevant question about patterns or decisions"
 ```
 BRV knowledge represents curated, validated project knowledge — prefer it over guessing from file names alone. After making significant architectural decisions, curate them: `brv curate "decision description" -f relevant/file.ts`.
 
-## Use context7 MCP
+## Use context7 for framework/tooling docs
 
-When you need framework-specific documentation (e.g., how to configure Playwright for a Next.js app, or pytest fixtures for FastAPI), query context7 for curated docs rather than guessing.
+Before guessing at config syntax or framework APIs (e.g., Playwright + Next.js, pytest fixtures, devbox package names), fetch curated docs:
+
+1. `mcp__context7__resolve-library-id` with `libraryName="<framework>"` → get libraryId
+2. `mcp__context7__query-docs` with `libraryId=<result>` and `topic="<specific topic>"` → get docs
+
+Use for: testing framework config, docker-compose syntax, devbox/nix packages, CI tooling.
