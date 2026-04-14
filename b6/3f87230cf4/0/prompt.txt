@@ -1,0 +1,7 @@
+harden the contract creation process. currently, it is not looking into architecture.md (which also tells a lot aboout test setups etc.). Make end-to-end tests mandatory (e.g. run playwright, detox etc.). Tests should test stuff users expect.
+
+
+at least final phases MUST implement and check e2e-tests.
+
+
+any ideas how to harden this?
