@@ -105,26 +105,62 @@ def git_repo(tmp_path):
 
 @pytest.fixture
 def fake_claude_env(tmp_path, git_repo, monkeypatch):
-    """Git repo with fake claude on PATH for E2E testing.
+    """Git repo where TaskRunner calls are intercepted by fake_claude.py.
 
-    Returns the repo path. All subprocess calls to 'claude' will hit
-    the deterministic fake instead of the real CLI.
+    The SDK uses a bundled claude binary that ignores PATH, so we patch
+    TaskRunner._run_claude and ._run_claude_structured directly to call
+    fake_claude.py via subprocess instead.
     """
-    # Create a bin/ dir with a 'claude' wrapper that runs our fake
-    bin_dir = tmp_path / "fake_bin"
-    bin_dir.mkdir()
+    from outbid_dirigent.task_runner import TaskRunner
     fake_claude_src = Path(__file__).parent / "fake_claude.py"
-    claude_wrapper = bin_dir / "claude"
-    claude_wrapper.write_text(
-        f"#!/usr/bin/env python3\n"
-        f"import runpy, sys\n"
-        f"sys.argv[0] = {str(fake_claude_src)!r}\n"
-        f"runpy.run_path({str(fake_claude_src)!r}, run_name='__main__')\n"
-    )
-    claude_wrapper.chmod(0o755)
 
-    # Prepend to PATH
-    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
+    def _invoke_fake(repo_path: Path, prompt: str) -> tuple[bool, str, str]:
+        """Run fake_claude.py and return (success, stdout, stderr)."""
+        import sys
+        env = {**os.environ, "PWD": str(repo_path)}
+        result = subprocess.run(
+            [sys.executable, str(fake_claude_src), "-p", prompt],
+            cwd=str(repo_path),
+            capture_output=True, text=True,
+            env=env,
+        )
+        return result.returncode == 0, result.stdout, result.stderr
+
+    def fake_run_claude(self, prompt, timeout=0, model="", effort="", system_prompt=""):
+        return _invoke_fake(self.repo_path, prompt)
+
+    def fake_run_claude_structured(self, prompt, output_format, timeout=0, model="", effort="", system_prompt="", agents=None):
+        _invoke_fake(self.repo_path, prompt)
+
+        # Detect which file was written and return it as structured dict
+        _agent_to_skill = {"contract-negotiator": "create-contract", "reviewer": "review-phase", "implementer": "fix-review"}
+        skill = next((s for s in ["create-plan", "implement-task", "create-contract", "review-phase", "fix-review"] if f"/dirigent:{s}" in prompt), None)
+        if skill is None:
+            skill = next((s for name, s in _agent_to_skill.items() if f"{name} agent" in prompt), "unknown")
+        dd = self.dirigent_dir
+
+        try:
+            if skill == "create-plan":
+                return True, json.loads((dd / "PLAN.json").read_text())
+            elif skill == "create-contract":
+                import re
+                m = re.search(r"phase[_\-\s]+id[\"'\s:=]+[\"']?(\w+)", prompt, re.IGNORECASE)
+                phase_id = m.group(1) if m else "01"
+                path = dd / "contracts" / f"phase-{phase_id}.json"
+                return True, json.loads(path.read_text())
+            elif skill == "review-phase":
+                import re
+                m = re.search(r"phase[_\-\s]+id[\"'\s:=]+[\"']?(\w+)", prompt, re.IGNORECASE)
+                phase_id = m.group(1) if m else "01"
+                path = dd / "reviews" / f"phase-{phase_id}.json"
+                return True, json.loads(path.read_text())
+        except Exception:
+            pass
+
+        return False, None
+
+    monkeypatch.setattr(TaskRunner, "_run_claude", fake_run_claude)
+    monkeypatch.setattr(TaskRunner, "_run_claude_structured", fake_run_claude_structured)
 
     # Create .dirigent dir and a spec
     dirigent_dir = git_repo / ".dirigent"

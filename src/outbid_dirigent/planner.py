@@ -13,6 +13,7 @@ from loguru import logger
 
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.task_runner import TaskRunner
+from outbid_dirigent.utils import strict_json_schema
 
 
 class Planner:
@@ -34,16 +35,23 @@ class Planner:
         #   - .dirigent/test-harness.json (from init step)
         prompt = "Run /dirigent:create-plan"
 
-        success, _, stderr = self.runner._run_claude(prompt, timeout=1800)
-        if not success:
-            logger.error(f"Plan creation failed: {stderr}")
+        success, structured = self.runner._run_claude_structured(
+            prompt,
+            output_format={"type": "json_schema", "schema": strict_json_schema(Plan.model_json_schema())},
+            timeout=1800,
+        )
+        if not success or structured is None:
+            logger.error("Plan creation failed or returned no structured output")
+            return None
+
+        try:
+            plan = Plan.model_validate(structured)
+        except Exception as e:
+            logger.error(f"Plan schema validation failed: {e}")
             return None
 
         plan_file = self.dirigent_dir / "PLAN.json"
-        plan = Plan.load(plan_file)
-        if plan is None:
-            logger.error("PLAN.json was not created or is invalid")
-            return None
+        plan_file.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
 
         logger.info(f"Plan: {len(plan.phases)} phases, {plan.total_tasks} tasks")
         if plan.assumptions:

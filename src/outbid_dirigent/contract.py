@@ -12,8 +12,6 @@ Contracts and reviews are structured JSON files validated by Pydantic.
 All prompts use /dirigent: slash commands resolved natively by the subprocess.
 """
 
-import json
-import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -23,11 +21,7 @@ import re
 
 from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict, CriterionLayer
 from outbid_dirigent.plan_schema import Plan, Phase
-
-# Validation scripts bundled with the plugin skills
-_PLUGIN_DIR = Path(__file__).parent / "plugin" / "skills"
-_CONTRACT_VALIDATOR = _PLUGIN_DIR / "create-contract" / "scripts" / "validate_schema.py"
-_REVIEW_VALIDATOR = _PLUGIN_DIR / "review-phase" / "scripts" / "validate_schema.py"
+from outbid_dirigent.utils import strict_json_schema
 
 
 class ContractManager:
@@ -58,35 +52,12 @@ class ContractManager:
     def _review_path(self, phase_id: str) -> Path:
         return self.reviews_dir / f"phase-{self._normalize_phase_id(phase_id)}.json"
 
-    @staticmethod
-    def _extract_raw_verdict(path: Path) -> Optional[str]:
-        """Last-resort fallback: read just the verdict from raw JSON when Pydantic fails."""
-        try:
-            if not path.exists():
-                return None
-            content = path.read_text(encoding="utf-8")
-            if not content.strip():
-                return None
-            raw = json.loads(content)
-            verdict = raw.get("verdict", "").strip().lower()
-            if verdict in ("pass", "fail"):
-                return verdict
-            return None
-        except Exception:
-            return None
-
     # ══════════════════════════════════════════
     # CONTRACT CREATION
     # ══════════════════════════════════════════
 
-    MAX_SCHEMA_RETRIES = 2
-
     def create_contract(self, phase: Phase, plan: Plan, spec_content: str) -> bool:
-        """Create acceptance criteria contract for a phase before execution.
-
-        Runs a validation+retry loop: if the agent produces invalid JSON,
-        the orchestrator feeds validation errors back for a targeted fix.
-        """
+        """Create acceptance criteria contract for a phase before execution."""
         contract_path = self._contract_path(phase.id)
 
         if contract_path.exists():
@@ -100,36 +71,24 @@ class ContractManager:
             f"Use the contract-negotiator agent to create an acceptance criteria "
             f"contract for phase {phase.id}. Pass it: phase_id={phase.id}\n\n"
             f"IMPORTANT: All dirigent artifacts are at {self.dirigent_dir} "
-            f"(NOT in .dirigent/ in the repo). Read files from there and write output there.\n"
-            f"Write the contract to: {contract_path}"
+            f"(NOT in .dirigent/ in the repo). Read files from there."
         )
-        success, _, stderr = self.runner._run_claude(prompt, timeout=300)
-
-        if not success:
-            logger.error(f"Contract creation failed for phase {phase.id}: {stderr[:200]}")
+        success, structured = self.runner._run_claude_structured(
+            prompt,
+            output_format={"type": "json_schema", "schema": strict_json_schema(Contract.model_json_schema())},
+            timeout=300,
+        )
+        if not success or structured is None:
+            logger.error(f"Contract creation failed for phase {phase.id}")
             return False
 
-        # Validate with schema script + Pydantic, retry with error feedback
-        for attempt in range(1, self.MAX_SCHEMA_RETRIES + 1):
-            errors = self._run_validator(_CONTRACT_VALIDATOR, contract_path)
-            if not errors:
-                break
-            logger.warning(
-                f"Contract phase {phase.id} schema errors (attempt {attempt}): "
-                + "; ".join(errors[:3])
-            )
-            fix_prompt = (
-                f"The contract JSON at {contract_path} has schema errors. "
-                f"Fix ONLY these errors and rewrite the file:\n"
-                + "\n".join(f"- {e}" for e in errors)
-            )
-            self.runner._run_claude(fix_prompt, timeout=120)
-
-        contract = Contract.load(contract_path)
-        if contract is None:
-            logger.error(f"Contract for phase {phase.id} was not created or is invalid JSON")
+        try:
+            contract = Contract.model_validate(structured)
+        except Exception as e:
+            logger.error(f"Contract schema validation failed for phase {phase.id}: {e}")
             return False
 
+        contract_path.write_text(contract.model_dump_json(indent=2), encoding="utf-8")
         self._validate_contract_quality(contract)
 
         logger.info(
@@ -149,28 +108,6 @@ class ContractManager:
             )
 
         return True
-
-    @staticmethod
-    def _run_validator(script: Path, target: Path) -> list[str]:
-        """Run a validation script and return error lines. Empty list = valid."""
-        if not script.exists() or not target.exists():
-            return []
-        try:
-            result = subprocess.run(
-                ["python3", str(script), str(target)],
-                capture_output=True, text=True, timeout=10,
-            )
-            if result.returncode == 0:
-                return []
-            # Extract ERROR lines from output
-            return [
-                line.strip().removeprefix("ERROR: ").removeprefix("  ERROR: ")
-                for line in result.stdout.splitlines()
-                if "ERROR" in line
-            ]
-        except Exception as e:
-            logger.debug(f"Validator failed: {e}")
-            return []
 
     def load_contract(self, phase_id: str) -> Contract | None:
         """Load and validate a phase contract."""
@@ -230,51 +167,29 @@ class ContractManager:
         commit_count = len(phase.tasks)
         review_path = self._review_path(phase.id)
 
-        review_path_str = str(review_path)
-        contract_path_str = str(self._contract_path(phase.id))
         prompt = (
             f"Use the reviewer agent to review phase {phase.id}. "
             f"There are {commit_count} commits to review. This is iteration {iteration}.\n\n"
             f"IMPORTANT: All dirigent artifacts are at {self.dirigent_dir} "
             f"(NOT in .dirigent/ in the repo).\n"
-            f"Read the contract from: {contract_path_str}\n"
-            f"Write the review to: {review_path_str}"
+            f"Read the contract from: {self._contract_path(phase.id)}"
         )
-
-        success, _, stderr = self.runner._run_claude(prompt, timeout=1200)
-
-        if not success:
-            logger.warning(f"Phase {phase.id} review subprocess failed: {stderr[:200]}")
+        success, structured = self.runner._run_claude_structured(
+            prompt,
+            output_format={"type": "json_schema", "schema": strict_json_schema(Review.model_json_schema())},
+            timeout=1200,
+        )
+        if not success or structured is None:
+            logger.warning(f"Phase {phase.id} review subprocess failed")
             return "error"
 
-        # Validate with schema script + retry with error feedback
-        for attempt in range(1, self.MAX_SCHEMA_RETRIES + 1):
-            errors = self._run_validator(_REVIEW_VALIDATOR, review_path)
-            if not errors:
-                break
-            logger.warning(
-                f"Phase {phase.id} review schema errors (attempt {attempt}): "
-                + "; ".join(errors[:3])
-            )
-            fix_prompt = (
-                f"The review JSON at {review_path} has schema errors. "
-                f"Fix ONLY these errors and rewrite the file:\n"
-                + "\n".join(f"- {e}" for e in errors)
-            )
-            self.runner._run_claude(fix_prompt, timeout=120)
-
-        # Parse structured review
-        review = Review.load(review_path)
-        if review is None:
-            # Fallback: try to extract just the verdict from raw JSON
-            verdict = self._extract_raw_verdict(review_path)
-            if verdict:
-                logger.warning(
-                    f"Phase {phase.id} review: Pydantic validation failed but raw verdict is '{verdict}' — using fallback"
-                )
-                return verdict
-            logger.warning(f"Phase {phase.id} review: output missing or invalid JSON")
+        try:
+            review = Review.model_validate(structured)
+        except Exception as e:
+            logger.warning(f"Phase {phase.id} review schema error: {e}")
             return "error"
+
+        review.save(review_path)
 
         # Reject pass verdicts where functional criteria lack evidence
         unproven = review.criteria_without_evidence
