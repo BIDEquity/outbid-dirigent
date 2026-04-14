@@ -16,11 +16,14 @@ Write acceptance criteria where every behavioral verification command is EXECUTA
 
 1. Read `${DIRIGENT_RUN_DIR}/PLAN.json` to find the phase
 2. Read `${DIRIGENT_RUN_DIR}/SPEC.md` for feature context
+2b. **Read `./ARCHITECTURE.md`** from the target repo root (if it exists). Extract: e2e framework name and run command, test directory structure and naming conventions, dev-server startup command, CI test commands that are known to work. This prevents inventing verification commands that don't match the repo's infrastructure.
 3. Read `${DIRIGENT_RUN_DIR}/test-harness.json` for test infrastructure (base_url, auth, seed data, health checks)
+3b. **Detect if this is the final phase**: count all phase IDs in PLAN.json. If this phase's ID is numerically the highest, it is the final phase. Final phases require at least one behavioral criterion using the e2e run command from `./ARCHITECTURE.md` or `test-harness.json` `e2e_framework.run_command`.
 4. **PROBE the environment**: Before writing a verification command, try a simpler version to confirm it's plausible
    - Can curl reach the base_url? Try: `curl -sf {base_url}/health || echo "NOT REACHABLE"`
    - What test runner is available? Check: `which pytest`, `npx jest --version`, `go test --help`
    - Are ports open? Check: `lsof -i :{port} 2>/dev/null | head -3`
+   - Is the e2e framework installed? Check: `npx playwright --version 2>/dev/null`, `npx cypress --version 2>/dev/null`, `detox --version 2>/dev/null`
 5. Write the contract JSON
 6. **VALIDATE**: Run `python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json`
 7. Fix any validation errors and re-run until it passes
