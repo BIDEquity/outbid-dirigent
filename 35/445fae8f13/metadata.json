@@ -3,9 +3,20 @@
   "checkpoint_id": "35445fae8f13",
   "strategy": "manual-commit",
   "branch": "feat/v1.6",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
-    "pyproject.toml"
+    "a.py",
+    "pyproject.toml",
+    "scaffolding-improvements.txt",
+    "src/outbid_dirigent/contract.py",
+    "src/outbid_dirigent/init_phase.py",
+    "src/outbid_dirigent/llm_router.py",
+    "src/outbid_dirigent/oracle.py",
+    "src/outbid_dirigent/planner.py",
+    "src/outbid_dirigent/task_runner.py",
+    "src/outbid_dirigent/utils.py",
+    "tests/conftest.py",
+    "tests/test_llm_router.py"
   ],
   "sessions": [
     {
@@ -13,13 +24,19 @@
       "transcript": "/35/445fae8f13/0/full.jsonl",
       "content_hash": "/35/445fae8f13/0/content_hash.txt",
       "prompt": "/35/445fae8f13/0/prompt.txt"
+    },
+    {
+      "metadata": "/35/445fae8f13/1/metadata.json",
+      "transcript": "/35/445fae8f13/1/full.jsonl",
+      "content_hash": "/35/445fae8f13/1/content_hash.txt",
+      "prompt": "/35/445fae8f13/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 7,
-    "cache_creation_tokens": 25372,
-    "cache_read_tokens": 47579,
-    "output_tokens": 414,
-    "api_call_count": 3
+    "input_tokens": 14,
+    "cache_creation_tokens": 60344,
+    "cache_read_tokens": 173962,
+    "output_tokens": 4328,
+    "api_call_count": 8
   }
 }
