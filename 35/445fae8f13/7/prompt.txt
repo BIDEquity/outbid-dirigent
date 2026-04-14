@@ -1,0 +1,13 @@
+look at @scaffold.sh . is it correct that this script always cd`s into dhe same dir?
+
+---
+
+what does `set -euo pipefail` do?
+
+---
+
+and the test command?
+
+---
+
+is this a sensible scaffold script?
