@@ -10,6 +10,8 @@ agent: reviewer
 <instructions>
 <step id="1">Read the contract from `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` to understand the acceptance criteria.</step>
 <step id="1b">If `.brv/context-tree/` exists and `brv` CLI is available, run `brv query "What domain rules and patterns apply to phase {PHASE_ID}?"` to understand domain expectations the code should meet.</step>
+<step id="1c">Detect if this is the final phase: count all phase IDs in `${DIRIGENT_RUN_DIR}/PLAN.json`. If this phase's ID is the highest, it is the **final phase** — stricter e2e requirements apply (see rules below).</step>
+<step id="1d">Read `./ARCHITECTURE.md` from the repo root (if it exists) to understand the configured e2e framework, test infrastructure, and dev-server setup.</step>
 <step id="2">Run `git diff HEAD~{COMMITS}` to see all changes made during this phase. Examine each changed file.</step>
 <step id="3">For each acceptance criterion, EXECUTE the verification method described in the criterion. Do NOT judge pass/fail by reading code alone — you MUST run the actual command and record the output as evidence.</step>
 <step id="4">Check for code quality issues: bugs, broken API compatibility, incomplete work, logic errors.</step>
@@ -24,6 +26,7 @@ agent: reviewer
 <step id="5c">If auth.login_command is set, run it to obtain a token/session. Use it for subsequent requests.</step>
 <step id="5d">Run each verification_command. Check if the result matches the "expected" field. If a verification command fails and it relates to an acceptance criterion, mark that criterion as "fail" and include the command output in evidence.</step>
 <step id="5e">If e2e_framework.run_command is set and the framework is configured, run the e2e test suite. Report failures as findings with severity "critical".</step>
+<step id="5f">**Final phase enforcement:** If this is the final phase AND no criterion in the contract uses an e2e framework command (playwright/cypress/detox/pytest --e2e), OR all such criteria lack evidence in your results — add a critical finding: `"Final phase requires e2e verification evidence — none found."` and set verdict to "fail".</step>
 </e2e-verification>
 
 <output file="${DIRIGENT_RUN_DIR}/reviews/phase-{PHASE_ID}.json">
@@ -83,6 +86,7 @@ agent: reviewer
 <rule>The "iteration" field must match the --iteration argument</rule>
 <rule>The output MUST be valid JSON matching the schema exactly</rule>
 <rule>If e2e verification commands fail, include the command output in the finding notes AND in the criterion evidence</rule>
+<rule>If this is the final phase, at least one criteria_results entry MUST contain evidence from an e2e framework run (playwright/cypress/detox/pytest --e2e). Missing e2e evidence on a final phase = automatic "fail".</rule>
 <rule>Unit tests passing alone is NOT sufficient to mark a criterion as "pass" — the verification method in the contract must be executed</rule>
 <rule>If the contract criterion says "Run: <command>" you MUST run that exact command and record the result</rule>
 </rules>

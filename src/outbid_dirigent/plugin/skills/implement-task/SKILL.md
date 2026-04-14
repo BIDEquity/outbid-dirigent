@@ -66,6 +66,11 @@ Before starting implementation, read `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE
 
 If any criterion seems unverifiable or contradicts the task description, note it in your summary as `DEVIATION: Contract-Concern — [explanation]`.
 
+**Final phase tasks:** If this is the final phase (check all phase IDs in `${DIRIGENT_RUN_DIR}/PLAN.json` — if this phase's ID is numerically the highest, it's final), the reviewer will require e2e evidence. Before committing:
+1. Run the e2e suite — use `e2e_framework.run_command` from `test-harness.json` or the command in `./ARCHITECTURE.md`
+2. If e2e tests don't yet cover the features you implemented, write them — they are not optional for the final phase
+3. If the e2e run fails, fix the code or tests before committing
+
 ## Convention Awareness
 
 **If a `<convention-skills>` block is present**, load each listed skill BEFORE writing any code. These are project-specific convention skills that define exactly how this codebase writes code — authorization patterns, form objects, naming conventions, test structure.

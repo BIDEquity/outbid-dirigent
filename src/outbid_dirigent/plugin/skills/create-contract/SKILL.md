@@ -136,6 +136,25 @@ These test CODE STRUCTURE, not USER BEHAVIOR. They are **forbidden** in behavior
 1. **Required:** `${DIRIGENT_RUN_DIR}/PLAN.json` — find the phase matching `$ARGUMENTS` (the phase ID)
 2. **Required:** `${DIRIGENT_RUN_DIR}/SPEC.md` — understand what the user wants
 3. **Critical:** `${DIRIGENT_RUN_DIR}/test-harness.json` — if this exists, it tells you EXACTLY how to verify
+4. **Optional but high-value:** `./ARCHITECTURE.md` in the target repo root — if it exists, read it. It contains: which e2e framework is configured, test directory layout, dev-server startup command, seeding/fixture patterns, and CI test commands that are known to work. This prevents you from inventing verification commands that don't match the repo's actual infrastructure.
+
+## Final Phase Detection
+
+Count all phase IDs in `PLAN.json`. If the phase you are contracting is the **highest-numbered phase** (numerically), it is the **final phase**.
+
+Final phase contracts MUST include at least one `behavioral` criterion that runs the project's e2e framework end-to-end. Discover the right command from `./ARCHITECTURE.md` or `test-harness.json`; if neither specifies one, use the best match:
+
+- Playwright: `Run: npx playwright test --reporter=line`
+- Cypress:    `Run: npx cypress run --headless`
+- Detox:      `Run: detox test --configuration release`
+- pytest e2e: `Run: python -m pytest tests/ --e2e -v`
+- Or: use `e2e_framework.run_command` from `test-harness.json` if present
+
+**The e2e criterion description MUST be user-facing:**
+- ✅ `"A logged-in user can complete checkout and see a confirmation page"`
+- ❌ `"Playwright test suite passes"`
+
+If no e2e framework is detectable, add a criterion using the project's highest-level test runner against the full suite (not just unit tests).
 
 ## Step 2: Build Verification Commands
 
@@ -255,6 +274,8 @@ Write `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json`:
 <rule>Every behavioral/boundary criterion verification MUST start with "Run: " followed by an executable command</rule>
 <rule>NEVER use grep/rg/cat on source files as behavioral verification — test the RUNNING system</rule>
 <rule>If test-harness.json exists, you MUST use its base_url and auth in verification commands</rule>
+<rule>If this is the final phase (highest-numbered in PLAN.json), at least one behavioral criterion MUST use the project's e2e framework run command</rule>
+<rule>E2e criterion descriptions MUST describe user-observable behavior, not test-runner output ("user can X", not "tests pass")</rule>
 <rule>Criteria come from the phase's task descriptions — what do the tasks promise to deliver?</rule>
 <rule>The executor will read these criteria and their verification commands — be precise about expected behavior</rule>
 <rule>Each criterion answers: "If this fails, would a user notice?" If no, it belongs in structural, not behavioral</rule>
