@@ -139,7 +139,18 @@ The repo ships with `.devcontainer/devcontainer.json` for VS Code / GitHub Codes
 
 ## Routing Engine
 
-The Dirigent automatically selects one of five execution paths based on repo analysis and spec content.
+The Dirigent automatically selects one of six execution paths based on repo analysis and spec content.
+
+### Route Q — Quick
+
+> Small changes doable in a single run (1-3 files, no planning overhead).
+
+**Triggers:** Small, self-contained spec — low complexity score — no deep repo context required
+
+**Pipeline:**
+```
+Plan --> Execute --> Ship
+```
 
 ### Route A — Greenfield
 
@@ -254,30 +265,41 @@ dirigent --spec .planning/SPEC.md --repo . --use-proteus --resume
 src/outbid_dirigent/
     ├─ dirigent.py              # Entry point + orchestration
     ├─ analyzer.py              # Repo + spec analysis
-    ├─ router.py                # Route selection (5 routes)
+    ├─ router.py                # Route selection (6 routes)
+    ├─ llm_router.py            # LLM-based route discriminator with heuristic fallback
     ├─ executor.py              # Master orchestrator
     ├─ task_runner.py           # Individual task execution (subprocess per task)
     ├─ planner.py               # Plan creation via Claude Code
     ├─ contract.py              # Phase contracts + review/fix loop
     ├─ contract_schema.py       # Contract/Review/Verdict data models
     ├─ plan_schema.py           # Plan/Phase/Task data models
+    ├─ spec_compactor.py        # Spec compaction pipeline (per-task req filtering)
     ├─ shipper.py               # Branch, push, PR creation
     ├─ oracle.py                # Architecture decisions (Claude API)
     ├─ init_phase.py            # Environment bootstrap
     ├─ progress.py              # Progress reporting
-    ├─ logger.py                # Structured logging to .dirigent/logs/
+    ├─ run_dir.py               # Run directory management (~/.dirigent/runs/<id>/)
+    ├─ logger.py                # Structured logging to run dir
     ├─ portal_reporter.py       # Outbid Portal event reporting
     ├─ questioner.py            # Interactive question handling
     ├─ test_harness_schema.py   # Test harness data model
     ├─ test_manifest.py         # Test manifest handling
     ├─ proteus_integration.py   # Proteus domain extraction
+    ├─ brv_bridge.py            # ByteRover knowledge bridge
+    ├─ opencode_bridge.py       # OpenCode execution bridge
+    ├─ utils.py                 # Shared utilities
     └─ demo_runner.py           # Demo mode with simulated events
 ```
 
 ### Generated Files
 
+Run artifacts are stored in `~/.dirigent/runs/<run-id>/` (isolated per run). Only a small manifest stays in the repo:
+
 ```
 {repo}/.dirigent/
+└── manifest.json          # Pointer to run dir (run_id, run_dir path)
+
+~/.dirigent/runs/<run-id>/
 ├── ANALYSIS.json          # Repo analysis result
 ├── ROUTE.json             # Selected route + steps
 ├── PLAN.json              # Execution plan (phases → tasks)
@@ -297,6 +319,55 @@ src/outbid_dirigent/
     ├── run-*.log
     └── run-*.jsonl
 ```
+
+---
+
+## Plugin Skills
+
+The Claude Code plugin ships 25 skills and 4 commands, invoked by the orchestrator and available for direct use.
+
+### Execution Skills (invoked by Dirigent)
+
+| Skill | Purpose |
+|---|---|
+| `/dirigent:create-plan` | Create a phased execution plan (PLAN.json) from spec and repo context |
+| `/dirigent:create-contract` | Create acceptance criteria contract for a phase before execution |
+| `/dirigent:review-phase` | Review code changes from a completed phase against the contract |
+| `/dirigent:fix-review` | Fix issues found during phase review |
+| `/dirigent:implement-task` | Behavioral rules for autonomous task execution from a plan |
+| `/dirigent:extract-business-rules` | Extract all business rules from a legacy codebase |
+| `/dirigent:quick-scan` | Quick scan of relevant files for a feature (Hybrid route) |
+| `/dirigent:greenfield-scaffold` | Propose test setup and architecture best practices before planning |
+| `/dirigent:run-init` | Inspect repo and produce a test harness specification for e2e verification |
+| `/dirigent:increase-testability` | Analyze testability gaps and show concrete ways to improve the testability score |
+| `/dirigent:add-posthog` | Analyze the app and produce a PostHog tracking instrumentation plan |
+| `/dirigent:build-manifest` | Analyze the current repo and generate outbid-test-manifest.yaml |
+| `/dirigent:validate-manifest` | Validate an outbid-test-manifest.yaml against the schema |
+| `/dirigent:entropy-minimization` | Align code and documentation, remove dead code, resolve contradictions after execution |
+| `/dirigent:generate-spec` | Generate a SPEC.md from a user description, asking max 2-3 clarifying questions |
+| `/dirigent:generate-architecture` | Generate ARCHITECTURE.md for the target repository |
+| `/dirigent:generate-conventions` | Generate CONVENTIONS.md — codified patterns agents must follow when writing code |
+
+### Research & Utility Skills
+
+| Skill | Purpose |
+|---|---|
+| `/dirigent:find-edits` | Find all Edit/Write tool calls for a file from past Claude sessions |
+| `/dirigent:find-errors` | Find errors and failures from past Claude sessions, grouped by type |
+| `/dirigent:search-memories` | Search past Claude session logs for relevant context using DuckDB |
+| `/dirigent:query-data` | Run ad-hoc DuckDB queries on any data file (CSV, Parquet, JSON, JSONL) |
+| `/dirigent:query-brv` | Retrieve or store domain knowledge via ByteRover (.brv/context-tree/) |
+| `/dirigent:quick-feature` | Implement a small feature end-to-end — plan, implement, review — using focused subagents |
+| `/dirigent:build-plugin` | Scan a codebase and build a Claude Code plugin tailored to its stack |
+
+### Commands (always available in Claude Code)
+
+| Command | Purpose |
+|---|---|
+| `/dirigent:hi` | The Dirigent coach — interactive onboarding, vibecoding playbook, and daily-driver entry point |
+| `/dirigent:start` | Alias for `/dirigent:hi` |
+| `/dirigent:show-plan` | Display the current execution plan in a readable format |
+| `/dirigent:show-progress` | Show current execution progress (phases, tasks, status) |
 
 ---
 
@@ -358,6 +429,8 @@ dirigent --spec <path> --repo <path> [options]
 | `--phase` | Run specific phase: `analyze`, `execute`, `ship`, or `all` (default: `all`) |
 | `--use-proteus` | Enable Proteus deep domain extraction |
 | `--resume` | Resume interrupted execution |
+| `--route` | Manual route override: `quick`, `greenfield`, `legacy`, `hybrid`, `testability`, `tracking` |
+| `--force-continue` | Skip past a failed phase review and continue (results may be incomplete) |
 | `--dry-run` | Analyze only, no changes |
 | `--force` | Re-run analysis (ignore cache) |
 | `--quiet` | Minimal output |
