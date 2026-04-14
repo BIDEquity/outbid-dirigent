@@ -83,18 +83,20 @@ sequenceDiagram
 
 ## Route Selection
 
-The Router selects one of five execution routes based on repo analysis and spec keywords:
+The Router selects one of six execution routes based on repo analysis and spec keywords:
 
 ```mermaid
 flowchart LR
     A[AnalysisResult] --> D{Route Decision}
 
+    D -->|"small, self-contained"| Q["QUICK"]
     D -->|"add, build, create"| G["GREENFIELD"]
     D -->|"refactor, migrate, rewrite"| L["LEGACY"]
     D -->|"complex existing + new feature"| H["HYBRID"]
     D -->|"test, coverage, testability"| T["TESTABILITY"]
     D -->|"analytics, tracking, events"| K["TRACKING"]
 
+    Q --> Q1["Plan → Execute → Ship"]
     G --> G1["Init → Plan → Execute → Entropy Min → Test → Ship"]
     L --> L1["Init → Extract Rules → Plan → Execute → Entropy Min → Test → Ship"]
     H --> H1["Init → Quick Scan → Plan → Execute → Entropy Min → Test → Ship"]
@@ -136,12 +138,18 @@ graph LR
         portal_reporter.py
         questioner.py
         proteus_integration.py
+        brv_bridge.py
+        opencode_bridge.py
         demo_runner.py
     end
 
     subgraph Infra["Infrastructure"]
         logger.py
         plan_schema.py
+        run_dir.py
+        spec_compactor.py
+        llm_router.py
+        utils.py
     end
 
     Core --> Execution
@@ -270,10 +278,13 @@ classDiagram
 
 ## State & Artifacts
 
-All orchestration state lives in `.dirigent/`:
+Run artifacts are stored in `~/.dirigent/runs/<run-id>/` (isolated per run). The repo stores only a small manifest:
 
 ```
-.dirigent/
+{repo}/.dirigent/
+└── manifest.json          # Pointer to run dir (run_id, run_dir path, file hashes)
+
+~/.dirigent/runs/<run-id>/
 ├── ANALYSIS.json          # Repo + spec analysis
 ├── ROUTE.json             # Selected route + steps
 ├── PLAN.json              # Execution plan (phases → tasks)
@@ -336,7 +347,7 @@ stateDiagram-v2
 | **Proteus** | Deep domain extraction (5-phase) | Optional |
 | **Docker** | Service orchestration for tests | Optional |
 
-## Plugin Skills (21 skills, 20 commands)
+## Plugin Skills (25 skills, 4 commands)
 
 The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during execution:
 
@@ -346,23 +357,30 @@ The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during
 | `/dirigent:create-contract` | Contract system | Define phase acceptance criteria |
 | `/dirigent:review-phase` | Contract system | Evaluate phase against contract |
 | `/dirigent:fix-review` | Contract system | Fix review findings |
+| `/dirigent:implement-task` | TaskRunner | Behavioral rules for autonomous task execution |
 | `/dirigent:extract-business-rules` | Executor (Legacy) | Extract business rules from codebase |
 | `/dirigent:quick-scan` | Executor (Hybrid/Tracking) | Scan relevant files for context |
+| `/dirigent:greenfield-scaffold` | Executor (Greenfield) | Propose test setup and architecture best practices |
 | `/dirigent:run-init` | InitPhase | Bootstrap environment + test harness |
-| `/dirigent:execute-task` | TaskRunner | Behavioral rules for task execution |
 | `/dirigent:increase-testability` | Testability route | Improve test coverage score |
 | `/dirigent:add-posthog` | Tracking route | Add PostHog analytics events |
 | `/dirigent:build-manifest` | Testability route | Generate outbid-test-manifest.yaml |
 | `/dirigent:validate-manifest` | Testability route | Validate manifest against schema |
-| `/dirigent:show-plan` | User (CLI) | Render plan for user |
-| `/dirigent:show-progress` | User (CLI) | Render execution progress |
+| `/dirigent:entropy-minimization` | Executor (all routes) | Align docs, remove dead code, resolve contradictions |
+| `/dirigent:generate-spec` | CLI (spec resolution) | Generate SPEC.md from user description with 2-3 questions |
+| `/dirigent:generate-architecture` | InitPhase | Generate ARCHITECTURE.md for the target repo |
+| `/dirigent:generate-conventions` | InitPhase | Generate CONVENTIONS.md with codified coding patterns |
+| `/dirigent:quick-feature` | User (direct) | Implement small features end-to-end with focused subagents |
+| `/dirigent:build-plugin` | User (direct) | Build a Claude Code plugin tailored to a codebase |
+| `/dirigent:query-brv` | Research | Retrieve or store domain knowledge via ByteRover |
 | `/dirigent:find-edits` | Research | Find file changes from sessions |
 | `/dirigent:find-errors` | Recovery | Surface errors from sessions |
 | `/dirigent:search-memories` | Research | Search previous session logs |
 | `/dirigent:query-data` | Research | Run DuckDB queries on data files |
-| `/dirigent:generate-spec` | CLI (spec resolution) | Generate SPEC.md from user description with 2-3 questions |
-| `/dirigent:generate-architecture` | InitPhase | Generate ARCHITECTURE.md for the target repo |
-| `/dirigent:entropy-minimization` | Executor (all routes) | Align docs, remove dead code, resolve contradictions |
+| `/dirigent:show-plan` | Command | Render plan for user |
+| `/dirigent:show-progress` | Command | Render execution progress |
+| `/dirigent:hi` | Command | Coach — onboarding, playbook, daily-driver entry point |
+| `/dirigent:start` | Command | Alias for `/dirigent:hi` |
 
 ## Key Design Decisions
 

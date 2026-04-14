@@ -63,7 +63,7 @@ Then ask via AskUserQuestion (this renders as buttons, not prose):
 |---|---|
 | 🎬 Watch it work | 60s demo on our sample repo — zero side effects. (Recommended for first-time users.) |
 | 🎯 Plan a real change | One sentence → real SPEC + PLAN for THIS repo. Read-only, nothing executes. |
-| 🗺️ Show me the 5 routes | Greenfield / Legacy / Hybrid / Testability / Tracking — what each does. |
+| 🗺️ Show me the 6 routes | Quick / Greenfield / Legacy / Hybrid / Testability / Tracking — what each does. |
 | 📖 Open the playbook | Browse the vibecoding canon — 15 opinionated takes across 3 tracks. |
 | 🧰 I'm new to terminals | Setup guide: tmux, git, Claude Code, shell basics. For non-techies. |
 | 🤔 Just tell me | 150 words of prose + links to README/ARCHITECTURE. |
