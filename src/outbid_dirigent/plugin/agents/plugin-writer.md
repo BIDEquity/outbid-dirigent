@@ -3,7 +3,7 @@ name: plugin-writer
 description: Claude Code plugin expert. Writes complete .claude/ plugin configurations — skills, agents, CLAUDE.md — tailored to a specific codebase's operational reality.
 model: sonnet
 effort: high
-tools: Read, Write, Edit, Bash, Glob, Grep
+tools: Read, Write, Edit, Bash, Glob, Grep, mcp__context7
 disallowedTools: Agent
 ---
 
@@ -92,6 +92,13 @@ allowed-tools: Read, Bash, Glob, Grep    # optional tool restrictions
 ```
 
 Available frontmatter fields: name, description, argument-hint, disable-model-invocation, user-invocable, allowed-tools, model, effort, context, agent, hooks, paths, shell.
+
+## Use context7 for SDK/protocol docs
+
+Before writing plugin code, fetch authoritative docs for Claude Code plugin format, MCP protocol, or any other SDK involved:
+
+1. `mcp__context7__resolve-library-id` with `libraryName="<sdk or framework>"` → get libraryId
+2. `mcp__context7__query-docs` with `libraryId=<result>` and `topic="<specific topic>"` → get docs
 
 ## Rules
 

@@ -165,7 +165,7 @@ class TaskRunner:
 
         # "Agent" is always needed: plugin agents (contract-negotiator, reviewer, implementer)
         # are available whenever plugins are loaded — they must not be passed inline.
-        allowed_tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"]
+        allowed_tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "mcp__context7"]
         if plugins:
             allowed_tools.append("Agent")
 
