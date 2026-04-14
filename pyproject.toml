@@ -49,6 +49,11 @@ filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "src/outbid_dirigent/plugin/.claude-plugin/plugin.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
