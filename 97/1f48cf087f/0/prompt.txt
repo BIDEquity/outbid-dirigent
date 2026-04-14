@@ -1,0 +1,1 @@
+does this also bump the plugin version?
