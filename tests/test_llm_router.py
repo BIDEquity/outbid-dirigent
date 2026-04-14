@@ -12,6 +12,9 @@ from outbid_dirigent.llm_router import (
 )
 
 
+import json as _json
+
+
 class _FakeUsage:
     input_tokens = 100
     output_tokens = 50
@@ -19,9 +22,17 @@ class _FakeUsage:
     cache_creation_input_tokens = 0
 
 
+class _FakeContentBlock:
+    def __init__(self, text):
+        self.text = text
+
+
 class _FakeResponse:
     def __init__(self, decision):
-        self.parsed_output = decision
+        if decision is not None:
+            self.content = [_FakeContentBlock(_json.dumps(decision.model_dump()))]
+        else:
+            self.content = [_FakeContentBlock("invalid-json")]
         self.usage = _FakeUsage()
 
 
@@ -45,7 +56,8 @@ def test_returns_route_decision(mock_cls):
 
     # Verify parse was called with structured output
     call_kwargs = mock_client.messages.parse.call_args.kwargs
-    assert call_kwargs["output_format"] is RouteDecision
+    assert "output_config" in call_kwargs
+    assert call_kwargs["output_config"]["format"]["type"] == "json_schema"
     assert call_kwargs["system"] == ROUTE_SYSTEM_PROMPT
 
 

@@ -20,6 +20,7 @@ import anthropic
 from loguru import logger
 
 from outbid_dirigent.test_harness_schema import TestHarness
+from outbid_dirigent.utils import strict_json_schema
 
 
 class InitPhase:
@@ -205,14 +206,15 @@ def generate_harness_from_architecture(
             max_tokens=4000,
             system=HARNESS_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
-            output_format=TestHarness,
+            output_config={"format": {"type": "json_schema", "schema": strict_json_schema(TestHarness.model_json_schema())}},
         )
 
         duration_ms = int((datetime.now() - start).total_seconds() * 1000)
-        harness = response.parsed_output
 
-        if harness is None:
-            logger.error("Harness generation: model refused to produce output")
+        try:
+            harness = TestHarness.model_validate_json(response.content[0].text)
+        except Exception as e:
+            logger.error(f"Harness generation: failed to parse output: {e}")
             return None
 
         usage = response.usage

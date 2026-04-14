@@ -7,6 +7,7 @@ Extracted from the Executor god class. Handles:
 - Parsing results, deviations, summaries
 """
 
+import asyncio
 import os
 import re
 import subprocess
@@ -15,6 +16,16 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger
+
+from claude_agent_sdk import query
+from claude_agent_sdk.types import (
+    AgentDefinition,
+    AssistantMessage,
+    ClaudeAgentOptions,
+    ResultMessage,
+    TextBlock,
+    ToolUseBlock,
+)
 
 from outbid_dirigent.plan_schema import Plan, Task
 from outbid_dirigent.router import load_state, save_state
@@ -101,59 +112,40 @@ class TaskRunner:
 
     # ── Claude Code invocation ──
 
-    def _run_claude(
+    async def _aquery_claude(
         self,
         prompt: str,
         timeout: int = 0,
         model: str = "",
         effort: str = "",
         system_prompt: str = "",
-    ) -> tuple[bool, str, str]:
-        """Run Claude Code with a prompt. Returns (success, stdout, stderr)."""
+        output_format: dict | None = None,
+        agents: dict[str, AgentDefinition] | None = None,
+    ) -> tuple[bool, str, str, dict | None]:
+        """Async query via claude_agent_sdk. Returns (success, result_text, error_text, structured_output)."""
         timeout = timeout or self.DEFAULT_TIMEOUT
         model = model or self.default_model
         effort = effort or self.default_effort
 
-        # Always tell the subprocess where artifacts live
         run_dir_hint = (
             f"DIRIGENT_RUN_DIR={self.dirigent_dir} — "
             f"all dirigent artifacts (PLAN.json, SPEC.md, contracts/, reviews/, summaries/, test-harness.json) "
             f"live here, NOT in .dirigent/ in the repo."
         )
-        full_system_prompt = f"{run_dir_hint}\n\n{system_prompt}" if system_prompt else run_dir_hint
-
-        cmd = ["claude", "--dangerously-skip-permissions"]
-        if model:
-            cmd.extend(["--model", model])
-        if effort:
-            cmd.extend(["--effort", effort])
-        cmd.extend(["--append-system-prompt", full_system_prompt])
-
-        # Inject bundled plugin for session recall skills
-        plugin_dir = Path(__file__).parent / "plugin"
-        if plugin_dir.exists():
-            cmd.extend(["--plugin-dir", str(plugin_dir)])
-
-        # Inject OpenCode-sourced convention skills if available
-        if self.opencode_plugin_dir:
-            cmd.extend(["--plugin-dir", str(self.opencode_plugin_dir)])
-
-        cmd.extend(["-p", prompt])
+        append_text = f"{run_dir_hint}\n\n{system_prompt}" if system_prompt else run_dir_hint
 
         # Clean env: strip venv vars so subprocess uses target repo's venv
         clean_env = {
             k: v for k, v in os.environ.items()
             if k not in ("VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV")
         }
-        # Remove any venv bin/ dirs from PATH
         if "VIRTUAL_ENV" in os.environ:
             venv_bin = str(Path(os.environ["VIRTUAL_ENV"]) / "bin")
             clean_env["PATH"] = os.pathsep.join(
-                p for p in clean_env.get("PATH", "").split(os.pathsep)
-                if p != venv_bin
+                p for p in clean_env.get("PATH", "").split(os.pathsep) if p != venv_bin
             )
-
-        # Add portal connection info for hooks
+        clean_env["DIRIGENT_HOOK_LOG_DIR"] = str(self.dirigent_dir / "hooks")
+        clean_env["DIRIGENT_RUN_DIR"] = str(self.dirigent_dir)
         if self.portal_url and self.execution_id and self.reporter_token:
             clean_env["OUTBID_PORTAL_URL"] = self.portal_url
             clean_env["OUTBID_EXECUTION_ID"] = self.execution_id
@@ -163,30 +155,102 @@ class TaskRunner:
             if self._current_phase is not None:
                 clean_env["OUTBID_CURRENT_PHASE"] = str(self._current_phase)
 
-        # Set hook log directory to match where Executor looks for events
-        clean_env["DIRIGENT_HOOK_LOG_DIR"] = str(self.dirigent_dir / "hooks")
-        # Tell skills where to find/write artifacts
-        clean_env["DIRIGENT_RUN_DIR"] = str(self.dirigent_dir)
+        # Build plugins list
+        plugins: list[dict] = []
+        plugin_dir = Path(__file__).parent / "plugin"
+        if plugin_dir.exists():
+            plugins.append({"type": "local", "path": str(plugin_dir)})
+        if self.opencode_plugin_dir:
+            plugins.append({"type": "local", "path": str(self.opencode_plugin_dir)})
+
+        # "Agent" is always needed: plugin agents (contract-negotiator, reviewer, implementer)
+        # are available whenever plugins are loaded — they must not be passed inline.
+        allowed_tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"]
+        if plugins:
+            allowed_tools.append("Agent")
+
+        options = ClaudeAgentOptions(
+            model=model or None,
+            effort=effort or None,
+            cwd=str(self.repo_path),
+            env=clean_env,
+            plugins=plugins,
+            allowed_tools=allowed_tools,
+            permission_mode="bypassPermissions",
+            system_prompt={"type": "preset", "preset": "claude_code", "append": append_text},
+            output_format=output_format,
+            agents=agents,
+        )
+
+        result_text = ""
+        error_text = ""
+        structured: dict | None = None
+
+        async def _consume():
+            nonlocal result_text, error_text, structured
+            async for message in query(prompt=prompt, options=options):
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock) and block.text.strip():
+                            logger.debug(f"[claude:text] {block.text[:300]}")
+                        elif isinstance(block, ToolUseBlock):
+                            logger.debug(f"[claude:tool] {block.name}({str(block.input)[:120]})")
+                elif isinstance(message, ResultMessage):
+                    if message.is_error:
+                        error_text = message.result or "Unknown error"
+                        logger.info(f"[claude:error] {error_text[:500]}")
+                    else:
+                        result_text = message.result or ""
+                        structured = message.structured_output
+                        logger.info(f"[claude:result] {result_text[:500]}")
 
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.repo_path,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=clean_env,
-            )
-            return result.returncode == 0, result.stdout, result.stderr
-        except subprocess.TimeoutExpired:
-            logger.error(f"Claude Code timeout after {timeout}s")
-            return False, "", f"Timeout after {timeout}s"
-        except FileNotFoundError:
-            logger.error("Claude CLI not found. Is 'claude' installed?")
-            return False, "", "Claude CLI not found"
+            await asyncio.wait_for(_consume(), timeout=timeout)
+            return True, result_text, error_text, structured
+        except asyncio.TimeoutError:
+            error_text = f"Timeout after {timeout}s"
+            logger.error(f"[claude:timeout] {error_text}")
+            return False, "", error_text, None
         except Exception as e:
-            logger.error(f"Claude Code error: {e}")
-            return False, "", str(e)
+            error_text = str(e)
+            logger.error(f"[claude:error] {error_text}")
+            return False, "", error_text, None
+
+    def _run_claude(
+        self,
+        prompt: str,
+        timeout: int = 0,
+        model: str = "",
+        effort: str = "",
+        system_prompt: str = "",
+    ) -> tuple[bool, str, str]:
+        """Run Claude Code with a prompt. Returns (success, stdout, stderr)."""
+        success, stdout, stderr, _ = asyncio.run(
+            self._aquery_claude(prompt, timeout=timeout, model=model,
+                                effort=effort, system_prompt=system_prompt)
+        )
+        return success, stdout, stderr
+
+    def _run_claude_structured(
+        self,
+        prompt: str,
+        output_format: dict,
+        timeout: int = 0,
+        model: str = "",
+        effort: str = "",
+        system_prompt: str = "",
+        agents: dict | None = None,
+    ) -> tuple[bool, dict | None]:
+        """Run Claude Code and return structured output. Returns (success, structured_dict)."""
+        success, _, stderr, structured = asyncio.run(
+            self._aquery_claude(prompt, timeout=timeout, model=model,
+                                effort=effort, system_prompt=system_prompt,
+                                output_format=output_format, agents=agents)
+        )
+        if not success or structured is None:
+            logger.error(f"Structured query failed: {stderr[:200]}")
+            return False, None
+        return True, structured
 
     # ── Context building ──
 
