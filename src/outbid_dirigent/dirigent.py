@@ -546,6 +546,8 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
 
 
 def main():
+    from outbid_dirigent import __version__
+
     parser = argparse.ArgumentParser(
         description="Outbid Dirigent – Headless autonomous coding agent controller",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -566,6 +568,12 @@ Beispiele:
   # Dry-Run (keine Änderungen)
   dirigent --spec SPEC.md --repo /path/to/repo --dry-run
         """,
+    )
+
+    parser.add_argument(
+        "-V", "--version",
+        action="version",
+        version=f"outbid-dirigent {__version__}",
     )
 
     parser.add_argument(
