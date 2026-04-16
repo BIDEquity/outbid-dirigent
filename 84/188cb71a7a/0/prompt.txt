@@ -1,0 +1,7 @@
+Lass mal überlegen zu dem Cuseum-Beispiel. Klar ist das kein Mini-Prototyp. Aber: ich glaube, man kann aus allem einen Prototypen bauen. 
+
+Wie würde man das Prototypable machen?
+
+---
+
+bump now.

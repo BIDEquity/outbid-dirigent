@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "84188cb71a7a",
+  "strategy": "manual-commit",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "pyproject.toml",
+    "src/outbid_dirigent/plugin/.claude-plugin/plugin.json"
+  ],
+  "sessions": [
+    {
+      "metadata": "/84/188cb71a7a/0/metadata.json",
+      "transcript": "/84/188cb71a7a/0/full.jsonl",
+      "content_hash": "/84/188cb71a7a/0/content_hash.txt",
+      "prompt": "/84/188cb71a7a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 10,
+    "cache_creation_tokens": 3683,
+    "cache_read_tokens": 1001166,
+    "output_tokens": 2304,
+    "api_call_count": 4
+  }
+}
