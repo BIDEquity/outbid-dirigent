@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "194afae10ad7",
+  "session_id": "c78af251-0210-4f98-a06a-b9cd3ec3f203",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-16T15:47:41.400927Z",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/contract.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6[1m]",
+  "turn_id": "6bd8fed9c68a",
+  "checkpoint_transcript_start": 1248,
+  "transcript_lines_at_start": 1248,
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 6990,
+    "cache_read_tokens": 2809701,
+    "output_tokens": 2136,
+    "api_call_count": 10
+  },
+  "session_metrics": {
+    "turn_count": 37
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-16T15:47:40.676826Z",
+    "agent_lines": 8,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 8,
+    "agent_percentage": 100
+  }
+}

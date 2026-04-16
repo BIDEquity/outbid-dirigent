@@ -1,0 +1,1 @@
+was passiert, wenn contract creatinon faield? wogegen prüft der reviewer? wieso passiert das? wieso ist das non-blocking?
