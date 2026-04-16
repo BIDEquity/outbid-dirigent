@@ -1,0 +1,5 @@
+nochmal bitte detailiert zu den "stacks" und zum konzeot prototyp. ich glaube, wir brauchen ein etwas anderes konzept. prototyp + mit evolutionaary architecture. also: unsere use cases und stacks sind gut. Aber: es fehlt eine Architektur-Dimension.
+
+---
+
+feedback Also unsere Erfahrung war schon das der Output besser wird wenn man by the book architecture entwerfen lässt, idealerweiße eben passend zur Domäne bzw. dem Problem der Domäne. Also Streaming vs. Event Driven vs. Sync Rest etc.
