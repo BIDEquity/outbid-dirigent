@@ -1,0 +1,5 @@
+spawne einen kritker-subagent. dieser soll die zwei dimensionen stack vs. arch pattern, die wir heute gebaut haben kritisieren und auseinandernehmen. sind es die richtigen, für greenfield projekte? was, wenn wir über einen prototypen hinausgehen wollen?
+
+---
+
+beide
