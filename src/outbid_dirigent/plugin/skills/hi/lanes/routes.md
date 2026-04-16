@@ -7,7 +7,7 @@
 | Route | Trigger condition | Phase sequence | Example use case | One-line CLI |
 |---|---|---|---|---|
 | **Quick** ⚡ | Small, self-contained change doable in 1-3 files | Plan → Execute → Ship | "Fix the typo in the welcome email subject line" | `dirigent --spec SPEC.md --repo .` (auto-routed) |
-| **Greenfield** 🌱 | New or small repo, no existing tests, no complex conventions | Init → Plan → Execute → Entropy Min → Ship | "Scaffold a new FastAPI service with auth and a health endpoint" | `dirigent --spec SPEC.md --repo .` |
+| **Greenfield** 🌱 | New or small repo, no existing tests, no complex conventions | Scaffold → Plan → Execute → Entropy Min → Ship | "Scaffold a new FastAPI service with auth and a health endpoint" | `dirigent --spec SPEC.md --repo .` |
 | **Legacy** 🏛️ | Established codebase with domain rules to preserve, migration-heavy work | Init → Extract Rules → Plan → Execute → Entropy Min → Ship | "Migrate this Rails app's auth from Devise to a custom JWT middleware without losing business rules" | `dirigent --spec SPEC.md --repo . --use-proteus` |
 | **Hybrid** 🧩 | Mid-sized repo where only part of the codebase is relevant to the change | Init → Quick Scan → Plan → Execute → Entropy Min → Ship | "Add a new endpoint to an existing API without touching the frontend" | `dirigent --spec SPEC.md --repo .` (auto-routed) |
 | **Testability** 🧪 | Repo has poor test coverage and you want to improve *before* adding features | Init → Testability Analysis → Plan → Execute → Ship | "Get this module to 80% coverage and remove the untested death zones" | `dirigent --spec SPEC.md --repo . --route testability` |

@@ -159,13 +159,12 @@ class TestBuildRoute:
         assert route.oracle_needed is True
 
     @pytest.mark.parametrize("route_str,route_type", [
-        ("greenfield", RouteType.GREENFIELD),
         ("legacy", RouteType.LEGACY),
         ("hybrid", RouteType.HYBRID),
         ("testability", RouteType.TESTABILITY),
         ("tracking", RouteType.TRACKING),
     ])
-    def test_all_routes_start_with_init(self, tmp_path, route_str, route_type):
+    def test_non_greenfield_routes_start_with_init(self, tmp_path, route_str, route_type):
         router = make_router(tmp_path)
         analysis = {
             "route": route_str,
@@ -176,6 +175,18 @@ class TestBuildRoute:
         }
         route = router.determine_route(analysis)
         assert route.steps[0].step_type == StepType.INIT
+
+    def test_greenfield_starts_with_scaffold(self, tmp_path):
+        router = make_router(tmp_path)
+        analysis = {
+            "route": "greenfield",
+            "route_reason": "",
+            "estimated_scope": "medium",
+            "file_count": 5,
+            "commit_count": 10,
+        }
+        route = router.determine_route(analysis)
+        assert route.steps[0].step_type == StepType.GREENFIELD_SCAFFOLD
 
     @pytest.mark.parametrize("route_str", [
         "greenfield", "legacy", "hybrid", "testability", "tracking",
@@ -301,7 +312,7 @@ class TestRouteLoadSave:
         assert loaded["estimated_tasks"] == 8
         assert loaded["oracle_needed"] is False
         assert loaded["repo_context_needed"] is True
-        assert "init" in loaded["steps"]
+        assert "greenfield_scaffold" in loaded["steps"]
         assert "ship" in loaded["steps"]
 
     def test_save_route_writes_created_at(self, tmp_path):
