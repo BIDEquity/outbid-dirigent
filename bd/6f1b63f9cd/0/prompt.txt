@@ -1,0 +1,7 @@
+what would need to be installed in an agent workspace to build all of our stacks. give me just a list of tools / packages. 
+
+also think of supplementary utilities (e.g. uv for python)
+
+---
+
+add a --version flag to the cli
