@@ -82,7 +82,7 @@ class ContractManager:
         success, structured = self.runner._run_claude_structured(
             prompt,
             output_format={"type": "json_schema", "schema": strict_json_schema(Contract.model_json_schema())},
-            timeout=300,
+            timeout=600,
         )
         if not success or structured is None:
             logger.error(f"Contract creation failed for phase {phase.id}")
