@@ -526,15 +526,23 @@ LIMIT 45;
         sections.append(f"<files-to-modify>{', '.join(task.files_to_modify) or 'keine'}</files-to-modify>")
         sections.append("</your-task>")
 
+        # Key patterns — ALWAYS injected, non-negotiable tooling and library choices.
+        # These override Claude's defaults (e.g. "use polars not pandas", "use uv not pip").
+        # Must come BEFORE convention skills and architecture context so the agent reads them first.
+        patterns = self._load_architecture_section("key-patterns")
+        if patterns:
+            sections.append(
+                '<key-patterns hint="MANDATORY — these are non-negotiable project conventions. '
+                'Use EXACTLY these tools and libraries. Do NOT substitute alternatives '
+                '(e.g. do NOT use pandas when polars is specified, do NOT use pip when uv is specified).">\n'
+                f'{patterns}\n'
+                '</key-patterns>'
+            )
+
         # Convention skills — tell the agent which project-specific skills to load
         skill_block = self._build_convention_skills_block(task)
         if skill_block:
             sections.append(skill_block)
-        else:
-            # Fallback: inject <key-patterns> from ARCHITECTURE.md
-            patterns = self._load_architecture_section("key-patterns")
-            if patterns:
-                sections.append(f"<key-patterns hint=\"follow these patterns when writing code\">\n{patterns}\n</key-patterns>")
 
         # Architecture context — testing strategy + architecture decisions from ARCHITECTURE.md
         for tag, hint in [
