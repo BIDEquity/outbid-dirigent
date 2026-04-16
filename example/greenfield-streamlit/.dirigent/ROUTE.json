@@ -1,0 +1,17 @@
+{
+  "route": "greenfield",
+  "reason": "Greenfield-Keywords in Spec: build; Aktiv entwickeltes Projekt; Kleines Projekt",
+  "steps": ["greenfield_scaffold", "planning", "execution", "entropy_minimization", "test", "ship"],
+  "step_details": [
+    {"type": "greenfield_scaffold", "name": "Greenfield Scaffold", "description": "Pick stack, scaffold project, create ARCHITECTURE.md and start.sh", "required": true},
+    {"type": "planning", "name": "Planung", "description": "Create execution plan", "required": true},
+    {"type": "execution", "name": "Ausfuehrung", "description": "Execute tasks sequentially", "required": true},
+    {"type": "entropy_minimization", "name": "Entropy Minimization", "description": "Align docs, remove dead code", "required": false},
+    {"type": "test", "name": "Test Suite", "description": "Run test suite", "required": false},
+    {"type": "ship", "name": "Shipping", "description": "Branch, push, PR", "required": true}
+  ],
+  "estimated_tasks": 4,
+  "oracle_needed": false,
+  "repo_context_needed": false,
+  "created_at": "2026-04-16T12:00:01.000000"
+}
