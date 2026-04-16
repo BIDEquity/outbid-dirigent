@@ -1,0 +1,15 @@
+push with tags
+
+---
+
+generalisiere das, was wir eben über "make this a prototype" besprochen haben, in 2-3 sätzen
+
+---
+
+Wir müssen nachschärfen:
+
+1. claude hat die tooling conventinos ignoriert (pandas genutzt). bitte diese stärker forcieren / in den vordergrund stellen.
+
+weitere greenfield-punkte (bitte krituich validieren, AuthProvider sind halöt per se immer mit cloud=
+
+[Image #2]
