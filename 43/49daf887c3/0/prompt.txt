@@ -1,0 +1,9 @@
+wie machst du den FullFlow test?
+
+---
+
+aber wir haben doch hier kleine Beispiel-Repos (bspw. für Legacy).
+
+---
+
+ja, 2. repo. wie beim 1. keine direkte validierung druchl klassische tests sondern eher "beobachten"

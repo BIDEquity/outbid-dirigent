@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "4349daf887c3",
+  "strategy": "manual-commit",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "example/greenfield-streamlit/.dirigent/ANALYSIS.json",
+    "example/greenfield-streamlit/.dirigent/ROUTE.json",
+    "example/greenfield-streamlit/.dirigent/SPEC.md",
+    "example/greenfield-streamlit/.dirigent/STATE.json",
+    "example/greenfield-streamlit/README.md",
+    "example/greenfield-streamlit/data/sample.csv",
+    "example/setup-greenfield-smoke.sh"
+  ],
+  "sessions": [
+    {
+      "metadata": "/43/49daf887c3/0/metadata.json",
+      "transcript": "/43/49daf887c3/0/full.jsonl",
+      "content_hash": "/43/49daf887c3/0/content_hash.txt",
+      "prompt": "/43/49daf887c3/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 21,
+    "cache_creation_tokens": 12196,
+    "cache_read_tokens": 2901059,
+    "output_tokens": 6297,
+    "api_call_count": 13
+  }
+}
