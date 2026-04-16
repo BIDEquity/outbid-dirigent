@@ -1,0 +1,91 @@
+rewrite the greenfield route. 
+
+first, understand what happens there.
+
+---
+
+Good. Lets collect things to adapt.
+
+First: the skill needs to be more opinionated about tech stacks. Greenfield is meant for very rapoid prototyping of new apps. Research the web what langs/frameworks are suited for this.
+
+I would think: streamlit, gradio, next.js, vite/vitedoc (static sites) + the existing stacks. Supabase for Backend As A service. Duckdb for data storage / analytics. Assume this must create a standalone app that a dumb non-techie can connect to later. What tools are best for this.
+
+---
+
+assume that we have control over the workspace where the agent runs and whats installed there. Rethink the tiers. Also, I do not see any backend options in tier 1
+
+---
+
+why is supabase missing? you CAN start it locally
+
+---
+
+give me the tiers in one table again. Just the table.
+
+---
+
+give me the table so i can nicely copy it into a slack message
+
+---
+
+ok great. Put this into the scaffold skill. NOT inline in the MD, use subfolders and cross-reference from there. for each tool, describe how to check if it is installed, how to run it (the main commands), how to test it. 
+
+This information is crucial for the implementatino (contract needs to include testing) and shipping step (shipping needs to include a start scrpt in this route).
+
+---
+
+ok great. Put this into the scaffold skill. NOT inline in the MD, use subfolders and cross-reference from there. for each tool, describe how to check if it is installed, how to run it (the main commands), how to test it. 
+
+This information is crucial for the implementatino (contract needs to include testing) and shipping step (shipping needs to include a start scrpt in this route).
+
+---
+
+all python stacks should use uv (assume its installed). all stacks should add a note mentioning to query context7 tools for up to date info. the skill and agent must be able to use contet7 tools
+
+---
+
+whats missing from the tooling side?
+
+---
+
+careful that we are not erbuilding contxt 7
+
+---
+
+where would you put that?
+
+---
+
+cool. What other opinionated stuff wuld you add?
+
+---
+
+ah yes, great picks. more: use polars over pandas, use pydantic and pydantic settings for i/o and config. use dataclass for dtos. More you can think of?
+
+---
+
+please.
+
+---
+
+lets further cleanup. what does the init step do?
+
+---
+
+how complex is it to omit this step?
+
+---
+
+yes.
+
+---
+
+plan, execute, test and ship need to be aware of opinionated tooling and stacks, dont they?
+
+---
+
+yes
+
+---
+
+ye

@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "f234c0500a38",
+  "strategy": "manual-commit",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 14,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/README.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/astro-starlight.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/duckdb.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/fastapi.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/gradio.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/nextjs.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/pocketbase.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/sqlite.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/streamlit.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/supabase-local.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/vite-react.md",
+    "src/outbid_dirigent/plugin/skills/hi/lanes/routes.md",
+    "src/outbid_dirigent/router.py",
+    "src/outbid_dirigent/shipper.py",
+    "tests/test_router.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f2/34c0500a38/0/metadata.json",
+      "transcript": "/f2/34c0500a38/0/full.jsonl",
+      "content_hash": "/f2/34c0500a38/0/content_hash.txt",
+      "prompt": "/f2/34c0500a38/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 121,
+    "cache_creation_tokens": 296185,
+    "cache_read_tokens": 10455494,
+    "output_tokens": 58532,
+    "api_call_count": 77
+  }
+}
