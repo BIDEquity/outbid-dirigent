@@ -55,6 +55,24 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | State management | `useState` + `useContext` | Redux, Zustand for prototypes |
 | CSS/Styling | Tailwind if scaffold includes it, otherwise CSS modules | styled-components, emotion |
 
+### AI Integration
+
+| What | Use | NOT |
+|---|---|---|
+| LLM SDK | `anthropic` directly | LangChain, LlamaIndex, CrewAI, AutoGen |
+| Structured output | `client.messages.parse()` + Pydantic | parsing JSON from free text, regex |
+| Streaming (UI) | `client.messages.stream()` — always when user waits | non-streaming (30s blank screen) |
+| Prompt caching | always for repeated system prompts | re-sending full context every call |
+| RAG (keyword) | DuckDB FTS or SQLite FTS | ChromaDB for simple keyword search |
+| RAG (semantic) | `lancedb` (embedded, local) | Pinecone, Weaviate (cloud) |
+| Embeddings (local) | `sentence-transformers` | — |
+| Embeddings (API) | Voyage AI | OpenAI embeddings |
+| Agent framework | raw SDK + tool use | LangChain agents |
+| API keys | `.env` → `pydantic-settings` | hardcoded, `os.environ` scattered |
+| Cost tracking | log `response.usage` tokens | ignore costs |
+| Rate limits | `tenacity` with exponential backoff | bare `try/except/sleep` |
+| Local LLM | Ollama (only if SPEC requires it) | manual GGUF loading |
+
 ### Architecture
 
 | What | Rule |
@@ -85,10 +103,15 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | Database (Analytics) | [DuckDB](duckdb.md) | — |
 | ML/Model UI | [Gradio](gradio.md) | Streamlit |
 | Docs/Static | [Astro Starlight](astro-starlight.md) | — |
+| Mobile | [Expo](expo.md) | — |
+| LLM Integration | [Anthropic SDK](anthropic-sdk.md) | — |
+| Vector DB / RAG | [LanceDB](lancedb.md) | — |
 
 ## Archetype Combos
 
 Match the SPEC to one of these archetypes. Pick the first one that fits.
+
+### Web Apps
 
 | SPEC Shape | Combo | Ports |
 |---|---|---|
@@ -97,11 +120,33 @@ Match the SPEC to one of these archetypes. Pick the first one that fits.
 | "Full-stack app with auth" (simple) | Next.js + PocketBase | 3000, 8090 |
 | "Full-stack app with auth" (production) | Next.js + Supabase Local | 3000, 54321, 54323 |
 | "App with database" | FastAPI + SQLite | 8000 |
-| "ML model demo" | Gradio | 7860 |
 | "Internal tool / form app" | Streamlit | 8501 |
 | "Docs site / landing page" | Astro Starlight | 4321 |
 | "Python app with real database" | FastAPI + Supabase Local | 8000, 54321 |
 | "Data pipeline + dashboard" | Streamlit + DuckDB + FastAPI | 8501, 8000 |
+
+### AI Apps
+
+| SPEC Shape | Combo | Ports |
+|---|---|---|
+| "Chatbot / AI assistant" | Streamlit + Anthropic SDK | 8501 |
+| "Document Q&A / search" | Streamlit + LanceDB + Anthropic SDK | 8501 |
+| "AI agent with tools" | FastAPI + Anthropic SDK | 8000 |
+| "AI-powered data analysis" | Streamlit + DuckDB + Anthropic SDK | 8501 |
+| "ML model demo" | Gradio | 7860 |
+
+### Mobile Apps
+
+| SPEC Shape | Combo | Ports |
+|---|---|---|
+| "Mobile app" (simple) | Expo + PocketBase | 8081, 8090 |
+| "Mobile app" (production) | Expo + Supabase Local | 8081, 54321, 54323 |
+| "Mobile app with scanning/camera/NFC" | Expo + Supabase Local + expo-camera | 8081, 54321, 54323 |
+
+### Default
+
+| SPEC Shape | Combo | Ports |
+|---|---|---|
 | Default (unclear) | Streamlit | 8501 |
 
 ## Each Stack File Contains
