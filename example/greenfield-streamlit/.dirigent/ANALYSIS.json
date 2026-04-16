@@ -1,0 +1,20 @@
+{
+  "repo_path": "/tmp/greenfield-streamlit",
+  "repo_name": "greenfield-streamlit",
+  "primary_language": "Python",
+  "secondary_languages": [],
+  "framework_detected": null,
+  "build_tool": null,
+  "commit_count": 1,
+  "last_commit_days_ago": 0,
+  "file_count": 2,
+  "total_lines": 5,
+  "spec_title": "CSV Data Explorer",
+  "spec_keywords": ["build"],
+  "route": "greenfield",
+  "route_reason": "Greenfield-Keywords in Spec: build; Aktiv entwickeltes Projekt; Kleines Projekt",
+  "confidence": "high",
+  "legacy_signals": 0,
+  "greenfield_signals": 4,
+  "analyzed_at": "2026-04-16T12:00:00.000000"
+}
