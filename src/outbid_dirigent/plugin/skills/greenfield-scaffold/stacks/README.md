@@ -113,16 +113,20 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | LLM Integration | [Anthropic SDK](anthropic-sdk.md) | — |
 | Vector DB / RAG | [LanceDB](lancedb.md) | — |
 
-## Choosing Stack × Pattern
+## Choosing Stack × Architecture
 
-Every greenfield scaffold picks **TWO** things from the SPEC:
+Every greenfield scaffold picks from **four dimensions** in the SPEC:
 
-1. **Use-Case-Archetype** → which stack combo (tables below)
-2. **Architecture Pattern** → which control flow — see **[architecture-patterns/](architecture-patterns/README.md)**
+1. **Stack** (Use-Case-Archetype) → which stack combo (tables below)
+2. **Interaction Shape** → Sync REST / Streaming / Event-Driven / Real-time / Batch
+3. **Compute Topology** → In-Process / Serverless / Long-running Worker
+4. **Domain Pattern** (optional) → Pipeline / Agent Loop / State Machine / Webhook Receiver / Multi-Tenant
 
-**Check the Pattern × Stack Compatibility Matrix in [architecture-patterns/](architecture-patterns/README.md) BEFORE committing to a combo** — some combos don't support some patterns (e.g. Streamlit + Real-time is △, Astro + anything dynamic is ✗).
+See **[architecture-patterns/](architecture-patterns/README.md)** for all three architecture axes with decision signals and matrices.
 
-Default architecture pattern is **Sync REST / CRUD** (~80% of prototypes). Only deviate when the SPEC explicitly demands Streaming / Event-Driven / Pipeline / Agent Loop / Real-time / Batch.
+**Check the Stack × Interaction Shape Matrix BEFORE committing to a combo** — some combos don't fit (e.g. Streamlit + Real-time = △, Astro Starlight + anything dynamic = ✗).
+
+Default: **Sync REST + In-Process + (no Domain Pattern)** — covers ~80% of prototypes. Only deviate when the SPEC explicitly demands otherwise.
 
 ## Archetype Combos
 
