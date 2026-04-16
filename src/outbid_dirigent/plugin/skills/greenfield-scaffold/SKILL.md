@@ -17,6 +17,32 @@ These artifacts guide every downstream step:
 
 Get them right and the entire feature ships clean. Get them wrong and every task fights the architecture.
 
+## File Routing — Where Everything Lives
+
+Use this table to navigate the skill. **Read only what you need for the current step** — don't pre-load everything.
+
+| You need... | Go to | When |
+|---|---|---|
+| **Stack catalog + opinionated defaults** | `stacks/README.md` | Step 1A — pick the stack combo |
+| **Architecture pattern catalog + matrix** | `stacks/architecture-patterns/README.md` | Step 1B — pick the control-flow pattern |
+| **Stack-specific commands** (scaffold, run, test, install-check) | `stacks/<stack-name>.md` (e.g. `stacks/streamlit.md`) | Step 2 (availability check), Step 4 (scaffold), Step 6 (test-harness), Step 7 (start.sh) |
+| **Pattern-specific code skeleton** | `stacks/architecture-patterns/<pattern>.md` (e.g. `stacks/architecture-patterns/streaming.md`) | Step 5 — write `### Pattern Implementation Skeleton` into ARCHITECTURE.md |
+| **Framework API / latest syntax** | context7 MCP (`mcp__context7__resolve-library-id` + `query-docs`) | Anywhere you're tempted to recall API from memory — query instead |
+
+## Steps At A Glance
+
+| # | Step | Output |
+|---|---|---|
+| 1 | Classify SPEC: Stack + Pattern + Out-of-Scope hints | Decisions in memory |
+| 2 | Verify stack availability | Pass/fail |
+| 3 | Assess existing repo structure | Skip-scaffold flag |
+| 4 | Run scaffold commands | Project skeleton on disk |
+| 5 | Write ARCHITECTURE.md | `<testing-verification>`, `<architecture-decisions>`, `<key-patterns>` |
+| 6 | Write test-harness.json | `${DIRIGENT_RUN_DIR}/test-harness.json` |
+| 7 | Write start.sh | `start.sh` at repo root, executable, binds 0.0.0.0 |
+| 8 | Validate | All outputs verified |
+| 9 | Commit | `ARCHITECTURE.md` + `start.sh` committed |
+
 ## When This Runs
 
 First step in the greenfield route (no init phase). You have:
@@ -37,32 +63,68 @@ Before writing scaffold commands, config syntax, or framework-specific code, alw
 
 This is mandatory — your training data may be stale. Scaffold commands, config formats, and API surfaces change between versions.
 
-## Step 1: Classify the SPEC
+## Step 1: Classify the SPEC (TWO dimensions)
 
-Read `${DIRIGENT_RUN_DIR}/SPEC.md` and match it to an archetype from `stacks/README.md`. Read the archetype combos table and pick the first one that fits.
+Read `${DIRIGENT_RUN_DIR}/SPEC.md` and classify in TWO orthogonal dimensions:
 
-**Do NOT deliberate over stack choices.** The stacks are opinionated defaults. Pick the combo, move on.
+### 1A: Use-Case-Archetype → Stack
 
-Read the full archetype table from `stacks/README.md`. It covers Web Apps, AI Apps, and Mobile Apps. Here is a summary — always check the README for the complete list:
+Match the SPEC to an archetype from `stacks/README.md` and pick the stack combo. Read the "Typical Pattern" column too — it tells you the default for 1B.
 
-| SPEC Shape | Combo | Stack Files to Read |
-|---|---|---|
-| "Dashboard for this data" | Streamlit + DuckDB | `stacks/streamlit.md`, `stacks/duckdb.md` |
-| "API + frontend app" | FastAPI + Vite+React | `stacks/fastapi.md`, `stacks/vite-react.md` |
-| "Full-stack app with auth" (simple) | Next.js + PocketBase | `stacks/nextjs.md`, `stacks/pocketbase.md` |
-| "Full-stack app with auth" (production) | Next.js + Supabase Local | `stacks/nextjs.md`, `stacks/supabase-local.md` |
-| "App with database" | FastAPI + SQLite | `stacks/fastapi.md`, `stacks/sqlite.md` |
-| "Chatbot / AI assistant" | Streamlit + Anthropic SDK | `stacks/streamlit.md`, `stacks/anthropic-sdk.md` |
-| "Document Q&A / search" | Streamlit + LanceDB + Anthropic SDK | `stacks/streamlit.md`, `stacks/lancedb.md`, `stacks/anthropic-sdk.md` |
-| "AI agent with tools" | FastAPI + Anthropic SDK | `stacks/fastapi.md`, `stacks/anthropic-sdk.md` |
-| "AI-powered data analysis" | Streamlit + DuckDB + Anthropic SDK | `stacks/streamlit.md`, `stacks/duckdb.md`, `stacks/anthropic-sdk.md` |
-| "ML model demo" | Gradio | `stacks/gradio.md` |
-| "Mobile app" (simple) | Expo + PocketBase | `stacks/expo.md`, `stacks/pocketbase.md` |
-| "Mobile app" (production) | Expo + Supabase Local | `stacks/expo.md`, `stacks/supabase-local.md` |
-| "Mobile app with scanning/camera/NFC" | Expo + Supabase Local | `stacks/expo.md`, `stacks/supabase-local.md` |
-| "Internal tool / form app" | Streamlit | `stacks/streamlit.md` |
-| "Docs site / landing page" | Astro Starlight | `stacks/astro-starlight.md` |
-| Default (unclear) | Streamlit | `stacks/streamlit.md` |
+| SPEC Shape | Combo | Typical Pattern | Stack Files to Read |
+|---|---|---|---|
+| "Dashboard for CSV data" | Streamlit + DuckDB | Sync REST | `stacks/streamlit.md`, `stacks/duckdb.md` |
+| "Live dashboard for sensor data" | Streamlit + DuckDB | Streaming | `stacks/streamlit.md`, `stacks/duckdb.md` |
+| "API + frontend app" | FastAPI + Vite+React | Sync REST | `stacks/fastapi.md`, `stacks/vite-react.md` |
+| "Event-driven workflow API" | FastAPI + Supabase Local | Event-Driven | `stacks/fastapi.md`, `stacks/supabase-local.md` |
+| "ETL pipeline" | FastAPI + DuckDB | Pipeline / ETL | `stacks/fastapi.md`, `stacks/duckdb.md` |
+| "Scheduled report generator" | FastAPI + SQLite | Batch | `stacks/fastapi.md`, `stacks/sqlite.md` |
+| "Full-stack app with auth" (simple) | Next.js + PocketBase | Sync REST | `stacks/nextjs.md`, `stacks/pocketbase.md` |
+| "Full-stack app with auth" (production) | Next.js + Supabase Local | Sync REST | `stacks/nextjs.md`, `stacks/supabase-local.md` |
+| "Collaborative whiteboard" | Next.js + Supabase Local | Real-time | `stacks/nextjs.md`, `stacks/supabase-local.md` |
+| "App with database" | FastAPI + SQLite | Sync REST | `stacks/fastapi.md`, `stacks/sqlite.md` |
+| "Chatbot / AI assistant" | Streamlit + Anthropic SDK | Streaming | `stacks/streamlit.md`, `stacks/anthropic-sdk.md` |
+| "Document Q&A / search" | Streamlit + LanceDB + Anthropic SDK | Streaming | `stacks/streamlit.md`, `stacks/lancedb.md`, `stacks/anthropic-sdk.md` |
+| "AI agent with tools" | FastAPI + Anthropic SDK | Agent Loop | `stacks/fastapi.md`, `stacks/anthropic-sdk.md` |
+| "AI-powered data analysis" | Streamlit + DuckDB + Anthropic SDK | Agent Loop | `stacks/streamlit.md`, `stacks/duckdb.md`, `stacks/anthropic-sdk.md` |
+| "ML model demo" | Gradio | Sync REST | `stacks/gradio.md` |
+| "Mobile app" (simple) | Expo + PocketBase | Sync REST | `stacks/expo.md`, `stacks/pocketbase.md` |
+| "Mobile app" (production) | Expo + Supabase Local | Sync REST | `stacks/expo.md`, `stacks/supabase-local.md` |
+| "Mobile app with scanning/camera/NFC" | Expo + Supabase Local | Event-Driven | `stacks/expo.md`, `stacks/supabase-local.md` |
+| "Internal tool / form app" | Streamlit | Sync REST | `stacks/streamlit.md` |
+| "Docs site / landing page" | Astro Starlight | — (static) | `stacks/astro-starlight.md` |
+| Default (unclear) | Streamlit | Sync REST | `stacks/streamlit.md` |
+
+### 1B: Architecture Pattern → Control Flow
+
+Read `stacks/architecture-patterns/README.md`. Pick ONE pattern from the 7 by-the-book options:
+
+- **Sync REST / CRUD** (default, 80% of prototypes)
+- **Streaming** — "live", "as it happens", LLM streaming
+- **Event-Driven** — "when X happens then Y", webhooks, triggers
+- **Pipeline / ETL** — "ingest → transform → export"
+- **Agent Loop** — LLM with tool_use, self-directed
+- **Real-time / Collaborative** — shared state across clients
+- **Batch / Scheduled** — cron, nightly, hourly
+
+Start with the "Typical Pattern" from 1A. Override only if the SPEC's domain problem demands a different pattern (see Decision Signals in `stacks/architecture-patterns/README.md`).
+
+### 1C: Verify Stack × Pattern Compatibility
+
+Check the Pattern × Stack Compatibility Matrix in `stacks/architecture-patterns/README.md`. Your chosen stack must be ✓ (or at worst △) for your chosen pattern. If it's ✗, reconsider one of the two choices.
+
+### 1D: Read Out-of-Scope / Future Hints
+
+Read the "Out of Scope", "Later", "Future", or "Not in this phase" sections of the SPEC. These items are NOT being built now but they heavily influence current architectural decisions:
+
+- **If SPEC says "later: live updates"** → current Sync REST choice should keep `data.py` return shapes compatible with async generators (don't cache eagerly)
+- **If SPEC says "eventually: multi-user collaboration"** → avoid Streamlit (session-only) for parts that might need Real-time later; prefer FastAPI + client-agnostic state
+- **If SPEC says "future: move to Postgres"** → keep SQL standard in `data.py`, avoid SQLite-specific features (UPSERT quirks, JSON1 extensions)
+- **If SPEC says "later: mobile app"** → web choice should expose a proper API layer, not a Streamlit-only blob
+
+Capture these in the `### Future Considerations` block of `<architecture-decisions>` so downstream tasks respect them.
+
+**Do NOT deliberate beyond 2 minutes.** Match SPEC signals → stack + pattern → verify compatibility → note future hints → move on.
 
 ## Step 2: Verify Stack Availability
 
@@ -144,9 +206,18 @@ Port: {port from stack file}
 ## Architecture Decisions
 
 ### Stack Choice
-Archetype: {archetype}
+Archetype: {archetype from Step 1A}
 Combo: {list of stacks}
 Rationale: {1-2 sentences why this combo fits the SPEC}
+
+### Architecture Pattern
+Chosen: {Sync REST / Streaming / Event-Driven / Pipeline / Agent Loop / Real-time / Batch}
+Rationale: {1 sentence why this pattern matches the domain problem}
+Stack Compatibility: ✓ (verified against Pattern × Stack Matrix)
+
+### Pattern Implementation Skeleton
+{3-5 line code skeleton showing the pattern for this stack combo.
+ Copy from stacks/architecture-patterns/README.md "Code skeleton" for the chosen pattern.}
 
 ### Project Bootstrap
 {scaffold commands from Step 4}
@@ -160,6 +231,23 @@ Rationale: {1-2 sentences why this combo fits the SPEC}
 | Package | Purpose | Why this one |
 |---------|---------|-------------|
 | {pkg} | {what} | {why not alternatives} |
+
+### Future Considerations (Out-of-Scope Hints)
+{Read SPEC's "Out of Scope" / "Future" / "Later" sections. List items that
+ are NOT being built now but will influence future evolution:
+
+ - {Future feature}: {which pattern/stack change it implies}
+
+ Example:
+ - "Live updates for sensor data" (out of scope): would shift pattern
+   from Sync REST to Streaming — keep data.py functions return-shape
+   compatible with async generators.
+ - "Multi-user collaboration" (later): would require Real-time pattern —
+   avoid session-only state patterns in data.py.
+ - "Move to Postgres" (future): keep data.py SQL standard, no
+   SQLite-specific features.}
+
+Empty if the SPEC has no out-of-scope or future hints.
 
 ### Decisions NOT Made
 {What's deliberately left open and why}
@@ -299,6 +387,8 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 
 <rules>
 <rule>Pick the stack from the archetype table — do not deliberate or propose alternatives</rule>
+<rule>Pick ONE architecture pattern from stacks/architecture-patterns/README.md. Verify stack × pattern compatibility via the matrix. Don't mix patterns. Don't invent custom patterns.</rule>
+<rule>Read SPEC's Out-of-Scope / Future sections and capture hints in <architecture-decisions> Future Considerations — they influence current decisions even if not implemented now</rule>
 <rule>Read the stack files in stacks/ for exact commands — do not invent scaffold, run, or test commands</rule>
 <rule>Copy the relevant opinionated defaults from stacks/README.md into <key-patterns> — this is how the executor learns them</rule>
 <rule>Create test-harness.json in ${DIRIGENT_RUN_DIR} — the test step and planner depend on it</rule>

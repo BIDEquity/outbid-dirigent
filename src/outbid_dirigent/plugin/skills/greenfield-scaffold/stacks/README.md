@@ -113,47 +113,65 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | LLM Integration | [Anthropic SDK](anthropic-sdk.md) | — |
 | Vector DB / RAG | [LanceDB](lancedb.md) | — |
 
+## Choosing Stack × Pattern
+
+Every greenfield scaffold picks **TWO** things from the SPEC:
+
+1. **Use-Case-Archetype** → which stack combo (tables below)
+2. **Architecture Pattern** → which control flow — see **[architecture-patterns/](architecture-patterns/README.md)**
+
+**Check the Pattern × Stack Compatibility Matrix in [architecture-patterns/](architecture-patterns/README.md) BEFORE committing to a combo** — some combos don't support some patterns (e.g. Streamlit + Real-time is △, Astro + anything dynamic is ✗).
+
+Default architecture pattern is **Sync REST / CRUD** (~80% of prototypes). Only deviate when the SPEC explicitly demands Streaming / Event-Driven / Pipeline / Agent Loop / Real-time / Batch.
+
 ## Archetype Combos
 
 Match the SPEC to one of these archetypes. Pick the first one that fits.
+"Typical Pattern" is the default for that archetype — can be overridden if SPEC demands.
 
 ### Web Apps
 
-| SPEC Shape | Combo | Ports |
-|---|---|---|
-| "Dashboard for this data" | Streamlit + DuckDB | 8501 |
-| "API + frontend app" | FastAPI + Vite+React | 8000, 5173 |
-| "Full-stack app with auth" (simple) | Next.js + PocketBase | 3000, 8090 |
-| "Full-stack app with auth" (production) | Next.js + Supabase Local | 3000, 54321, 54323 |
-| "App with database" | FastAPI + SQLite | 8000 |
-| "Internal tool / form app" | Streamlit | 8501 |
-| "Docs site / landing page" | Astro Starlight | 4321 |
-| "Python app with real database" | FastAPI + Supabase Local | 8000, 54321 |
-| "Data pipeline + dashboard" | Streamlit + DuckDB + FastAPI | 8501, 8000 |
+| SPEC Shape | Combo | Ports | Typical Pattern |
+|---|---|---|---|
+| "Dashboard for CSV data" | Streamlit + DuckDB | 8501 | Sync REST |
+| "Live dashboard for sensor data" | Streamlit + DuckDB | 8501 | Streaming |
+| "API + frontend app" | FastAPI + Vite+React | 8000, 5173 | Sync REST |
+| "Event-driven workflow API" | FastAPI + Supabase Local | 8000, 54321 | Event-Driven |
+| "ETL pipeline" | FastAPI + DuckDB | 8000 | Pipeline / ETL |
+| "Scheduled report generator" | FastAPI + SQLite | 8000 | Batch |
+| "Full-stack app with auth" (simple) | Next.js + PocketBase | 3000, 8090 | Sync REST |
+| "Full-stack app with auth" (production) | Next.js + Supabase Local | 3000, 54321, 54323 | Sync REST |
+| "Collaborative whiteboard" | Next.js + Supabase Local | 3000, 54321 | Real-time |
+| "App with database" | FastAPI + SQLite | 8000 | Sync REST |
+| "Internal tool / form app" | Streamlit | 8501 | Sync REST |
+| "Docs site / landing page" | Astro Starlight | 4321 | — (static) |
+| "Python app with real database" | FastAPI + Supabase Local | 8000, 54321 | Sync REST |
+| "Data pipeline + dashboard" | Streamlit + DuckDB + FastAPI | 8501, 8000 | Pipeline / ETL |
 
 ### AI Apps
 
-| SPEC Shape | Combo | Ports |
-|---|---|---|
-| "Chatbot / AI assistant" | Streamlit + Anthropic SDK | 8501 |
-| "Document Q&A / search" | Streamlit + LanceDB + Anthropic SDK | 8501 |
-| "AI agent with tools" | FastAPI + Anthropic SDK | 8000 |
-| "AI-powered data analysis" | Streamlit + DuckDB + Anthropic SDK | 8501 |
-| "ML model demo" | Gradio | 7860 |
+| SPEC Shape | Combo | Ports | Typical Pattern |
+|---|---|---|---|
+| "Chatbot / AI assistant" | Streamlit + Anthropic SDK | 8501 | Streaming |
+| "Document Q&A / search" | Streamlit + LanceDB + Anthropic SDK | 8501 | Streaming |
+| "AI agent with tools" | FastAPI + Anthropic SDK | 8000 | Agent Loop |
+| "AI-powered data analysis" | Streamlit + DuckDB + Anthropic SDK | 8501 | Agent Loop |
+| "ML model demo" | Gradio | 7860 | Sync REST |
 
 ### Mobile Apps
 
-| SPEC Shape | Combo | Ports |
-|---|---|---|
-| "Mobile app" (simple) | Expo + PocketBase | 8081, 8090 |
-| "Mobile app" (production) | Expo + Supabase Local | 8081, 54321, 54323 |
-| "Mobile app with scanning/camera/NFC" | Expo + Supabase Local + expo-camera | 8081, 54321, 54323 |
+| SPEC Shape | Combo | Ports | Typical Pattern |
+|---|---|---|---|
+| "Mobile app" (simple) | Expo + PocketBase | 8081, 8090 | Sync REST |
+| "Mobile app" (production) | Expo + Supabase Local | 8081, 54321, 54323 | Sync REST |
+| "Mobile app with scanning/camera/NFC" | Expo + Supabase Local + expo-camera | 8081, 54321, 54323 | Event-Driven |
+| "Real-time collaborative mobile" | Expo + Supabase Local | 8081, 54321 | Real-time |
 
 ### Default
 
-| SPEC Shape | Combo | Ports |
-|---|---|---|
-| Default (unclear) | Streamlit | 8501 |
+| SPEC Shape | Combo | Ports | Typical Pattern |
+|---|---|---|---|
+| Default (unclear) | Streamlit | 8501 | Sync REST |
 
 ## Each Stack File Contains
 
