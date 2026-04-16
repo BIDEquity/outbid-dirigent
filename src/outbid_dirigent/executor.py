@@ -492,7 +492,7 @@ class Executor:
                     phase_tasks_completed += 1
                     continue
 
-                self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id))
+                self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id) if phase.id.isdigit() else 0)
 
                 result = self.runner.run_task(task, plan, phase_num=phase.id)
 
@@ -504,8 +504,8 @@ class Executor:
                     if result.commit_hash:
                         phase_commit_count += 1
                     for dev in result.deviations:
-                        self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=int(phase.id))
-                    self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=int(phase.id))
+                        self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=int(phase.id) if phase.id.isdigit() else 0)
+                    self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=int(phase.id) if phase.id.isdigit() else 0)
                 else:
                     state.setdefault("failed_tasks", []).append({
                         "task_id": task.id,
