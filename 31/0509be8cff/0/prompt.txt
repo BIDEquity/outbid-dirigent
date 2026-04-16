@@ -1,0 +1,1 @@
+can you generate a greenfield smoke test with a very simple spec (mention that it must not be larger than 2 phases and 7 tasks).
