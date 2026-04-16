@@ -40,9 +40,15 @@ class ContractManager:
 
     @staticmethod
     def _normalize_phase_id(phase_id: str) -> str:
-        """Normalize phase ID to zero-padded two-digit format (1 -> 01, 01 -> 01)."""
+        """Normalize phase ID to zero-padded two-digit format.
+
+        Handles various planner outputs: "1" -> "01", "01" -> "01",
+        "phase-1" -> "01", "phase-01" -> "01".
+        """
+        # Strip "phase-" prefix if the planner included it
+        cleaned = phase_id.removeprefix("phase-").removeprefix("phase_")
         try:
-            return str(int(phase_id)).zfill(2)
+            return str(int(cleaned)).zfill(2)
         except (ValueError, TypeError):
             return str(phase_id)
 
