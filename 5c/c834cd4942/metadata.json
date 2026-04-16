@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "5cc834cd4942",
+  "strategy": "manual-commit",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/contract.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/5c/c834cd4942/0/metadata.json",
+      "transcript": "/5c/c834cd4942/0/full.jsonl",
+      "content_hash": "/5c/c834cd4942/0/content_hash.txt",
+      "prompt": "/5c/c834cd4942/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 9,
+    "cache_creation_tokens": 287639,
+    "cache_read_tokens": 1144088,
+    "output_tokens": 762,
+    "api_call_count": 5
+  }
+}
