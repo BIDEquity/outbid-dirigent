@@ -101,16 +101,10 @@ class Router:
 
     GREENFIELD_STEPS = [
         RouteStep(
-            step_type=StepType.INIT,
-            name="Init Phase",
-            description="Bootstrap dev environment, seed data, configure e2e credentials",
-            required=False,
-        ),
-        RouteStep(
             step_type=StepType.GREENFIELD_SCAFFOLD,
             name="Greenfield Scaffold",
-            description="Propose test setup and architecture best practices before planning",
-            required=False,
+            description="Pick stack, scaffold project, create ARCHITECTURE.md and start.sh",
+            required=True,
         ),
         RouteStep(
             step_type=StepType.PLANNING,

@@ -207,42 +207,56 @@ class Shipper:
             return False
 
     def _build_getting_started(self) -> str:
-        """Build a Getting Started section from test-harness and runtime info."""
+        """Build a Getting Started section from start.sh, test-harness, or runtime info."""
         parts = ["## Getting Started", ""]
         harness_path = self.dirigent_dir / "test-harness.json"
         analysis_path = self.dirigent_dir / "ANALYSIS.json"
+        start_script = self.repo_path / "start.sh"
 
-        # Try runtime info from analysis
-        if analysis_path.exists():
-            import json
-            try:
-                analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
-                runtime = analysis.get("runtime", {})
-                if runtime:
-                    setup = runtime.get("setup_steps", [])
-                    start = runtime.get("start_command", "")
-                    port = runtime.get("port", "")
-                    if setup:
-                        parts.append("### Setup")
-                        parts.append("```bash")
-                        for step in setup:
-                            parts.append(step)
-                        parts.append("```")
-                        parts.append("")
-                    if start:
-                        parts.append("### Run")
-                        parts.append("```bash")
-                        parts.append(start)
-                        parts.append("```")
-                        if port:
-                            parts.append(f"\nOpen http://localhost:{port}")
-                        parts.append("")
-            except Exception:
-                pass
+        # Prefer start.sh (greenfield route produces this)
+        if start_script.exists():
+            parts.append("### Run")
+            parts.append("```bash")
+            parts.append("./start.sh")
+            parts.append("```")
+            parts.append("")
 
-        # Try test-harness for verification
+            # Extract ports from test-harness for the "Open" hint
+            harness = TestHarness.load(harness_path)
+            if harness and harness.portal:
+                parts.append(f"Open http://localhost:{harness.portal.port}{harness.portal.url_after_start}")
+                parts.append("")
+        else:
+            # Fallback: try runtime info from analysis
+            if analysis_path.exists():
+                import json
+                try:
+                    analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+                    runtime = analysis.get("runtime", {})
+                    if runtime:
+                        setup = runtime.get("setup_steps", [])
+                        start = runtime.get("start_command", "")
+                        port = runtime.get("port", "")
+                        if setup:
+                            parts.append("### Setup")
+                            parts.append("```bash")
+                            for step in setup:
+                                parts.append(step)
+                            parts.append("```")
+                            parts.append("")
+                        if start:
+                            parts.append("### Run")
+                            parts.append("```bash")
+                            parts.append(start)
+                            parts.append("```")
+                            if port:
+                                parts.append(f"\nOpen http://localhost:{port}")
+                            parts.append("")
+                except Exception:
+                    pass
+
+        # Add verification commands from test-harness
         if harness_path.exists():
-            from outbid_dirigent.test_harness_schema import TestHarness
             harness = TestHarness.load(harness_path)
             if harness and harness.commands:
                 parts.append("### Verify")
