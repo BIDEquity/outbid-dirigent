@@ -1,7 +1,16 @@
 ---
 name: add-stack-or-pattern
-description: Repo-internal maintainer skill. Add or modify a stack or architecture pattern in the greenfield-scaffold plugin skill, keeping ALL cross-references consistent. Use when adding/changing Streamlit, FastAPI, Sync REST, Streaming, etc.
+description: Repo-internal maintainer skill. Add or modify a stack, interaction shape, compute topology, domain pattern, or evolution threshold in the greenfield-scaffold plugin skill, keeping ALL cross-references consistent.
 ---
+
+## Architecture is Three Axes
+
+Remember: the greenfield skill uses THREE architectural axes, not one:
+- **Interaction Shape** (5 options): Sync REST / Streaming / Event-Driven / Real-time / Batch — each has its own file under `architecture-patterns/`
+- **Compute Topology** (3 options): In-Process / Serverless / Long-running Worker — described in `architecture-patterns/README.md` (no separate files)
+- **Domain Patterns** (optional): Pipeline, Agent Loop, State Machine, Webhook Receiver, Multi-Tenant — files under `architecture-patterns/` (pipeline.md, agent-loop.md)
+
+When adding/modifying, be precise about WHICH axis you're touching.
 
 # Add or Modify a Stack / Architecture Pattern
 

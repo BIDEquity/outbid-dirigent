@@ -24,9 +24,10 @@ Use this table to navigate the skill. **Read only what you need for the current 
 | You need... | Go to | When |
 |---|---|---|
 | **Stack catalog + opinionated defaults** | `stacks/README.md` | Step 1A — pick the stack combo |
-| **Architecture pattern catalog + matrix** | `stacks/architecture-patterns/README.md` | Step 1B — pick the control-flow pattern |
+| **Architecture catalog + matrices** (Interaction Shape / Compute Topology / Domain Pattern) | `stacks/architecture-patterns/README.md` | Step 1B — pick one from each axis |
 | **Stack-specific commands** (scaffold, run, test, install-check) | `stacks/<stack-name>.md` (e.g. `stacks/streamlit.md`) | Step 2 (availability check), Step 4 (scaffold), Step 6 (test-harness), Step 7 (start.sh) |
 | **Pattern-specific code skeleton** | `stacks/architecture-patterns/<pattern>.md` (e.g. `stacks/architecture-patterns/streaming.md`) | Step 5 — write `### Pattern Implementation Skeleton` into ARCHITECTURE.md |
+| **Migration thresholds per stack** | `stacks/evolution-thresholds.md` | Step 5 — write `### Evolution Thresholds` into ARCHITECTURE.md |
 | **Framework API / latest syntax** | context7 MCP (`mcp__context7__resolve-library-id` + `query-docs`) | Anywhere you're tempted to recall API from memory — query instead |
 
 ## Steps At A Glance
@@ -95,23 +96,38 @@ Match the SPEC to an archetype from `stacks/README.md` and pick the stack combo.
 | "Docs site / landing page" | Astro Starlight | — (static) | `stacks/astro-starlight.md` |
 | Default (unclear) | Streamlit | Sync REST | `stacks/streamlit.md` |
 
-### 1B: Architecture Pattern → Control Flow
+### 1B: Architecture — Three Axes
 
-Read `stacks/architecture-patterns/README.md`. Pick ONE pattern from the 7 by-the-book options:
+Read `stacks/architecture-patterns/README.md`. Architecture is not one dimension — pick **three** things:
 
+**1B-i: Interaction Shape (1 of 5)** — how clients interact with the system:
 - **Sync REST / CRUD** (default, 80% of prototypes)
 - **Streaming** — "live", "as it happens", LLM streaming
 - **Event-Driven** — "when X happens then Y", webhooks, triggers
-- **Pipeline / ETL** — "ingest → transform → export"
-- **Agent Loop** — LLM with tool_use, self-directed
 - **Real-time / Collaborative** — shared state across clients
 - **Batch / Scheduled** — cron, nightly, hourly
 
-Start with the "Typical Pattern" from 1A. Override only if the SPEC's domain problem demands a different pattern (see Decision Signals in `stacks/architecture-patterns/README.md`).
+Start with the "Typical Pattern" from 1A. Override only if the SPEC's domain problem demands a different shape.
 
-### 1C: Verify Stack × Pattern Compatibility
+**1B-ii: Compute Topology (1 of 3)** — where the code runs:
+- **In-Process** (default) — single long-lived process (FastAPI, Streamlit, Next.js dev)
+- **Serverless / Edge** — short-lived functions (Supabase Edge, Vercel Functions). Pick when the stack is natively serverless.
+- **Long-running Worker** — dedicated background process. Pick when work is async / takes minutes / needs retries.
 
-Check the Pattern × Stack Compatibility Matrix in `stacks/architecture-patterns/README.md`. Your chosen stack must be ✓ (or at worst △) for your chosen pattern. If it's ✗, reconsider one of the two choices.
+**1B-iii: Domain Pattern (0 or 1 — optional)** — shape of the problem:
+- **Pipeline / ETL** — sequential stages with clear I/O
+- **Agent Loop** — LLM with tool use, self-directed
+- **State Machine / Workflow** — entity with sequential states + error paths (use this, NOT Event-Driven, when ordering and error recovery matter)
+- **Webhook Receiver** — external trigger (usually Serverless)
+- **Multi-Tenant Isolation** — orthogonal; applies regardless of other axes
+
+Most prototypes need zero Domain Patterns. Only add one when the SPEC's problem shape matches.
+
+### 1C: Verify Stack × Interaction Shape Compatibility
+
+Check the Stack × Interaction Shape Matrix in `stacks/architecture-patterns/README.md`. Your chosen stack must be ✓ (or at worst △) for your chosen shape. If it's ✗, reconsider one of the two choices.
+
+Also check the Compute Topology × Stack table — make sure your stack naturally supports your chosen topology.
 
 ### 1D: Read Out-of-Scope / Future Hints
 
@@ -210,14 +226,23 @@ Archetype: {archetype from Step 1A}
 Combo: {list of stacks}
 Rationale: {1-2 sentences why this combo fits the SPEC}
 
-### Architecture Pattern
-Chosen: {Sync REST / Streaming / Event-Driven / Pipeline / Agent Loop / Real-time / Batch}
-Rationale: {1 sentence why this pattern matches the domain problem}
-Stack Compatibility: ✓ (verified against Pattern × Stack Matrix)
+### Architecture (three axes)
+
+**Interaction Shape:** {Sync REST / Streaming / Event-Driven / Real-time / Batch}
+Rationale: {1 sentence why this shape matches the domain problem}
+
+**Compute Topology:** {In-Process / Serverless / Long-running Worker}
+Rationale: {why this topology fits the SPEC + chosen stack}
+
+**Domain Pattern:** {None / Pipeline / Agent Loop / State Machine / Webhook Receiver / Multi-Tenant}
+Rationale: {only if applicable; most prototypes have none}
+
+Stack Compatibility: ✓ (verified against matrix in architecture-patterns/README.md)
 
 ### Pattern Implementation Skeleton
-{3-5 line code skeleton showing the pattern for this stack combo.
- Copy from stacks/architecture-patterns/README.md "Code skeleton" for the chosen pattern.}
+{3-5 line code skeleton showing the Interaction Shape for this stack combo.
+ Copy from the matching architecture-patterns/<shape>.md "Code Example" section.
+ If a Domain Pattern is also used, show how it nests inside.}
 
 ### Project Bootstrap
 {scaffold commands from Step 4}
@@ -248,6 +273,22 @@ Stack Compatibility: ✓ (verified against Pattern × Stack Matrix)
    SQLite-specific features.}
 
 Empty if the SPEC has no out-of-scope or future hints.
+
+### Evolution Thresholds
+{MANDATORY. Read `stacks/evolution-thresholds.md` and copy relevant rows for
+ the chosen stack combo. Use concrete numbers, not adjectives.
+
+ | Component | Threshold | Next step |
+ |---|---|---|
+ | {Stack 1} | {quantitative limit} | {concrete next stack} |
+ | {Stack 2} | {quantitative limit} | {concrete next stack} |
+
+ ### Upfront Commitments (cannot be added late)
+ {Only if applicable. Hardware / developer-program / cert registrations with
+  lead time that MUST be started during prototype phase, not deferred.
+  Examples: Apple Pass Type ID, APNs cert, Google Wallet issuer account.
+  Empty if the prototype has no such dependencies.}
+}
 
 ### Decisions NOT Made
 {What's deliberately left open and why}
@@ -387,8 +428,10 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 
 <rules>
 <rule>Pick the stack from the archetype table — do not deliberate or propose alternatives</rule>
-<rule>Pick ONE architecture pattern from stacks/architecture-patterns/README.md. Verify stack × pattern compatibility via the matrix. Don't mix patterns. Don't invent custom patterns.</rule>
+<rule>Pick ONE Interaction Shape + ONE Compute Topology from stacks/architecture-patterns/README.md. Domain Pattern is optional (most prototypes have none). Verify stack compatibility via the matrix. Don't invent custom shapes.</rule>
+<rule>State Machine beats Event-Driven for sequential workflows with error paths. If the SPEC describes "X then Y then Z with fallbacks", use State Machine in domain.py, not raw event fan-out.</rule>
 <rule>Read SPEC's Out-of-Scope / Future sections and capture hints in <architecture-decisions> Future Considerations — they influence current decisions even if not implemented now</rule>
+<rule>Write ### Evolution Thresholds into <architecture-decisions> with concrete numbers (not adjectives). Pull defaults from stacks/evolution-thresholds.md. If there are upfront commitments with lead time (Apple Pass Type ID, APNs cert, etc.) list them separately — they cannot be deferred.</rule>
 <rule>Read the stack files in stacks/ for exact commands — do not invent scaffold, run, or test commands</rule>
 <rule>Copy the relevant opinionated defaults from stacks/README.md into <key-patterns> — this is how the executor learns them</rule>
 <rule>Create test-harness.json in ${DIRIGENT_RUN_DIR} — the test step and planner depend on it</rule>
