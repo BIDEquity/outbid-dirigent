@@ -1,0 +1,70 @@
+what is the spec?`
+
+---
+
+[Image #1] wo würde das rauskommen in unseren greenfield best practices?
+
+---
+
+ehrlich: Ja. Wir brauchen ehrlichgesagt ach noch AI-Tool-Best-Practices. Was würde dir dazu einfallen?
+
+---
+
+ja.
+
+---
+
+2026-04-16 16:37:08.015 | WARNING  | outbid_dirigent.executor:execute_plan:481 - Phase phase-1 contract creation failed (non-blocking)
+[2026-04-16 16:37:08] ⚡ Starte Ausführung: Phase phase-1 – Test Coverage & Robustness
+[2026-04-16 16:37:08] ❌ Unerwarteter Fehler: invalid literal for int() with base 10: 'phase-1' – invalid literal for int() with base 10: 'phase-1'
+Traceback (most recent call last):
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/dirigent.py", line 885, in main
+    success = run_execution(
+        repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort,
+    ...<3 lines>...
+        force_continue=args.force_continue,
+    )
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/dirigent.py", line 458, in run_execution
+    success = executor.execute_plan()
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/executor.py", line 495, in execute_plan
+    self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id))
+                                                             ~~~^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: 'phase-1'
+
+---
+
+2026-04-16 16:37:08.015 | WARNING  | outbid_dirigent.executor:execute_plan:481 - Phase phase-1 contract creation failed (non-blocking)
+[2026-04-16 16:37:08] ⚡ Starte Ausführung: Phase phase-1 – Test Coverage & Robustness
+[2026-04-16 16:37:08] ❌ Unerwarteter Fehler: invalid literal for int() with base 10: 'phase-1' – invalid literal for int() with base 10: 'phase-1'
+Traceback (most recent call last):
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/dirigent.py", line 885, in main
+    success = run_execution(
+        repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort,
+    ...<3 lines>...
+        force_continue=args.force_continue,
+    )
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/dirigent.py", line 458, in run_execution
+    success = executor.execute_plan()
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/executor.py", line 495, in execute_plan
+    self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id))
+                                                             ~~~^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: 'phase-1'
+
+---
+
+2026-04-16 16:37:08.015 | WARNING  | outbid_dirigent.executor:execute_plan:481 - Phase phase-1 contract creation failed (non-blocking)
+[2026-04-16 16:37:08] ⚡ Starte Ausführung: Phase phase-1 – Test Coverage & Robustness
+[2026-04-16 16:37:08] ❌ Unerwarteter Fehler: invalid literal for int() with base 10: 'phase-1' – invalid literal for int() with base 10: 'phase-1'
+Traceback (most recent call last):
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/dirigent.py", line 885, in main
+    success = run_execution(
+        repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort,
+    ...<3 lines>...
+        force_continue=args.force_continue,
+    )
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/dirigent.py", line 458, in run_execution
+    success = executor.execute_plan()
+  File "/Users/jk/.local/share/uv/tools/outbid-dirigent/lib/python3.14/site-packages/outbid_dirigent/executor.py", line 495, in execute_plan
+    self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id))
+                                                             ~~~^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: 'phase-1' hatten wir das nicht schon mal behoben
