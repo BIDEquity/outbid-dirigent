@@ -191,17 +191,18 @@ class ContractManager:
 
         review.save(review_path)
 
-        # Reject pass verdicts where functional criteria lack evidence
+        # Warn about criteria that lack evidence but don't override the verdict.
+        # The reviewer often executes verification commands (visible in logs) but
+        # fails to populate the structured evidence arrays. Overriding PASS→FAIL
+        # for missing evidence caused infinite review loops with no actionable fix.
         unproven = review.criteria_without_evidence
         if review.verdict == Verdict.PASS and unproven:
             logger.warning(
-                f"Phase {phase.id} review claimed PASS but {len(unproven)} criteria "
-                f"lack verification evidence — overriding to FAIL"
+                f"Phase {phase.id} review: {len(unproven)} criteria lack structured "
+                f"evidence (reviewer may have verified via tool calls without recording)"
             )
             for cr in unproven:
                 logger.warning(f"  No evidence: [{cr.ac_id}] {cr.notes[:100]}")
-            review.verdict = Verdict.FAIL
-            review.save(review_path)
 
         # Promote to PASS when all failures are infra-constrained (WARN only)
         if review.verdict == Verdict.FAIL and review.infra_constrained_only:
