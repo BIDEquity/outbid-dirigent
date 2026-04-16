@@ -49,11 +49,12 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | Date/time | native `Date`, `Intl.DateTimeFormat` | moment.js, dayjs |
 | Formatting | whatever the scaffold ships | adding prettier separately |
 | Exports | named exports | default exports, barrel files (`index.ts` re-exporting) |
+| CSS/Styling | Tailwind (Next.js scaffold includes it via `--tailwind`) | styled-components, emotion, plain CSS |
+| ORM (JS) | `prisma` (when raw SQL gets tedious) | TypeORM, Sequelize, Drizzle |
 | Next.js components | Server Components by default, `"use client"` only for interactivity | `"use client"` on every file |
 | Next.js data fetching | server components + `fetch` | React Query / TanStack Query in Next.js |
 | Forms | native `FormData` + server actions (Next.js), `useState` (Vite) | React Hook Form for a 3-field form |
 | State management | `useState` + `useContext` | Redux, Zustand for prototypes |
-| CSS/Styling | Tailwind if scaffold includes it, otherwise CSS modules | styled-components, emotion |
 
 ### AI Integration
 
@@ -80,9 +81,14 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | Abstractions | none until 2+ implementations. No DI frameworks. No event bus. |
 | File nesting | max 2 levels deep. Flat > nested. |
 | Barrel files | don't create `index.ts` re-exporting everything |
-| ORM | skip for prototypes. Raw SQL or `sqlmodel` if you must. |
+| ORM (Python) | `sqlmodel` when raw SQL gets tedious. Not SQLAlchemy + Alembic for prototypes. |
+| ORM (JS) | `prisma` when raw SQL gets tedious. Not TypeORM, Sequelize. |
 | API style | REST. Not GraphQL. Not tRPC. |
-| Auth | don't build it. PocketBase or Supabase handle it. |
+| Auth | don't build it. PocketBase (local, lightweight) or Supabase Local (local, production-grade). Skip OAuth/SSO for prototypes — email+password is enough. |
+| File storage | use the backend's built-in: Supabase Storage or PocketBase file fields. Not a separate S3/MinIO for prototypes. |
+| NoSQL / documents | use Postgres JSONB (via Supabase) or DuckDB nested types. Not MongoDB for prototypes. |
+| Event-driven | don't for prototypes. Direct function calls. If you must: FastAPI BackgroundTasks or simple in-process callbacks. Not Kafka, RabbitMQ, Redis Pub/Sub. |
+| CSS | Tailwind (comes with Next.js scaffold). For Python UIs: Streamlit handles it. Don't add CSS frameworks to Streamlit/Gradio apps. |
 | CORS (prototype) | `allow_origins=["*"]` is fine. Note "tighten for prod" in start.sh. |
 | Monorepo | no. One repo, one project. |
 | Dependencies | fewer is better. Don't add a lib for what stdlib does. |
