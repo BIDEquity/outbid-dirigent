@@ -44,6 +44,7 @@ SKILLS = [
     "fix-review",
     "extract-business-rules",
     "quick-scan",
+    "greenfield-scaffold",
 ]
 
 
@@ -274,6 +275,124 @@ def handle_quick_scan(prompt: str):
     print(f"fake-claude: wrote {out}")
 
 
+def handle_greenfield_scaffold(prompt: str):
+    """Simulate the greenfield scaffold step: ARCHITECTURE.md + start.sh + test-harness.json."""
+    cwd = Path(os.getcwd())
+
+    # Write ARCHITECTURE.md with the three sections
+    arch = cwd / "ARCHITECTURE.md"
+    arch.write_text("""\
+# Architecture
+
+<testing-verification>
+## Testing & Verification
+
+### Stack
+Streamlit + DuckDB
+Archetype: Dashboard for this data
+
+### Test Suite
+uv run pytest tests/ -v
+Framework: pytest
+Location: tests/
+
+### Dev Server
+uv run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+Port: 8501
+
+### How to Verify Manually
+1. Run `./start.sh`
+2. Open http://localhost:8501
+3. Verify the dashboard loads
+</testing-verification>
+
+<architecture-decisions>
+## Architecture Decisions
+
+### Stack Choice
+Archetype: Dashboard for this data
+Combo: Streamlit + DuckDB
+Rationale: SPEC asks for a data dashboard — Streamlit is the default Python UI, DuckDB for analytics.
+
+### Project Bootstrap
+uv init --name app
+uv add streamlit duckdb
+
+### File Organization
+```
+app.py
+tests/
+  test_app.py
+start.sh
+```
+
+### Decisions NOT Made
+- Auth strategy (not needed per SPEC)
+</architecture-decisions>
+
+<key-patterns>
+## Key Patterns
+
+### Opinionated Defaults (non-negotiable)
+- Package management: `uv` — not pip, not poetry
+- DataFrames: `polars` — not pandas
+- Validation / API I/O: `pydantic`
+- Config: `pydantic-settings`
+- Internal data objects: `dataclasses`
+- HTTP client: `httpx` — not requests
+- Logging: `loguru`
+- Testing: plain `pytest` functions + fixtures — not unittest.TestCase
+- Formatting: `ruff format`
+- Abstractions: none until 2+ implementations
+- Error handling: let it crash, validate at boundaries only
+
+### Project Conventions
+- Naming: snake_case for files and functions
+- Config access: pydantic-settings from .env
+</key-patterns>
+""", encoding="utf-8")
+
+    # Write start.sh
+    start_sh = cwd / "start.sh"
+    start_sh.write_text("""\
+#!/bin/bash
+set -e
+cd "$(dirname "$0")"
+uv sync
+exec uv run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+""", encoding="utf-8")
+    start_sh.chmod(0o755)
+
+    # Write test-harness.json
+    harness = {
+        "commands": {
+            "test": {
+                "command": "uv run pytest tests/ -v",
+                "explanation": "Run all unit tests with pytest",
+            },
+            "dev": {
+                "command": "uv run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true",
+                "explanation": "Start the Streamlit dev server",
+            },
+        },
+        "env_vars": {},
+        "portal": {
+            "start_command": "uv run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true",
+            "port": 8501,
+            "url_after_start": "/",
+        },
+        "_sources": {
+            "commands.test": "stacks/streamlit.md",
+            "commands.dev": "stacks/streamlit.md",
+            "portal.port": "stacks/streamlit.md",
+        },
+    }
+    write_json(dirigent_dir() / "test-harness.json", harness)
+
+    git_commit("docs: greenfield scaffold — Streamlit + DuckDB, testing strategy, start script")
+    print("fake-claude: greenfield scaffold complete")
+
+
 def handle_unknown(prompt: str):
     print("fake-claude: unknown skill — noop (success)")
 
@@ -290,6 +409,7 @@ HANDLERS = {
     "fix-review": handle_fix_review,
     "extract-business-rules": handle_extract_business_rules,
     "quick-scan": handle_quick_scan,
+    "greenfield-scaffold": handle_greenfield_scaffold,
     "unknown": handle_unknown,
 }
 
