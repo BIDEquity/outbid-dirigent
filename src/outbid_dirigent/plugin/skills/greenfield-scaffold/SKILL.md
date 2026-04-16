@@ -43,6 +43,8 @@ Read `${DIRIGENT_RUN_DIR}/SPEC.md` and match it to an archetype from `stacks/REA
 
 **Do NOT deliberate over stack choices.** The stacks are opinionated defaults. Pick the combo, move on.
 
+Read the full archetype table from `stacks/README.md`. It covers Web Apps, AI Apps, and Mobile Apps. Here is a summary — always check the README for the complete list:
+
 | SPEC Shape | Combo | Stack Files to Read |
 |---|---|---|
 | "Dashboard for this data" | Streamlit + DuckDB | `stacks/streamlit.md`, `stacks/duckdb.md` |
@@ -50,11 +52,16 @@ Read `${DIRIGENT_RUN_DIR}/SPEC.md` and match it to an archetype from `stacks/REA
 | "Full-stack app with auth" (simple) | Next.js + PocketBase | `stacks/nextjs.md`, `stacks/pocketbase.md` |
 | "Full-stack app with auth" (production) | Next.js + Supabase Local | `stacks/nextjs.md`, `stacks/supabase-local.md` |
 | "App with database" | FastAPI + SQLite | `stacks/fastapi.md`, `stacks/sqlite.md` |
+| "Chatbot / AI assistant" | Streamlit + Anthropic SDK | `stacks/streamlit.md`, `stacks/anthropic-sdk.md` |
+| "Document Q&A / search" | Streamlit + LanceDB + Anthropic SDK | `stacks/streamlit.md`, `stacks/lancedb.md`, `stacks/anthropic-sdk.md` |
+| "AI agent with tools" | FastAPI + Anthropic SDK | `stacks/fastapi.md`, `stacks/anthropic-sdk.md` |
+| "AI-powered data analysis" | Streamlit + DuckDB + Anthropic SDK | `stacks/streamlit.md`, `stacks/duckdb.md`, `stacks/anthropic-sdk.md` |
 | "ML model demo" | Gradio | `stacks/gradio.md` |
+| "Mobile app" (simple) | Expo + PocketBase | `stacks/expo.md`, `stacks/pocketbase.md` |
+| "Mobile app" (production) | Expo + Supabase Local | `stacks/expo.md`, `stacks/supabase-local.md` |
+| "Mobile app with scanning/camera/NFC" | Expo + Supabase Local | `stacks/expo.md`, `stacks/supabase-local.md` |
 | "Internal tool / form app" | Streamlit | `stacks/streamlit.md` |
 | "Docs site / landing page" | Astro Starlight | `stacks/astro-starlight.md` |
-| "Python app with real database" | FastAPI + Supabase Local | `stacks/fastapi.md`, `stacks/supabase-local.md` |
-| "Data pipeline + dashboard" | Streamlit + DuckDB + FastAPI | `stacks/streamlit.md`, `stacks/duckdb.md`, `stacks/fastapi.md` |
 | Default (unclear) | Streamlit | `stacks/streamlit.md` |
 
 ## Step 2: Verify Stack Availability
