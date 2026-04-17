@@ -1,0 +1,34 @@
+lets discuss the planner tune first, i guess there is more opportunity there.
+
+---
+
+lets try a and b now.
+
+---
+
+can you try that plan generation skill directly on the @example-specs/cuseum-vam-small.md
+
+---
+
+1 is a no-breainer - do it. 2: the 5*5 increase in exemptions is flexible enough while not too flexible at the same time.
+
+---
+
+yes. then: using the generated plan from the VAM step, can you generate the contract for a user-facing phase?
+
+---
+
+yes, do 3 and 2 and then explain the problem with 1. i have playwright installed.
+
+---
+
+Ok lets do A + two additions: give the executor skill knowledge about and opportunity to use (via aallowed tools) context7 as storage for up-to-date docs as well as a simlpe sidecar markdown reference on "how to set up" but - if and only if - this knowledge is not covered elsewehere.
+
+---
+
+two minor questions: 
+
+dirigent --spec cuseum-vam-small.md --repo . --output json
+ -> how can i write to stdout and file (probably tee) so you can read the output later for evaluation?
+
+please log the current version and commit hash on dirigent start (debug)
