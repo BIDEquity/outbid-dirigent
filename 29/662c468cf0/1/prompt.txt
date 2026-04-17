@@ -1,0 +1,570 @@
+spawne einen kritker-subagent. dieser soll die zwei dimensionen stack vs. arch pattern, die wir heute gebaut haben kritisieren und auseinandernehmen. sind es die richtigen, für greenfield projekte? was, wenn wir über einen prototypen hinausgehen wollen?
+
+---
+
+beide
+
+---
+
+I want to publish a version 2 of the dirigent today. please spawn subagents that look at each route and polish them for publication.
+
+---
+
+<task-notification>
+<task-id>a7166d6d54098f92c</task-id>
+<tool-use-id>toolu_01QQSMnMG4oCG3WCKPZwqhpH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a7166d6d54098f92c.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish quick-feature skill" completed</summary>
+<result>130 lines — within the 150 budget.
+
+## Changes Made
+- `quick-feature/SKILL.md` (81 → 130 lines): Added Scope Check table with 7 concrete redirect triggers at the top; added Steps At A Glance table (Agent / Input / Output per step); tightened the three agent prompts (absolute paths, scope-too-large verdict in Step 1, explicit verdict rules in Step 3, Conventional Commits in Step 2); added Anti-Patterns table (6 concrete failure modes with rationale); rewrote Rules with inline rationale — no platitudes; added constraints block matching greenfield style; introduced `QF-nn` acceptance-criteria IDs in the plan so reviewer's `criteria_results` schema has a real source.
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+- **AC-ID convention drift**: `quick-feature` uses `QF-nn`, but `plugin/agents/reviewer.md` documents `AC-NN-NN` (phase-scoped). The reviewer agent needs either a quick-route branch or a generic "use whatever IDs the plan declares" instruction. Fix belongs in `plugin/agents/reviewer.md`, not here.
+- **`disable-model-invocation: true`** frontmatter differs from greenfield's `context: fork` + `agent: infra-architect` header style. If the plugin loader treats these differently (route vs. direct-dispatch skills), the quick-feature metadata may need harmonization with whatever convention v2 settles on. Needs a look at the skill loader, not an in-file edit.
+- **Redirect target `/dirigent:start`** is the entry coach, not a direct "full pipeline" command. If v2 exposes a more specific command for "promote this to full pipeline", update the redirect text in Step 1 and Scope Check. Currently a coach hand-off, which is acceptable but not optimal.</result>
+<usage><total_tokens>51408</total_tokens><tool_uses>8</tool_uses><duration_ms>120459</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a8a74a96d3588a081</task-id>
+<tool-use-id>toolu_01FLku8bmWhbT1ftPhrDAAn4</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a8a74a96d3588a081.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish hybrid / quick-scan" completed</summary>
+<result>File is 251 lines — within the target range I suggested for the skill itself. Task complete.
+
+## Changes Made
+
+- `src/outbid_dirigent/plugin/skills/quick-scan/SKILL.md`: full rewrite from 45-line stub to 251-line polished skill. Added frontmatter-consistent intro paragraph explaining the Hybrid sweet-spot; added "When This Runs" block naming upstream (`run-init`) and downstream (`create-plan`) consumers; added 8-row "Steps At A Glance" table; added concrete file-discovery heuristics as an ordered grep strategy (feature name → domain terms → HTTP surface → adjacent feature analogy) with polyglot constraint (`--type` flag); added shallow import-following rule (depth ≤ 2); added explicit three-bucket classification (Modify / Read-only / Ignore); expanded CONTEXT.md template from 4 vague sections to 7 concrete sections (Entry Points, Files to Modify, Files to Read, Pattern Reference, Pattern Snippets, Integration Points, Out of Scope for This Scan) with in-template examples; added exclusion list (node_modules, dist, build, vendor, .venv, .git, lockfiles, generated code, migrations, fixtures, full file bodies); added explicit token budget table (200 lines / 3k tokens target, 300 / 5k hard cap, ≤15 files) with `wc -l` check and 10-minute stopping rule; added 10-row Anti-patterns table with rationale column; added 12 rules and 4 constraints; explicitly stated "no commit" since CONTEXT.md is transient planner fuel in `${DIRIGENT_RUN_DIR}`.
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+
+- `src/outbid_dirigent/plugin/skills/create-plan/SKILL.md` Step 1 line 84 only says "CONTEXT.md — relevant file analysis (Hybrid route)" — it does not document which sections to consume. If the quick-scan CONTEXT.md template is authoritative, create-plan should reference the specific section names (Entry Points, Files to Modify, Pattern Reference, Pattern Snippets) so tasks get `files_to_modify` / `files_to_create` fields pre-populated from the scan. Contract is implicit right now.
+- `src/outbid_dirigent/plugin/agents/infra-architect.md` line 62 lists `quick-scan → ${DIRIGENT_RUN_DIR}/CONTEXT.md` but does not distinguish quick-scan's "read selectively" posture from greenfield-scaffold's "produce everything" posture. The shared agent could default to greenfield habits (full scaffolding mindset) when invoked for quick-scan. Consider adding a one-line note: "quick-scan is read-selectively and produces ONE transient artifact; no commit, no start.sh, no test-harness.json."
+- `src/outbid_dirigent/plugin/skills/hi/lanes/routes.md` describes Hybrid's flow as "Init → Quick Scan → Plan → Execute → Entropy Min → Ship" but never ties the token/file budgets back to the user-visible route description. If a user picks Hybrid for a 50-file change, the budgets in quick-scan will force a Legacy re-route — worth surfacing in the route description.</result>
+<usage><total_tokens>59151</total_tokens><tool_uses>13</tool_uses><duration_ms>172575</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a0afbc79f0d449a31</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a0afbc79f0d449a31.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish legacy / extract-business-rules" completed</summary>
+<result>File grew from 46 to 301 lines, single-file polish as constrained. Here's the report:
+
+## Changes Made
+- `extract-business-rules/SKILL.md`: Full rewrite from 46 to 301 lines matching greenfield quality bar. Added: realism preamble with ~50-file / 30-min budget; Steps At A Glance table (8 steps); explicit downstream-consumer list (`oracle.py`, `task_runner.py`, `create-plan`, `implement-task`); Proteus decision rule (transcribe prior `.proteus/rules.json` rather than re-extract); three-tier scoping (read deeply / sample / skip) with concrete file categories; extraction heuristics table tied to common syntactic patterns (raise/assert/guards/schema constraints/state checks/magic numbers) with starter grep patterns; per-rule `BR-NN` template with mandatory source citation and confidence level; reshaped output skeleton with Scope, Not Reviewed, Open Questions sections; Anti-Patterns table (CSS, isinstance, null guards, historical migrations, logging, i18n, test-extraction, library defaults) with rationale; 10 rules each with rationale; constraints block enforcing read-only and no new support files.
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+- **Executor / Proteus coupling:** `executor.extract_business_rules()` (executor.py:342) runs Proteus directly and then re-compacts the spec — but it never writes `BUSINESS_RULES.md`. Yet `oracle.py:129`, `task_runner.py:265`, `create-plan:83`, and `implement-task:100` all read `BUSINESS_RULES.md`. In the Legacy route today, that file only materializes if the user invokes the skill manually via the coach lane. The skill now handles the transcription path, but the executor never triggers this skill — someone should decide whether `executor.extract_business_rules()` should also invoke this skill post-Proteus to produce the markdown artifact downstream expects.
+- **`spec_compactor.business_rules` vs `BUSINESS_RULES.md` duplication:** compactor inlines rules into `SPEC.compact.json`; the markdown file is then conditionally *also* loaded in `task_runner.py:558` (`if business_rules and not self._compact_spec_has_rules()`). This dual pathway is fragile but outside skill-polish scope.
+
+## Structural Concerns (report only)
+- The skill is advertised in the coach lane (`hi/SKILL.md:135`) as a standalone "deep domain extraction" skill, but the Legacy route's executor bypasses it. Users who read the coach list will expect this skill to be the thing the Legacy route runs — it isn't. Either wire the executor to invoke this skill after Proteus (so the markdown artifact exists), or update the coach description to clarify this is the manual/no-Proteus path. Polish can't fix that contract mismatch.
+- No test fixtures or examples in the skill — greenfield has `stacks/` with concrete per-stack command references. For Legacy, there is no equivalent artifact. Intentional per "no new complexity" guidance, but worth noting: the quality of extraction will vary more than greenfield scaffold because there's no stack-specific playbook to fall back on.</result>
+<usage><total_tokens>63197</total_tokens><tool_uses>19</tool_uses><duration_ms>238899</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a3e736bf71d445287</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a3e736bf71d445287.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish tracking / add-posthog" completed</summary>
+<result>Datei ist sauber, 325 Zeilen (vorher 107), alle Sections drin. Abgeschlossen.
+
+---
+
+## Changes Made
+
+- `add-posthog/SKILL.md`: komplette Neufassung (107 → 325 Zeilen, eine Datei beibehalten — kein Subdir, da kein Cartesian-Product wie bei greenfield). Ergänzt:
+  - Preamble mit Downstream-Kette (Planner → Executor → Reviewer) und Scheitermodi (blind / noisy / PII-leak)
+  - **Steps At A Glance**-Tabelle (10 Steps)
+  - **Step 2** — Existing-Analytics-Detection als Tabelle mit Signal-Patterns für GA/Mixpanel/Segment/Amplitude/Plausible/PostHog und Migrations-Stance
+  - **Step 3** — Discovery-Heuristiken als Tabelle (Auth, Conversion, CRUD, Feature-Gates, Invite, Search, Errors) + Cap 5–15 Events
+  - **Step 4** — SDK-Matrix pro Stack (Next App/Pages, React, Vue, SvelteKit, Expo, FastAPI, Express, Go) + Init-Regeln
+  - **Step 5** — Identify-Regeln mit explizit erlaubten vs. verbotenen Properties, Email-Hashing-Hinweis, Group-Analytics
+  - **Step 8** — PII-Filter-Tabelle (direkte Identifier, Location, Financial, Free-Text, Auth, GDPR Art. 9, precise-timestamp-PII)
+  - **Step 9** — Consent/GDPR als 4-Stance-Tabelle (opt-in / CMP / server-only / keine) plus IP-Handling, Deletion-Hook, `reset()` on logout
+  - **Step 10** — JSON-Schema + separate "Field semantics"-Tabelle (required, meaning) inkl. `category`, `side`, `pii_check`, `consent`-Block
+  - **Event Naming Convention**-Tabelle (snake_case / past-tense / kein UI-Name / kein Domain-Prefix / redesign-stable)
+  - **Anti-Patterns**-Tabelle (10 Zeilen: button_clicked, overtracking, PII in properties, pre-consent tracking, JSON.stringify blob, property sprawl, duplicate tools, client-side payments, paywall-flag ohne Server-Check, fehlendes reset)
+  - **Rules** von 8 auf 12 gehärtet — jede hat Rationale
+  - stray closing tags (`&lt;/content&gt;&lt;/invoke&gt;`) entfernt
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+
+- `executor.py:291-307` erwartet `tracking-plan.json` aber validiert das Schema nicht — wenn der Executor die neuen Felder (`consent`, `events[].side`, `events[].pii_check`, `events[].category`) nutzen soll, braucht es einen Pydantic-Schema-File analog zu `test-harness.json`. Außerhalb Scope.
+- `hi/lanes/coach.md:16` beschreibt die Tracking-Route als `add-posthog → create-plan`. Der Planner muss wissen, wie er aus dem neuen Schema (insbesondere `side: server` und `consent.deletion_hook_needed`) Tasks generiert. Plan-Skill nicht aktualisiert.
+- Tracking-Route hat keinen Review-Step der PII-Compliance enforced — idealerweise hätte `review-phase` eine Checkbox "no PII in event properties" wenn `tracking-plan.json` existiert.
+
+## Structural Concerns (report only)
+
+- `add-posthog` läuft laut `executor.py` **vor** dem Planner — das passt. Aber: der Step "Detect existing analytics" kann false-negatives liefern wenn der Analytics-Code in einem nicht-analysierten Teilbaum sitzt. Heuristik reicht für MVP; langfristig würde ein `ANALYSIS.json`-Feld `analytics_tools: []` die Detection deterministisch machen.
+- PostHog ist hier hart gekoppelt (Skill-Name, SDK-Matrix). Wenn das Produkt-Team später Mixpanel/Segment als alternative Backends anbieten will, ist dieses Skill nicht wiederverwendbar. Kein Action-Item jetzt — nur dokumentieren.</result>
+<usage><total_tokens>57168</total_tokens><tool_uses>12</tool_uses><duration_ms>220691</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad8b3389aef732b01</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/ad8b3389aef732b01.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish testability / increase-testability" completed</summary>
+<result>Now let me produce the user-facing report in the exact format specified.
+
+## Changes Made
+- `increase-testability/SKILL.md`: Full rewrite (94 → 297 lines) — added Testability-vs-Coverage table, File Routing table, Steps At A Glance, "When This Runs", inlined 0-10 scoring rubric with score-impact heuristics, expanded 11 analysis categories (seed-data, test-infrastructure, mock-replacement, auth-setup, e2e-framework, e2e-coverage, health-checks, api-contract-tests, init-script, ci-parity, coverage-reporting) with signal/why/fix-pattern each, added stack-specific guidance (pytest/vitest/rspec/Playwright), added Anti-Patterns section (100%-coverage goal, mock-everything, coverage-gate, test-pyramid-religion, dual-framework, snapshot-everything, flaky-tolerated retries), extended JSON output with `baseline_summary`, tightened rules (current_score must equal harness score, boundary mocks only, stack-match, SPEC-driven prioritization, max 10 recs).
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+- **Scoring rubric duplicated** between `run-init/SKILL.md` (authoritative) and now `increase-testability/SKILL.md`. If the 0-10 bands ever change in `run-init`, this skill drifts silently. A shared reference (e.g., `skills/_shared/testability-rubric.md`) would solve it, but that's a cross-cutting refactor.
+- `infra-architect.md` agent prompt (`plugin/agents/infra-architect.md`) lists the output file but has no awareness of the new category vocabulary or anti-patterns. Would benefit from a one-liner pointer.
+- `run-init/SKILL.md` and this file should ideally share the category taxonomy — right now run-init has free-text `testability_gaps[]` and this skill has a typed category enum. Misalignment risk when the harness writes gaps this skill can't map cleanly.
+
+## Structural Concerns (report only)
+- **`create-plan` does not read `testability-recommendations.json`.** A grep across the create-plan skill directory for `testability` or `recommendations` returns zero matches. The "Integration" section I wrote in the skill claims the planner consumes this file and turns it into tasks — that claim is currently aspirational. The file is produced (`executor.py:272`) but no downstream consumer turns it into PLAN.json tasks. Either (a) `create-plan` needs a step to load this file, or (b) the executor needs a testability-specific plan-generation path. Without that wiring, the output is orphan data.
+- **`effort` / `score_impact` are estimates with no calibration loop.** Nothing measures whether a recommendation actually moved the score after execution. A re-run of `run-init` after completion would validate, but that isn't currently wired into the testability route.
+- **11 categories may be too many for the planner to digest.** The constraint says max 10 recommendations, but the category count itself could push outputs toward checklist-padding. Worth monitoring in real runs.</result>
+<usage><total_tokens>64539</total_tokens><tool_uses>18</tool_uses><duration_ms>287198</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bgfmbymdy</task-id>
+<tool-use-id>toolu_013vs37wvUrSUj2FAbFnxjTw</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/bgfmbymdy.output</output-file>
+<status>completed</status>
+<summary>Background command "Run full test suite" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+spawne agenten, die die skills auf "müll" überprüfen, der wegkann. wir haben mmn zu viele Skills.
+
+---
+
+<task-notification>
+<task-id>ab6b9449126ec705f</task-id>
+<tool-use-id>toolu_01K2UMFJKwsC8MbGg2w49oKu</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/ab6b9449126ec705f.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit memory/recall skills" completed</summary>
+<result>I now have enough evidence. Let me compile the audit.
+
+## find-edits
+
+**Verdict:** DELETE
+
+**Evidence:**
+- Referenced in: `src/outbid_dirigent/plugin/skills/implement-task/SKILL.md:44` only (as a hint string, not invoked programmatically)
+- executor.py / dirigent.py / task_runner.py: 0 references
+- Mentioned in hi/SKILL.md: NO
+- Tests: 0 references
+- Overlap with: `search-memories` and `find-errors` — all three shell out to the same `~/.claude/projects/*.jsonl` DuckDB pattern
+- Real dependencies: `duckdb` CLI (available), JSONL schema of Claude session logs (fragile, undocumented)
+- Realistic use case: no. SQL in step 2 is broken — `unnest` over a `from_json` with schema `[{...}]` on `message.content::VARCHAR` will fail because `message.content` is often an array already, not a JSON-string matching that schema. The WHERE has precedence bug: `role = 'assistant' AND ... LIKE '%Edit%' OR ... LIKE '%Write%'` matches all Writes from any role.
+
+**Recommendation:** Delete. It's a hint in implement-task's skill list but never invoked, and the SQL is buggy. If edit-history ever matters, `git log -p &lt;file&gt;` covers it natively.
+
+---
+
+## find-errors
+
+**Verdict:** DELETE
+
+**Evidence:**
+- Referenced in: `implement-task/SKILL.md:45` (hint string only)
+- executor.py / dirigent.py: 0 references
+- Mentioned in hi/SKILL.md: NO
+- Tests: 0 references
+- Overlap with: `search-memories` (identical session-log grep pattern, just with a CASE-expression over error keywords)
+- Real dependencies: `duckdb` CLI, Claude session log schema
+- Realistic use case: no. `${KEYWORD_FILTER}` is a placeholder the user must manually substitute; the skill provides no actual substitution logic. Filters only `message.role = 'tool'` which isn't a valid role in Claude's log schema (it's `user` with `tool_result` content blocks).
+
+**Recommendation:** Delete. Redundant with search-memories and the SQL filter won't match real logs.
+
+---
+
+## search-memories
+
+**Verdict:** KEEP-BUT-HIDE
+
+**Evidence:**
+- Referenced in: `implement-task/SKILL.md:43` (hint)
+- executor.py / dirigent.py: 0 references
+- Mentioned in hi/SKILL.md: NO
+- Tests: 0 references
+- Overlap with: absorbs find-edits + find-errors (ILIKE is the general case)
+- Real dependencies: `duckdb` CLI (present), JSONL logs in `~/.claude/projects/`
+- Realistic use case: yes, but narrow. The ILIKE-on-`message.content::VARCHAR` pattern actually works (unlike the other two).
+
+**Recommendation:** Keep as the single "grep past sessions" primitive, but remove from any user-facing list. It's an advanced debug tool, not a daily driver.
+
+---
+
+## query-brv
+
+**Verdict:** KEEP
+
+**Evidence:**
+- Referenced in: `implement-task/SKILL.md:44,47,91,92`; `task_runner.py:574` (help hint injected into every coder prompt); `agents/implementer.md:45`; `agents/spec-writer.md:17`; `agents/reviewer.md:14`; `skills/create-plan/SKILL.md:91`; `skills/generate-spec/SKILL.md:24`; `skills/review-phase/SKILL.md:12`; `skills/fix-review/SKILL.md:13`; `skills/greenfield-scaffold/SKILL.md:174`
+- Mentioned in hi/SKILL.md: NO (surprising, but implement-task surfaces it)
+- Real dependencies: `brv` CLI (installed at `/Users/jk/.brv-cli/bin/brv`); ByteRover free provider
+- Realistic use case: yes — it is the documented way the implementer agent deepens domain context, and `brv_bridge.py` already primes shallow context.
+
+**Recommendation:** Keep. This is the most widely-referenced of the six and has real integration (brv_bridge.py + prompt hint). Consider adding to hi/SKILL.md sibling list for parity with the rest of the pipeline.
+
+---
+
+## query-data
+
+**Verdict:** KEEP-BUT-HIDE
+
+**Evidence:**
+- Referenced in: `implement-task/SKILL.md:46` (hint only)
+- executor.py / dirigent.py: 0 references
+- Mentioned in hi/SKILL.md: NO
+- Overlap with: none (the other DuckDB skills hardcode session-log paths; this one is general-purpose)
+- Real dependencies: `duckdb` CLI (present)
+- Realistic use case: yes, narrow — ad-hoc CSV/Parquet/JSONL exploration during a task. But not really a "Dirigent" concern; Claude Code can run duckdb directly without a skill wrapper.
+
+**Recommendation:** Keep as a cheat-sheet reference, but hide from user-facing surfaces. Thin wrapper; could be inlined into implement-task's context hints or deleted with minimal loss.
+
+---
+
+## generate-conventions
+
+**Verdict:** DEPRECATE (already marked, finish the job)
+
+**Evidence:**
+- Referenced in: `hi/SKILL.md:139` and `hi/lanes/coach.md:18` — both still route users to it
+- `agents/infra-architect.md:61` still lists it as a mapping target
+- Frontmatter description already says DEPRECATED
+- README.md and ARCHITECTURE.md reference it
+- Real dependencies: git log, grep, and a 245-line prompt — functionally works
+- Realistic use case: no — content is now in ARCHITECTURE.md `&lt;key-patterns&gt;`; running it creates a stale parallel file
+
+**Recommendation:** Leave the skill file (matches memory entry "No new complexity layers" — don't break consumers), but remove the three live references in `hi/SKILL.md:139`, `hi/lanes/coach.md:18`, and `agents/infra-architect.md:61` so it stops being recommended. Delete on next major version.
+
+---
+
+## Summary Table
+
+| Skill | Verdict | Why |
+|---|---|---|
+| find-edits | DELETE | 0 real callers, buggy SQL, redundant with search-memories, `git log -p` covers it |
+| find-errors | DELETE | 0 real callers, `${KEYWORD_FILTER}` placeholder never substituted, wrong role filter, redundant with search-memories |
+| search-memories | KEEP-BUT-HIDE | Only one of the three session-log skills whose SQL actually runs; niche debug tool, not user-facing |
+| query-brv | KEEP | Most-referenced of the six; wired into task_runner prompt + 5 agents/skills; brv CLI present |
+| query-data | KEEP-BUT-HIDE | Generic DuckDB cheat-sheet with 1 hint-level reference; keep but don't advertise |
+| generate-conventions | DEPRECATE | Already marked deprecated in frontmatter but still listed in hi/coach/infra-architect — finish removing those references |
+
+Key finding: no skill in this set is invoked programmatically by `executor.py` or `dirigent.py`. They are all prompt-level hints the LLM may or may not follow. That makes the cost of deletion low and the cost of keeping dead ones (context bloat, bad examples in the skills list) real.
+
+Relevant file paths:
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/{find-edits,find-errors,search-memories,query-brv,query-data,generate-conventions}/SKILL.md`
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/hi/SKILL.md:139` (remove generate-conventions line)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/hi/lanes/coach.md:18` (remove generate-conventions route)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/agents/infra-architect.md:61` (remove mapping)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/implement-task/SKILL.md:43-47` (if deleting find-edits/find-errors, drop those hint lines)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/brv_bridge.py` (confirms query-brv has real Python integration)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/task_runner.py:574` (injects query-brv hint into every task prompt)</result>
+<usage><total_tokens>49141</total_tokens><tool_uses>23</tool_uses><duration_ms>95176</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a2ca634a89c0f8ceb</task-id>
+<tool-use-id>toolu_01M6hb63X9MYQ5AWN3jhJWXb</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a2ca634a89c0f8ceb.output</output-file>
+<status>completed</status>
+<summary>Agent "Audit infra/build skills" completed</summary>
+<result>Confirmed — `test_manifest.py` exists but is not imported by `executor.py`, `dirigent.py`, `router.py`, `task_runner.py`, or `analyzer.py`. The manifest system is dead in the Python pipeline. `test-harness.json` is the active replacement.
+
+Now I have enough evidence. Let me produce the audit.
+
+## run-init
+
+**Verdict:** KEEP-BUT-HIDE (or DEPRECATE)
+
+**Evidence:**
+- Referenced in: `plugin/agents/infra-architect.md:57`, `plugin/skills/increase-testability/SKILL.md:51,79,156,285`, `plugin/skills/quick-scan/SKILL.md:18`, `plugin/skills/hi/SKILL.md:140`
+- `executor.run_init()` (line 215) calls `init_phase.run()` — does NOT invoke the `run-init` skill. `init_phase.py:138` invokes `/dirigent:generate-architecture` instead, and generates harness via structured output (`init_phase.py:143-145`).
+- Route integration: `StepType.INIT` in LEGACY, HYBRID, TESTABILITY, TRACKING routes — but the code path never calls the slash-command.
+- Redundant with: `generate-architecture` (which is now the primary harness driver) + `greenfield-scaffold` (which writes `test-harness.json` directly per `greenfield-scaffold/SKILL.md:341`).
+- Still functional?: Yes, it still writes a valid `test-harness.json`, but its own frontmatter says "FALLBACK… only invoked if the init script produces a harness directly" — and no code path invokes it.
+
+**Recommendation:**
+DEPRECATE. The skill is orphaned: init_phase.py uses structured output, greenfield-scaffold writes harness directly. Keep it as a manual fallback for legacy repos where init script runs but produces no harness, but hide it from `/hi` and `testability`/`quick-scan` docs (they still reference it falsely — increase-testability even anchors its score against run-init's rubric).
+
+---
+
+## generate-architecture
+
+**Verdict:** KEEP
+
+**Evidence:**
+- Referenced in: `init_phase.py:138` (called automatically when `ARCHITECTURE.md` missing), `plugin/agents/infra-architect.md:60`, `plugin/skills/hi/SKILL.md:138`, `plugin/skills/hi/lanes/coach.md:18`
+- Route integration: Invoked indirectly by `StepType.INIT` via `init_phase.run()` when no `ARCHITECTURE.md` exists.
+- Redundant with: `generate-conventions` (already marked DEPRECATED and redirects here).
+- Still functional?: Yes — live integration, also user-facing per `README.md`/`ARCHITECTURE.md`.
+
+**Recommendation:**
+KEEP. This is the only skill in scope with a real live caller in Python code (`init_phase.py:138`). Also the target of the deprecated `generate-conventions` redirect.
+
+---
+
+## entropy-minimization
+
+**Verdict:** KEEP
+
+**Evidence:**
+- Referenced in: `executor.py:313-336` (`entropy_minimization()` method), `dirigent.py:462-467`, `router.py:38` (`StepType.ENTROPY_MINIMIZATION`)
+- Route integration: `StepType.ENTROPY_MINIMIZATION` in ALL five non-quick routes (Greenfield, Legacy, Hybrid, Testability, Tracking) at lines 120, 161, 202, 243, 289. Runs per-route, not manual.
+- Redundant with: none
+- Still functional?: Yes, fully wired — prompt built and invoked for every route run.
+
+**Recommendation:**
+KEEP. Most-integrated skill of the six — runs after EXECUTION on every real route.
+
+---
+
+## build-manifest
+
+**Verdict:** DELETE (or DEPRECATE)
+
+**Evidence:**
+- Referenced in: README.md:344, ARCHITECTURE.md:367 (docs only). No Python executor calls it.
+- Route integration: NONE. `StepType.TEST` → `executor.run_tests()` reads `test-harness.json`, not `outbid-test-manifest.yaml`.
+- The backing module `src/outbid_dirigent/test_manifest.py` (890+ lines, `TestManifest`/`TestStepRunner`/`ManifestGenerator`) has **zero callers** in `executor.py`, `dirigent.py`, `router.py`, `task_runner.py`, `analyzer.py`, `init_phase.py`.
+- Redundant with: `run-init` / `generate-architecture` + `test-harness.json` (the replacement — per `task_runner.py:580-586`, `executor.py:610`, `review-phase/SKILL.md:24`, `create-contract/SKILL.md:138`).
+- Outbid-specific: `outbid-test-manifest.yaml` name and `$id: https://outbid.dev/schemas/test-manifest.json` — Outbid-portal artifact.
+- Still functional?: Yes, produces YAML, but nothing consumes it.
+
+**Recommendation:**
+DEPRECATE now, DELETE after confirming `test_manifest.py` has no external (portal) consumer. The `test-harness.json` pathway has fully replaced this. ARCHITECTURE.md even falsely claims this runs in Testability route (line 367) — but Testability's actual steps don't include it.
+
+---
+
+## validate-manifest
+
+**Verdict:** DELETE (follows build-manifest)
+
+**Evidence:**
+- Referenced in: README.md:345, ARCHITECTURE.md:368. No code caller.
+- Route integration: NONE.
+- Redundant with: `build-manifest` (same dead file, no consumer). Only useful if `build-manifest` stays.
+- Still functional?: Yes in isolation — runs Pydantic validation — but validates a file no one reads.
+
+**Recommendation:**
+DELETE together with `build-manifest`. Zombie validator for a zombie artifact.
+
+---
+
+## build-plugin
+
+**Verdict:** KEEP-BUT-HIDE
+
+**Evidence:**
+- Referenced in: README.md:361, ARCHITECTURE.md:374. `disable-model-invocation: true` in frontmatter — user-only.
+- Route integration: NONE — explicitly a standalone user tool (meta-skill: generate plugins for other repos).
+- Agents `codebase-mapper.md` + `plugin-writer.md` exist and were recently edited (events.jsonl 2026-04-14).
+- Redundant with: nothing in the audit scope. It's orthogonal — generates external plugins, not run by the Dirigent pipeline.
+- Still functional?: Likely yes (never invoked by pipeline so hasn't been stressed; agents both exist).
+
+**Recommendation:**
+KEEP-BUT-HIDE. Useful occasional tool but orthogonal to Dirigent's routes. Already has `disable-model-invocation: true` — fine. Mention in `hi/coach.md` as "bootstrap other projects", don't promote in main flow.
+
+---
+
+## Summary Table
+
+| Skill | Verdict | Why |
+|---|---|---|
+| run-init | DEPRECATE | Orphaned fallback; `init_phase.py` uses structured output + `generate-architecture`; no code path invokes it. Still referenced misleadingly in 4 other skills. |
+| generate-architecture | KEEP | Only skill with a live Python caller (`init_phase.py:138`); anchor for the whole ARCHITECTURE.md flow. |
+| entropy-minimization | KEEP | Wired into `StepType.ENTROPY_MINIMIZATION` in all 5 major routes, actively called via `executor.entropy_minimization()`. |
+| build-manifest | DELETE | Writes `outbid-test-manifest.yaml`, superseded by `test-harness.json`. Backing module `test_manifest.py` has zero Python callers. |
+| validate-manifest | DELETE | Validator for a dead artifact — drop together with `build-manifest`. |
+| build-plugin | KEEP-BUT-HIDE | Meta-tool for bootstrapping plugins in other repos; already `disable-model-invocation: true`; not part of any route. |
+
+**Follow-ups worth surfacing:**
+- `src/outbid_dirigent/test_manifest.py` (890 LOC) is dead code. Check Outbid-portal for external consumers before ripping.
+- `README.md:344-345` and `ARCHITECTURE.md:367-368` claim `build-manifest`/`validate-manifest` run in Testability route — this is wrong; fix or remove after verdict.
+- `increase-testability/SKILL.md`, `quick-scan/SKILL.md`, `hi/SKILL.md` reference `run-init` as if it's the harness producer — drift from reality (`init_phase.py` is).</result>
+<usage><total_tokens>79491</total_tokens><tool_uses>36</tool_uses><duration_ms>116796</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ae371da440c218bf0</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/ae371da440c218bf0.output</output-file>
+<status>completed</status>
+<summary>Agent "Core skill duplication audit" completed</summary>
+<result>I have enough information. Let me compose the findings report.
+
+---
+
+# Skill-Audit: Big-Picture Findings (25 Skills)
+
+## 1. Konzeptionelle Überschneidungen
+
+### `create-plan` vs `quick-feature`
+- `create-plan` ist **ein Pipeline-Step** (erzeugt PLAN.json, `context: fork`, `agent: infra-architect`).
+- `quick-feature` ist **ein Orchestrator** (`disable-model-invocation: true`, dispatcht plan→implement→review als Subagents für 1-3-File-Changes).
+- **Verdict:** Keine Redundanz. Unterschiedliche Scopes und Rollen. Beide behalten.
+
+### `create-contract` vs `review-phase` / `fix-review` (Review-Workflow)
+- `create-contract` schreibt Kriterien VOR der Phase. `review-phase` prüft dagegen. `fix-review` behebt Findings.
+- Drei-Phasen-Loop, sauber getrennt, keine Überschneidung.
+- **Verdict:** Keine Redundanz.
+
+### `entropy-minimization` vs `fix-review`
+- `entropy-minimization` läuft **am Ende der Route**, räumt repo-weit auf (dead code, veraltete Docs).
+- `fix-review` läuft **pro Phase**, behebt nur gemeldete Findings.
+- Scopes disjunkt (repo-weit vs phase-eng, agent `doc-cleaner` vs `implementer`).
+- **Verdict:** Keine Redundanz.
+
+### `generate-architecture` vs `greenfield-scaffold`
+- **Potentielle Überschneidung**: Beide schreiben ARCHITECTURE.md-Sections (`&lt;key-patterns&gt;`, `&lt;architecture-decisions&gt;`). `greenfield-scaffold` ergänzt Scaffold + start.sh + test-harness.json.
+- `greenfield-scaffold` ist ein Route-Step (nur in GREENFIELD_STEPS); `generate-architecture` ist ein User-Invocable für bestehende Repos.
+- **Verdict:** Beide behalten, aber `greenfield-scaffold` sollte idealerweise `generate-architecture` intern aufrufen statt ARCHITECTURE.md selbst zu schreiben. Derzeit duplizieren sie Write-Logik.
+
+### `find-edits` vs `find-errors` vs `search-memories`
+- Drei spezialisierte Views auf denselben Session-Log-Store.
+- `find-edits` (file→Edit/Write), `find-errors` (keyword→errors), `search-memories` (keyword→all content).
+- Unterschiedliche Queries, unterschiedlicher Output. Kein Austausch möglich.
+- **Verdict:** Keine Redundanz, aber ein Audit-Teamkollege prüft das im Detail.
+
+### `build-manifest` vs `validate-manifest`
+- Klassischer Build→Validate-Flow. `build-manifest` erzeugt outbid-test-manifest.yaml, `validate-manifest` prüft gegen Schema+Realität.
+- **Verdict:** Keine Redundanz.
+
+### `query-brv` vs `search-memories`
+- `query-brv` → `.brv/context-tree/` (kuratiertes Domain-Knowledge, projekt-gepflegt).
+- `search-memories` → Claude Session Logs (chronologisch, unkuratiert).
+- **Verdict:** Unterschiedliche Datenquellen, keine Redundanz.
+
+---
+
+## 2. Orphan Skills
+
+| Skill | Referenced in | Verdict |
+|---|---|---|
+| `generate-conventions` | Self-labelled DEPRECATED; noch in `hi/SKILL.md:139`, `hi/lanes/coach.md:18`, `infra-architect.md:61` verlinkt | **DELETE or KEEP-BUT-HIDE** — hi-Listing ist broken, verweist User auf deprecated Skill |
+| `build-plugin` | Nur README.md + ARCHITECTURE.md (User-Docs) | **KEEP** — User-invocable `disable-model-invocation: true`, bewusst nicht vom Agent routbar |
+| `create-contract` | Nur via `contract-negotiator` Agent (contract.py) | **KEEP** — indirekt via Agent-Invocation, korrekt |
+| `validate-manifest` | Nur eigenes SKILL.md | **KEEP-BUT-HIDE** — User-invocable, logischer Partner zu build-manifest |
+| `extract-business-rules` | Referenziert in Docs + `hi/SKILL.md:135`, `hi/lanes/coach.md:12` | **KEEP** — aber ACHTUNG: Python-Executor (executor.py:342) ruft stattdessen **Proteus** auf. Skill könnte Legacy-Fallback oder Parallel-Implementierung sein. **Klärungsbedarf.** |
+| `query-data` | Nur eigenes SKILL.md | **KEEP-BUT-HIDE** — generisches Daten-Tool für User |
+| `find-edits`, `find-errors`, `search-memories` | Nur eigene SKILL.md | **KEEP-BUT-HIDE** — standalone Dev-Tools |
+| `run-init` | `infra-architect.md:57`, `quick-scan`, `increase-testability` | **KEEP** — im Route-Flow integriert |
+
+---
+
+## 3. Fehlende Skills
+
+- **Ship:** `StepType.SHIP` ist in jedem Route-Flow (router.py:132, 173, 215, 255), aber es gibt **kein `ship/` Skill** — Logic sitzt in `shipper.py`. Inkonsistent zu anderen Route-Steps die je ein Skill haben (`entropy-minimization`, `run-init`, `quick-scan`, `greenfield-scaffold`, `increase-testability`, `add-posthog`). Bewusste Wahl (Ship ist deterministisch-git-logic, kein LLM-Call)? Wahrscheinlich OK, aber dokumentieren.
+- **Test-Step:** `StepType.TEST` existiert in allen Routes, kein Skill dafür. Wird vermutlich direkt über test-harness.json ausgeführt.
+- **Init:** `StepType.INIT` → `run-init` Skill existiert. OK.
+- **Business-Rule-Extraktion:** `StepType.BUSINESS_RULE_EXTRACTION` → Python nutzt Proteus (executor.py:342), aber `extract-business-rules` Skill existiert parallel. **Inkonsistenz.**
+
+---
+
+## 4. hi/SKILL.md Sibling-Liste
+
+**Aufgelistet in hi (Lines 132-140):** generate-spec, create-plan, quick-feature, extract-business-rules, increase-testability, add-posthog, generate-architecture, generate-conventions, run-init.
+
+**Exists but not listed (16 Skills):**
+- build-manifest, build-plugin, create-contract, entropy-minimization, find-edits, find-errors, fix-review, greenfield-scaffold, implement-task, query-brv, query-data, quick-scan, review-phase, search-memories, validate-manifest.
+- Die meisten (create-contract, implement-task, fix-review, review-phase, greenfield-scaffold, quick-scan, entropy-minimization) sind **Route-interne Steps** — zu Recht nicht beworben.
+- `build-manifest`, `build-plugin`, `validate-manifest` sind User-Invocable und **sollten erwähnt werden**, oder mindestens in einer "Advanced" Section.
+- `find-edits`, `find-errors`, `search-memories`, `query-brv`, `query-data` sind Dev-Tools — optional "Dev Utilities" Section.
+
+**Listed but deprecated:** `generate-conventions` (explizit als DEPRECATED markiert, aber noch in hi-Liste + lanes/coach.md).
+
+---
+
+## 5. Frontmatter-Analyse
+
+| Kategorie | Skills | Pattern |
+|---|---|---|
+| **Route-Step Skills** (via Agent gefork'd) | create-contract, create-plan, entropy-minimization, fix-review, generate-architecture, generate-conventions (deprecated), generate-spec, greenfield-scaffold, implement-task, increase-testability, quick-scan, review-phase, run-init | `context: fork` + `agent: &lt;xyz&gt;` |
+| **User-Invocable Orchestrators** | build-plugin, quick-feature | `disable-model-invocation: true`, kein agent |
+| **Bare Skills** (kein fork, kein disable) | add-posthog, build-manifest, extract-business-rules, find-edits, find-errors, hi, query-brv, query-data, search-memories, validate-manifest | Nur `name` + `description` (+ optional `arguments`) |
+
+**Inkonsistenzen:**
+- `add-posthog` ist ein **Route-Step** (TRACKING_STEPS, ADD_TRACKING) — sollte analog zu `greenfield-scaffold` `context: fork` + `agent: infra-architect` haben. Aktuell bare. **Drift.**
+- `extract-business-rules` ist ein **Route-Step** (LEGACY_STEPS, BUSINESS_RULE_EXTRACTION) — ebenfalls bare, sollte forked laufen. **Drift.**
+- `hi` ist bare — korrekt, ist User-Entry-Point.
+- `build-plugin` und `quick-feature` beide `disable-model-invocation: true` — konsistent für User-Orchestratoren.
+
+---
+
+## 6. Top-3 Concrete Cleanup Actions
+
+1. **`generate-conventions` löschen** (oder mindestens aus `hi/SKILL.md:139`, `hi/lanes/coach.md:18`, `infra-architect.md:61` entfernen). Self-labelled deprecated, aber noch von 3 Stellen beworben — Users werden auf toten Pfad geschickt.
+
+2. **`extract-business-rules` Dual-Implementation klären:** `executor.py:342` nutzt Proteus, der Skill existiert parallel. Entweder (a) Skill löschen und nur Proteus-Path dokumentieren, oder (b) Skill als expliziten Proteus-Fallback kennzeichnen. Aktuell unklar, welcher Pfad in welchem Kontext gewinnt.
+
+3. **Frontmatter-Alignment für Route-Step-Skills:** `add-posthog` und `extract-business-rules` sind Route-Steps aber haben keinen `context: fork` + `agent:`. Entweder anpassen oder dokumentieren warum sie Ausnahmen sind. Drift reduziert Lesbarkeit des Skill-Systems.
+
+**Bonus:** `hi/SKILL.md` sollte eine "Advanced / Dev Utilities" Section bekommen — aktuell bewirbt sie 9 von 25 Skills, User-Invocable Skills wie `build-manifest`/`validate-manifest`/`build-plugin` fehlen komplett in der Discovery.
+
+---
+
+Relevante Pfade:
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/` (25 Skills)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/agents/` (8 Agents)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/router.py` (Route-Step-Definitionen)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/executor.py:342` (Proteus vs extract-business-rules Skill)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/hi/SKILL.md:132-140` (Sibling-Liste)
+- `/Users/jk/projects/outbid-dirigent/src/outbid_dirigent/plugin/skills/generate-conventions/SKILL.md` (deprecated)</result>
+<usage><total_tokens>62401</total_tokens><tool_uses>32</tool_uses><duration_ms>179124</duration_ms></usage>
+</task-notification>
+
+---
+
+ja ist gut, haben ja commitet
+
+---
+
+benenne auch den branch um - lokal und remote, sodass klar wird, dass es um eine v2 geht
+
+---
+
+<task-notification>
+<task-id>b0nr3dnkk</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/b0nr3dnkk.output</output-file>
+<status>completed</status>
+<summary>Background command "Run tests" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+ultrathink ob das shipbar ist.
+
+---
+
+mach rc1 und pushe.
+
+---
+
+deiner meinung nach: wo gehört containerisierung in unsersm greenfield-harness hin?
