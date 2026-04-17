@@ -67,6 +67,46 @@ def set_portal_reporter(reporter):
     _portal_reporter = reporter
 
 
+def _install_info() -> str:
+    """Return 'vX.Y.Z (abc1234)' — dirigent install version + short commit.
+
+    Resolution order:
+    1. Git HEAD of the package's source repo (editable/source install) —
+       accurate for the code actually running right now.
+    2. Build-time commit baked into `_build_info.COMMIT` (wheel install) —
+       written by `hatch_build.py` at build time.
+    3. 'installed' — wheel without build info (unlikely) or non-git source.
+
+    Never raises.
+    """
+    import subprocess
+    from outbid_dirigent import __version__
+    try:
+        import outbid_dirigent as _pkg
+        pkg_dir = Path(_pkg.__file__).parent
+        for parent in [pkg_dir, *pkg_dir.parents]:
+            if (parent / ".git").exists():
+                result = subprocess.run(
+                    ["git", "-C", str(parent), "rev-parse", "--short", "HEAD"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return f"v{__version__} ({result.stdout.strip()})"
+                break  # .git found but rev-parse failed — try build-info next
+    except Exception:
+        pass
+
+    try:
+        from outbid_dirigent import _build_info
+        commit = getattr(_build_info, "COMMIT", None)
+        if commit and commit != "unknown":
+            return f"v{__version__} ({commit})"
+    except Exception:
+        pass
+
+    return f"v{__version__} (installed)"
+
+
 def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
     """Validiert die Eingabepfade."""
     errors = []
@@ -759,6 +799,7 @@ Beispiele:
     output_json = args.output == "json"
     logger = init_logger(str(repo_path), verbose, output_json, dirigent_dir=run_dir.path)
     logger.start()
+    logger.info(f"dirigent {_install_info()}")
 
     # Portal Reporter initialisieren (für Events an Portal)
     has_credentials = args.portal_url and args.execution_id and args.reporter_token
