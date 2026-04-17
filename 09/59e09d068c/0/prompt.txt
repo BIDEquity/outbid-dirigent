@@ -1,0 +1,13 @@
+lets discuss the planner tune first, i guess there is more opportunity there.
+
+---
+
+lets try a and b now.
+
+---
+
+can you try that plan generation skill directly on the @example-specs/cuseum-vam-small.md
+
+---
+
+1 is a no-breainer - do it. 2: the 5*5 increase in exemptions is flexible enough while not too flexible at the same time.
