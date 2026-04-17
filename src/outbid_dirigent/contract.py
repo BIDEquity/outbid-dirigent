@@ -119,7 +119,7 @@ class ContractManager:
         """Load and validate a phase contract."""
         return Contract.load(self._contract_path(phase_id))
 
-    # Patterns that indicate structural checks masquerading as behavioral criteria
+    # Patterns that indicate structural checks masquerading as runtime criteria
     _GREP_PATTERNS = re.compile(
         r"\b(grep|rg|ag|ack)\b|"          # source code search
         r"\b(cat|head|tail)\s+\S+\.(py|ts|js|tsx|jsx|go|rs|java)\b|"  # reading source files
@@ -129,35 +129,46 @@ class ContractManager:
 
     def _validate_contract_quality(self, contract: Contract):
         """Soft validation: warn about weak contract patterns. Never blocks."""
+        from outbid_dirigent.contract_schema import PhaseKind
+
         criteria = contract.acceptance_criteria
-        behavioral = [c for c in criteria if c.layer == CriterionLayer.BEHAVIORAL]
-        boundary = [c for c in criteria if c.layer == CriterionLayer.BOUNDARY]
+        user_journey = [c for c in criteria if c.layer == CriterionLayer.USER_JOURNEY]
+        edge_case = [c for c in criteria if c.layer == CriterionLayer.EDGE_CASE]
+        unit = [c for c in criteria if c.layer == CriterionLayer.UNIT]
 
         total = len(criteria)
-        behavioral_ratio = len(behavioral) / total if total else 0
+        user_journey_ratio = len(user_journey) / total if total else 0
 
-        if not behavioral:
-            logger.warning(
-                f"Contract {contract.phase_id}: NO behavioral criteria — "
-                f"contract tests structure, not user-facing behavior"
-            )
-        elif behavioral_ratio < 0.5:
-            logger.warning(
-                f"Contract {contract.phase_id}: only {len(behavioral)}/{total} criteria "
-                f"are behavioral ({behavioral_ratio:.0%}) — should be >= 50%"
+        # Expectations depend on phase_kind; infrastructure is structural-only by design.
+        if contract.phase_kind != PhaseKind.INFRASTRUCTURE:
+            if not user_journey:
+                logger.warning(
+                    f"Contract {contract.phase_id}: NO user-journey criteria — "
+                    f"contract tests structure, not user-facing behavior"
+                )
+            elif user_journey_ratio < 0.4:
+                logger.warning(
+                    f"Contract {contract.phase_id}: only {len(user_journey)}/{total} criteria "
+                    f"are user-journey ({user_journey_ratio:.0%}) — should be >= 40%"
+                )
+
+            if not edge_case:
+                logger.warning(
+                    f"Contract {contract.phase_id}: no edge-case criteria — "
+                    f"error paths and degraded states are untested"
+                )
+
+        if contract.phase_kind == PhaseKind.USER_FACING and not unit:
+            logger.info(
+                f"Contract {contract.phase_id}: no unit criterion — "
+                f"if this phase adds pure logic (validators, transformers), add one"
             )
 
-        if not boundary:
-            logger.warning(
-                f"Contract {contract.phase_id}: no boundary criteria — "
-                f"error paths and edge cases are untested"
-            )
-
-        # Check for grep-based verification in behavioral/boundary criteria
-        for c in behavioral + boundary:
+        # Check for source-grep verification in runtime criteria
+        for c in user_journey + edge_case:
             if self._GREP_PATTERNS.search(c.verification):
                 logger.warning(
-                    f"Contract {contract.phase_id} [{c.id}]: behavioral/boundary criterion "
+                    f"Contract {contract.phase_id} [{c.id}]: {c.layer.value} criterion "
                     f"uses structural verification pattern: {c.verification[:80]}..."
                 )
 
