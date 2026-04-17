@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "29662c468cf0",
+  "strategy": "manual-commit",
+  "branch": "feat/v2",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/outbid_dirigent/contract.py",
+    "src/outbid_dirigent/contract_schema.py",
+    "src/outbid_dirigent/plugin/agents/contract-negotiator.md",
+    "src/outbid_dirigent/plugin/agents/reviewer.md",
+    "src/outbid_dirigent/plugin/skills/create-contract/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/create-contract/scripts/validate_schema.py",
+    "src/outbid_dirigent/plugin/skills/fix-review/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/hi/playbook/canon/verify-dont-vibe.md",
+    "src/outbid_dirigent/plugin/skills/implement-task/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/review-phase/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/29/662c468cf0/0/metadata.json",
+      "transcript": "/29/662c468cf0/0/full.jsonl",
+      "content_hash": "/29/662c468cf0/0/content_hash.txt",
+      "prompt": "/29/662c468cf0/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 84,
+    "cache_creation_tokens": 615490,
+    "cache_read_tokens": 4412968,
+    "output_tokens": 94219,
+    "api_call_count": 33
+  }
+}

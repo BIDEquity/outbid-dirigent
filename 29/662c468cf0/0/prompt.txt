@@ -1,0 +1,39 @@
+Hello. I built an agent harness in this repo. This runs several steps after each other glued together by some markdown / json files and a python script. I was wondering, how we could make this even more effective. 
+
+My idea: have a supervisor agent monitor the steps. Otherwise we observed that individual steps tend to lose foucs quite fast and mess around with detail work. Especially the "SPEC" / contract creation / execution is very detailed and technical and not at all focused on end-user-experience. 
+
+How can we make this supervisor agent work while at the sime time keeping the rigor of the (structured) agent sdk calls we have now?
+
+My idea: spawn an agent sdk run that can be resumed (using ClaudeSDKClient here). Please do not jump on this bandwagon saying "hey what a nice idea" and then build this as a half-assed solution. Think this through. Maybe i am on the "Holzweg".
+
+Discuss with me.
+
+---
+
+a little bit surprised about that.
+
+---
+
+the verdict on the supervisor idea. What i basically want is a long-running agent spawning sub-agents (like the dirigent does using pyhton scripts) but in a controllable and deterministic way while still keeping the flexibility and intelligence of a llm.
+
+---
+
+Ok. Convinced. We MUST reframe the contract generation to focus on things user see (and not curl delivers 200). Carefully read the contract creation. Keep the orchestrator skill (we already have a quick-feature skill) in your memory as a second improvement.
+
+---
+
+lets do 2. But one remark: what if we build greenfield stuff. we might have playwright installed and a dev server running. But in early phases, there might not be much to see just because we scaffold / do the boring stuff.
+
+---
+
+i once again agree with you on most. But where do unit tests get written now? Yes, a user doesnt care about them, but they are crucial for maintainability.
+
+---
+
+yes
+
+---
+
+Green.
+
+But flagging Planner awareness is great. Should we let the planner tune to be also more focused on user-output? Each phase must produce some visible change for an end user? And if not, the phase is too small. Then again, sometimes there is just "boring" work to do. But we actially observed the planner blowing up the number of phases unnecessarily (8 phases for a simple API change). So this is probably grounded in truth. Implement the current thing first, lets discuss the other stuff later.
