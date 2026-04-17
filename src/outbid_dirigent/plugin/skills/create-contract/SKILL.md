@@ -32,23 +32,30 @@ experience, the criterion tested the wrong thing.
    statements. If you can't map it, it's probably testing plumbing the user
    doesn't care about.
 
-## Step 2: Classify the phase
+## Step 2: Read the phase kind
 
-Read the phase's name and description in `${DIRIGENT_RUN_DIR}/PLAN.json`. Pick one:
+The planner already classified the phase. Read `phase.kind` for this
+phase from `${DIRIGENT_RUN_DIR}/PLAN.json` and copy it into the contract
+as `phase_kind`. One of:
 
-| Phase kind | When to pick | Examples |
+| Phase kind | Meaning | Examples |
 |---|---|---|
-| `user-facing` | The phase produces a UI surface or a user-observable behavior change. | "Admin can manage users", "Add dark mode toggle", "Checkout flow" |
-| `integration` | The phase delivers a subsystem that a later phase will expose to users. Not user-visible yet, but has a clear downstream consumer. | "Auth middleware", "tRPC router scaffold", "Background job queue" |
-| `infrastructure` | Scaffolding, migrations, tooling, CI. No consumer within the run. | "Scaffold Next.js app", "Prisma schema + initial migration", "GitHub Actions CI" |
+| `user-facing` | Delivers a UI surface or user-observable behavior change. | "Admin can manage users", "Add dark mode toggle", "Checkout flow" |
+| `integration` | Delivers a subsystem that a later phase will expose to users. | "Auth middleware", "tRPC router scaffold", "Background job queue" |
+| `infrastructure` | Scaffolding, migrations, tooling, CI. No consumer within the run. | "Scaffold Next.js app", "Prisma schema + initial migration" |
 
-When in doubt, prefer `user-facing`. Greenfield scaffolds often still have a
-trivial user-visible surface (dev server serves default page) — proving that
-end-to-end is higher-value than a bare `typecheck passes`.
+**If the plan does not have `kind` on the phase** (legacy plan, missing field):
+classify it yourself using the table above and record the choice in the
+contract. Prefer `user-facing` in doubt — greenfield scaffolds often still
+have a trivial user-visible surface (dev server serves default page) that
+proves more than a bare `typecheck passes`.
 
-Record your choice as `phase_kind` in the contract JSON. The validator
-enforces layer quotas based on this field, and the final phase cannot be
-classified `infrastructure`.
+**Do not contradict the planner.** If the plan says `user-facing` but there's
+no user-observable work in the phase tasks, that's a planning bug — surface
+it as a finding (a DEVIATION note in your output), do not silently reclassify.
+
+The contract validator enforces layer quotas based on `phase_kind`, and
+the final phase cannot be classified `infrastructure`.
 
 ## The four layers
 
