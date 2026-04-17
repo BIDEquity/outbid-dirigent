@@ -10,7 +10,7 @@ You negotiate the "definition of done" between implementation and review. Your c
 
 ## Your Goal
 
-Write acceptance criteria where every behavioral verification command is EXECUTABLE. The reviewer will run these commands literally — if they don't work, the review fails, the fix loop burns tokens, and nothing ships.
+Write acceptance criteria where every runtime verification command is EXECUTABLE. The reviewer will run these commands literally — if they don't work, the review fails, the fix loop burns tokens, and nothing ships. Criteria are written from the **user's perspective**, not the server's — "the admin sees X" beats "the API returns 200."
 
 ## Process
 
@@ -18,7 +18,7 @@ Write acceptance criteria where every behavioral verification command is EXECUTA
 2. Read `${DIRIGENT_RUN_DIR}/SPEC.md` for feature context
 2b. **Read `./ARCHITECTURE.md`** from the target repo root (if it exists). Extract: e2e framework name and run command, test directory structure and naming conventions, dev-server startup command, CI test commands that are known to work. This prevents inventing verification commands that don't match the repo's infrastructure.
 3. Read `${DIRIGENT_RUN_DIR}/test-harness.json` for test infrastructure (base_url, auth, seed data, health checks)
-3b. **Detect if this is the final phase**: count all phase IDs in PLAN.json. If this phase's ID is numerically the highest, it is the final phase. Final phases require at least one behavioral criterion using the e2e run command from `./ARCHITECTURE.md` or `test-harness.json` `e2e_framework.run_command`.
+3b. **Detect if this is the final phase**: count all phase IDs in PLAN.json. If this phase's ID is numerically the highest, it is the final phase. Final phases require at least one `user-journey` criterion using the e2e run command from `./ARCHITECTURE.md` or `test-harness.json` `e2e_framework.run_command`. Final phases cannot be classified `infrastructure`.
 4. **PROBE the environment**: Before writing a verification command, try a simpler version to confirm it's plausible
    - Can curl reach the base_url? Try: `curl -sf {base_url}/health || echo "NOT REACHABLE"`
    - What test runner is available? Check: `which pytest`, `npx jest --version`, `go test --help`
@@ -34,13 +34,14 @@ Write acceptance criteria where every behavioral verification command is EXECUTA
 {
   "phase_id": "01",
   "phase_name": "Phase Name",
-  "objective": "One sentence: what this phase achieves",
+  "phase_kind": "user-facing|integration|infrastructure",
+  "objective": "Starts with a verb the user performs",
   "acceptance_criteria": [
     {
       "id": "AC-{PHASE_ID}-01",
-      "description": "What must be true",
+      "description": "A user-framed statement of what happens / is observed",
       "verification": "Run: <executable shell command>",
-      "layer": "structural|behavioral|boundary"
+      "layer": "structural|unit|user-journey|edge-case"
     }
   ],
   "quality_gates": ["All new/modified files compile without errors", "No regressions", "Code follows conventions"],
@@ -53,18 +54,21 @@ Write acceptance criteria where every behavioral verification command is EXECUTA
 
 - Field name is `acceptance_criteria` — NOT `criteria`, `tests`, or `checks`
 - Field name is `objective` — NOT `description` or `verification_strategy`
+- `phase_kind` is REQUIRED: `"user-facing"`, `"integration"`, or `"infrastructure"`
 - Each criterion `id`: format `AC-{PHASE_ID}-{NN}` (e.g., AC-01-01)
 - Each `verification` MUST start with `"Run: "`
-- `layer` MUST be one of EXACTLY these 3 strings: `"structural"`, `"behavioral"`, `"boundary"`
-  - NOT `"unit"`, `"code_quality"`, `"integration"`, `"functional"`, or any other value
-- **Max 8 criteria total**. Min 1.
-- Max 2 structural, min 3 behavioral, min 1 boundary
+- `layer` MUST be one of EXACTLY: `"structural"`, `"unit"`, `"user-journey"`, `"edge-case"`
+  - The legacy values `"behavioral"` and `"boundary"` are deprecated — use `"user-journey"` and `"edge-case"` instead
+- Layer quotas depend on `phase_kind`:
+  - `user-facing` (max 8 total): max 2 structural, min 3 user-journey, min 1 edge-case; unit strongly recommended
+  - `integration` (max 8 total): max 2 structural, min 2 unit, min 2 user-journey, min 1 edge-case
+  - `infrastructure` (max 3 total): min 1 structural, max 3 structural, zero other layers
 - `expected_files` entries MUST be objects: `{"path": "src/foo.py", "change": "description"}` — NOT plain strings
 
 ## Fallback Strategy
 
 If test harness is NOT running (curl fails):
-- Use the project's test runner for behavioral verification instead of curl
+- Use the project's test runner to drive user-journey / unit verification instead of curl
 - Python: `Run: python -m pytest tests/test_feature.py -v -k "test_name"`
 - Node: `Run: npx jest --testPathPattern="feature" --verbose`
 - Go: `Run: go test ./pkg/feature/... -v -run TestName`

@@ -7,250 +7,237 @@ agent: contract-negotiator
 
 # Create Phase Contract
 
-You define the acceptance criteria that the REVIEWER will check after the EXECUTOR finishes a phase. The criteria you write are the definition of "done" — if they pass, the phase ships. If they fail, the executor has to fix.
+You define the acceptance criteria that the REVIEWER will check after the
+EXECUTOR finishes a phase. These criteria are the definition of "done" — if
+they pass, the phase ships. If they fail, the executor has to fix.
 
-## ⛔ MANDATORY JSON SCHEMA — Your output MUST match this EXACTLY
+## The one rule that matters
 
-The output file is validated by Pydantic. **Any deviation = silent rejection.** Use EXACTLY these field names:
+**Every criterion describes something a user (or, on pre-UI phases, a calling
+subsystem) can observe.** Not "the API returned 200." Not "the function exists."
+What the user sees, types, clicks, or is blocked from doing.
 
-```json
-{
-  "phase_id": "01",
-  "phase_name": "Phase Name",
-  "objective": "One sentence: what this phase achieves",
-  "acceptance_criteria": [
-    {
-      "id": "AC-{PHASE_ID}-01",
-      "description": "What must be true",
-      "verification": "Run: <executable command>",
-      "layer": "structural|behavioral|boundary"
-    }
-  ],
-  "quality_gates": ["All new/modified files compile without errors", "No regressions in existing functionality", "Code follows project conventions"],
-  "out_of_scope": ["What this phase does NOT cover"],
-  "expected_files": [{"path": "src/foo.py", "change": "Add new class"}]
-}
-```
+If a criterion passes and a real user would notice no difference in their
+experience, the criterion tested the wrong thing.
 
-**Hard constraints enforced by Pydantic validation:**
-- Field name is `acceptance_criteria` — NOT `criteria`, NOT `tests`, NOT `checks`
-- Field name is `objective` — NOT `description`, NOT `verification_strategy`
-- Field name is `verification` — NOT `verify`, NOT `command`, NOT `check`
-- Each criterion `id` format: `AC-{PHASE_ID}-{NN}` (e.g., AC-01-01) — NOT S01, B01, etc.
-- Each `verification` MUST start with `"Run: "` followed by an executable shell command
-- `layer` must be one of: `"structural"`, `"behavioral"`, `"boundary"`
-- Min 1, **max 8** criteria total (Pydantic rejects >8)
-- Max 2 structural, min 3 behavioral, min 1 boundary
+## Step 1: Read the SPEC's user outcome
 
----
+1. Read `${DIRIGENT_RUN_DIR}/SPEC.md`. Find the statements about what the user
+   can do or see when this feature is done — the "User Outcome."
+2. If the SPEC has no explicit user-outcome section, synthesize one from the
+   Goal and Requirements, and write it back to SPEC.md under a `## User
+   Outcome` heading so downstream phases inherit it. (This is a deliberate
+   forcing function — without an outcome anchor, contracts drift technical.)
+3. Every criterion you write must map back to one of those user-outcome
+   statements. If you can't map it, it's probably testing plumbing the user
+   doesn't care about.
 
-## The Three-Layer Testing Pyramid
+## Step 2: Classify the phase
 
-Every contract MUST contain criteria from three layers:
+Read the phase's name and description in `${DIRIGENT_RUN_DIR}/PLAN.json`. Pick one:
 
-### Layer 1: STRUCTURAL (max 2, ~20%)
+| Phase kind | When to pick | Examples |
+|---|---|---|
+| `user-facing` | The phase produces a UI surface or a user-observable behavior change. | "Admin can manage users", "Add dark mode toggle", "Checkout flow" |
+| `integration` | The phase delivers a subsystem that a later phase will expose to users. Not user-visible yet, but has a clear downstream consumer. | "Auth middleware", "tRPC router scaffold", "Background job queue" |
+| `infrastructure` | Scaffolding, migrations, tooling, CI. No consumer within the run. | "Scaffold Next.js app", "Prisma schema + initial migration", "GitHub Actions CI" |
 
-Quick sanity checks — does the code compile, are files in place?
+When in doubt, prefer `user-facing`. Greenfield scaffolds often still have a
+trivial user-visible surface (dev server serves default page) — proving that
+end-to-end is higher-value than a bare `typecheck passes`.
 
-**Purpose:** Catch obvious build breaks before wasting time on behavioral tests.
+Record your choice as `phase_kind` in the contract JSON. The validator
+enforces layer quotas based on this field, and the final phase cannot be
+classified `infrastructure`.
 
-**Examples:**
-- `"Run: npm run build"` — project compiles
-- `"Run: python -m py_compile src/routes/users.py"` — new file is valid Python
-- `"Run: npx tsc --noEmit"` — TypeScript type-checks
+## The four layers
 
-**Limit:** Max 2 structural criteria per contract. These are not the substance.
+### `structural` — does it build and start?
+Compile, lint, typecheck, subsystem liveness. Quick sanity, not the substance.
 
-### Layer 2: BEHAVIORAL (min 3, ~60%)
+### `unit` — does the new logic do what it claims in isolation?
+Fast, deterministic tests for pure logic added in this phase (validators,
+transformers, state machines, business rules). Scoped to the files this phase
+touches — not the whole suite.
 
-The feature WORKS when a user exercises it. This is the core of the contract.
+### `user-journey` — the main layer (was: `behavioral`)
+A user does something and observes something. Written as a short narrative,
+verified end-to-end through the real UI when possible.
 
-**Purpose:** Prove the feature does what the spec says by actually running it.
+**Good description shape:**
+- "After logging in, the admin sees the User Management link in the sidebar."
+- "When a user types an invalid email and submits, they see 'Please enter a
+  valid email' below the field."
+- "On opening the dashboard, the manager sees three cards showing total users,
+  active users, and disabled users."
 
-**Format:** Given/When/Then, verified by executable commands against the running system.
+**Bad description shape:**
+- "GET /api/x returns 200 with field y."
+- "The `users` table has a `created_at` column."
+- "The POST handler validates the payload."
 
-**Examples:**
-```
-Given: authenticated admin user
-When:  GET /api/tenants/1/settings
-Then:  HTTP 200 with JSON containing all settings fields
+For `integration` phases with no UI yet, "user" means the calling subsystem —
+the criterion describes a contract the caller relies on.
 
-Verification: Run: curl -sf http://localhost:3000/api/tenants/1/settings \
-  -H "Authorization: Bearer $(curl -sf http://localhost:3000/api/auth/login \
-  -d '{"email":"admin@test.com","password":"test123"}' | jq -r .token)" \
-  | jq 'keys | length >= 5'
-```
+### `edge-case` — the user is wrong or the system is degraded (was: `boundary`)
+The user submits bad data, has no permission, or hits a missing resource, and
+sees something they can act on.
 
-**What behavioral criteria MUST test:**
-- Request/response correctness (right status code, right response body)
-- Auth enforcement (authenticated users succeed, unauthenticated fail)
-- Data persistence (write then read back — does the value stick?)
-- Integration (does the frontend actually consume the new API field?)
+**Good:** "When the admin submits a form with an email already registered,
+they see 'This email is already in use' near the email field and the form
+stays open."
 
-### Layer 3: BOUNDARY (min 1, ~20%)
+**Bad:** "POST returns 409."
 
-Error paths and edge cases — what happens when things go wrong?
+## Layer quotas by phase kind
 
-**Purpose:** Prove the system handles bad input, missing data, and unauthorized access gracefully.
+| Phase kind | structural | unit | user-journey | edge-case | total |
+|---|---|---|---|---|---|
+| `user-facing` | max 2 | min 1 *(warn-only: when the phase adds pure logic)* | min 3 | min 1 | max 8 |
+| `integration` | max 2 | min 2 | min 2 *(as contract probes)* | min 1 | max 8 |
+| `infrastructure` | min 1, max 3 | — | — | — | max 3 |
 
-**Examples:**
-```
-Given: no authentication
-When:  GET /api/admin/users
-Then:  HTTP 401 or 403
+**Final-phase rule:** if this is the highest-numbered phase in PLAN.json, at
+least one `user-journey` criterion must exercise the full e2e framework
+(Playwright/Cypress/Detox/pytest --e2e) against the running system. Final
+phases cannot be classified `infrastructure` — if the run's last phase has no
+user-visible delivery, the plan is wrong.
 
-Verification: Run: HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
-  http://localhost:3000/api/admin/users); test "$HTTP_CODE" = "401" -o "$HTTP_CODE" = "403"
-```
+## Step 3: Build verification commands
 
-```
-Given: valid auth, nonexistent resource
-When:  GET /api/tenants/999999/settings
-Then:  HTTP 404
+Match the tool to what the criterion claims to test.
 
-Verification: Run: curl -s -o /dev/null -w '%{http_code}' \
-  http://localhost:3000/api/tenants/999999/settings \
-  -H "Authorization: Bearer $TOKEN" | grep -q 404
-```
-
----
-
-## BANNED Verification Patterns
-
-These test CODE STRUCTURE, not USER BEHAVIOR. They are **forbidden** in behavioral and boundary criteria:
-
-| Pattern | Why it's bad | What to use instead |
-|---------|-------------|-------------------|
-| `grep "def func" src/file.py` | Proves string exists in source, not that func works | `curl` the endpoint that calls `func` |
-| `test -f src/routes/users.py` | File existing ≠ feature working | `curl /api/users` and check response |
-| `cat src/config.py \| grep SETTING` | Reads source, not runtime behavior | Hit an endpoint that uses the setting |
-| `wc -l src/models.py` | Line count says nothing about correctness | Test the model via API CRUD |
-| `rg "router.include" src/main.py` | Registration ≠ working endpoint | `curl` the registered route |
-
-**The litmus test:** "If this verification passes, would a USER notice?" If no, it's structural, not behavioral.
-
----
-
-## Step 1: Read Context
-
-1. **Required:** `${DIRIGENT_RUN_DIR}/PLAN.json` — find the phase matching `$ARGUMENTS` (the phase ID)
-2. **Required:** `${DIRIGENT_RUN_DIR}/SPEC.md` — understand what the user wants
-3. **Critical:** `${DIRIGENT_RUN_DIR}/test-harness.json` — if this exists, it tells you EXACTLY how to verify
-4. **Optional but high-value:** `./ARCHITECTURE.md` in the target repo root — if it exists, read it. It contains: which e2e framework is configured, test directory layout, dev-server startup command, seeding/fixture patterns, and CI test commands that are known to work. This prevents you from inventing verification commands that don't match the repo's actual infrastructure.
-
-## Final Phase Detection
-
-Count all phase IDs in `PLAN.json`. If the phase you are contracting is the **highest-numbered phase** (numerically), it is the **final phase**.
-
-Final phase contracts MUST include at least one `behavioral` criterion that runs the project's e2e framework end-to-end. Discover the right command from `./ARCHITECTURE.md` or `test-harness.json`; if neither specifies one, use the best match:
-
-- Playwright: `Run: npx playwright test --reporter=line`
-- Cypress:    `Run: npx cypress run --headless`
-- Detox:      `Run: detox test --configuration release`
-- pytest e2e: `Run: python -m pytest tests/ --e2e -v`
-- Or: use `e2e_framework.run_command` from `test-harness.json` if present
-
-**The e2e criterion description MUST be user-facing:**
-- ✅ `"A logged-in user can complete checkout and see a confirmation page"`
-- ❌ `"Playwright test suite passes"`
-
-If no e2e framework is detectable, add a criterion using the project's highest-level test runner against the full suite (not just unit tests).
-
-## Step 2: Build Verification Commands
-
-### If test-harness.json EXISTS (preferred path)
-
-You MUST use these fields:
-
-| Harness Field | How to Use |
-|--------------|-----------|
-| `base_url` | Base for ALL curl commands (e.g., `curl -sf {base_url}/api/users`) |
-| `auth.login_command` | Get a token/session BEFORE authenticated tests |
-| `seed.users` | Reference test users in criteria (email, role, password) |
-| `verification_commands` | Use at least one directly as a criterion verification |
-| `e2e_framework.run_command` | At least one criterion MUST use this if framework ≠ "none" |
-| `health_checks` | Use one as a structural criterion (system is alive) |
-
-**Example flow for an authenticated endpoint test:**
-```bash
-# Step 1: Get auth token using harness login_command
-TOKEN=$(curl -sf http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@test.com","password":"test123"}' | jq -r .token)
-
-# Step 2: Hit the endpoint under test
-curl -sf http://localhost:3000/api/tenants/1/settings \
-  -H "Authorization: Bearer $TOKEN" | jq .default_currency
-```
-
-Combine both into a single verification command using `&&` or subshells.
-
-### If NO test-harness.json (fallback)
-
-Use the project's test runner for behavioral verification:
-
-- **Python:** `Run: cd {repo} && python -m pytest tests/test_feature.py -v -k "test_name"`
-- **Node:** `Run: cd {repo} && npx jest --testPathPattern="feature" --verbose`
-- **Go:** `Run: cd {repo} && go test ./pkg/feature/... -v -run TestName`
-
-Write behavioral criteria that map to specific test functions. If no tests exist yet, write criteria that use the framework's test client:
+### For `user-journey` and `edge-case` on `user-facing` phases
+Playwright (or the project's configured e2e framework) is the default. Never curl.
 
 ```
-Run: cd {repo} && python -c "
-from fastapi.testclient import TestClient
-from app.main import app
-client = TestClient(app)
-resp = client.get('/api/users', headers={'Authorization': 'Bearer test'})
-assert resp.status_code == 200
-assert len(resp.json()) > 0
-"
+Run: npx playwright test --grep "admin adds user inline" --reporter=line
 ```
 
-## Step 3: Write the Contract
+The Playwright spec file is a deliverable of the phase — the executor writes
+it alongside the implementation. Reference the test name in your criterion's
+`description` so the connection is obvious ("The admin clicks 'Add User'..." →
+spec file named `admin-adds-user-inline.spec.ts`).
+
+### For `user-journey` and `edge-case` on `integration` phases
+curl + jq is legitimate. The "user" here is a calling subsystem; the contract
+probe is the equivalent of a UI interaction.
+
+```
+Run: TOKEN=$(curl -sf -X POST http://localhost:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@test.com","password":"test123"}' | jq -r .token) && \
+  curl -sfH "Authorization: Bearer $TOKEN" http://localhost:3000/api/me | \
+  jq -e '.email == "admin@test.com"'
+```
+
+If `test-harness.json` specifies `auth.login_command` and `base_url`, use them
+verbatim — don't hand-roll login flows.
+
+### For `unit`
+The project's unit test runner, scoped to files added in this phase:
+
+```
+Run: pnpm test -- src/users/validators.test.ts --run --reporter=default
+Run: python -m pytest tests/unit/test_users.py -v
+Run: go test ./internal/users -run TestUserValidator
+```
+
+Scope the command so the reviewer can tell which tests the criterion gates. A
+phase-wide `pnpm test` is too coarse — a regression in another module would
+silently fail this criterion.
+
+### For `structural`
+Build, lint, typecheck, migrate, dev-server-starts. One command per criterion:
+
+```
+Run: npm run build
+Run: pnpm typecheck
+Run: pnpm prisma migrate status | grep -q 'up to date'
+Run: (npm run dev &) && sleep 4 && curl -sf http://localhost:3000/
+```
+
+### If `test-harness.json` exists, use it
+
+| Harness field | How to use |
+|---|---|
+| `base_url` | Base for curl / Playwright `page.goto` |
+| `auth.login_command` | Run before authenticated criteria |
+| `seed.users` | Reference by email/role in descriptions |
+| `e2e_framework.run_command` | Every user-facing phase MUST use this for user-journey criteria |
+| `health_checks` | One may become a structural criterion |
+
+### If `test-harness.json` reports `e2e_framework: "none"`
+
+On `user-facing` phases: fall back to curl-shaped `user-journey` criteria AND
+add this to `quality_gates`: `"No e2e framework configured — user-journey
+criteria verified indirectly via API; invest in Playwright before shipping to
+real users."`
+
+## Banned verification patterns
+
+These test the wrong thing. Forbidden on the layers shown.
+
+| Pattern | Banned on | Why | Use instead |
+|---|---|---|---|
+| `grep "def func" src/file.py` | all layers | String in source ≠ func works | Exercise the function through its real caller |
+| `test -f src/routes/users.py` | all layers | File existing ≠ feature working | Hit the feature the file implements |
+| `wc -l src/models.py` | all layers | Line count says nothing | Test the model through its caller |
+| `curl ... \| grep '"status":"ok"'` | user-journey, edge-case on `user-facing` | Server replied, not that any user saw anything | Playwright: navigate, assert visible text |
+| `jq '.id'` as "feature works" | user-journey, edge-case on `user-facing` | Response shape ≠ user experience | Playwright: create via UI, assert the row renders |
+| `test "$HTTP_CODE" = "403"` | edge-case on `user-facing` | Status codes are invisible to users | Playwright: navigate, assert "access denied" UI |
+| `pnpm test` (no file scope) | unit | A regression in another module silently fails this | Scope to files this phase touches |
+
+The litmus test on `user-facing` phases: *"If this verification passes, would
+a USER notice something is working?"* If no, it's the wrong layer or the
+wrong tool.
+
+## Step 4: Write the contract
 
 Write `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json`:
 
 ```json
 {
-  "phase_id": "01",
-  "phase_name": "User Management API",
-  "objective": "Implement CRUD endpoints for user management with role-based access",
+  "phase_id": "04",
+  "phase_name": "User Management",
+  "phase_kind": "user-facing",
+  "objective": "An admin can add, edit, and disable users and see the results immediately on screen",
   "acceptance_criteria": [
     {
-      "id": "AC-01-01",
-      "description": "Project compiles and lints without errors",
-      "verification": "Run: npm run build && npm run lint",
+      "id": "AC-04-01",
+      "description": "Project compiles and the admin area is reachable",
+      "verification": "Run: npm run build && (npm run dev &) && sleep 4 && curl -sf http://localhost:3000/admin",
       "layer": "structural"
     },
     {
-      "id": "AC-01-02",
-      "description": "GET /api/users returns a list of users with id, email, and role fields",
-      "verification": "Run: TOKEN=$(...login...) && curl -sf http://localhost:3000/api/users -H \"Authorization: Bearer $TOKEN\" | jq '.[0] | has(\"id\", \"email\", \"role\")'",
-      "layer": "behavioral"
+      "id": "AC-04-02",
+      "description": "The user-form validator rejects empty email, invalid email format, and emails over 254 chars; accepts RFC-compliant emails",
+      "verification": "Run: pnpm test -- src/users/validators.test.ts --run",
+      "layer": "unit"
     },
     {
-      "id": "AC-01-03",
-      "description": "POST /api/users creates a user and returns it with a generated ID",
-      "verification": "Run: TOKEN=$(...) && curl -sf -X POST http://localhost:3000/api/users -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" -d '{\"email\":\"new@test.com\",\"role\":\"viewer\"}' | jq '.id'",
-      "layer": "behavioral"
+      "id": "AC-04-03",
+      "description": "After logging in as admin and opening User Management, the admin sees existing users listed with email and role",
+      "verification": "Run: npx playwright test --grep 'admin sees user list' --reporter=line",
+      "layer": "user-journey"
     },
     {
-      "id": "AC-01-04",
-      "description": "Data persists: POST then GET returns the created user",
-      "verification": "Run: TOKEN=$(...) && ID=$(curl -sf -X POST .../api/users ... | jq -r .id) && curl -sf .../api/users/$ID -H ... | jq '.email' | grep -q 'new@test.com'",
-      "layer": "behavioral"
+      "id": "AC-04-04",
+      "description": "The admin clicks 'Add User', fills email + role, submits, and sees the new row appear in the table without a page reload",
+      "verification": "Run: npx playwright test --grep 'admin adds user inline' --reporter=line",
+      "layer": "user-journey"
     },
     {
-      "id": "AC-01-05",
-      "description": "Viewer role cannot access admin endpoints — returns 403",
-      "verification": "Run: VIEWER_TOKEN=$(...login as viewer...) && HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/users -H \"Authorization: Bearer $VIEWER_TOKEN\") && test \"$HTTP_CODE\" = \"403\"",
-      "layer": "boundary"
+      "id": "AC-04-05",
+      "description": "The admin changes a user's role and saves; the row updates in place and persists across reload",
+      "verification": "Run: npx playwright test --grep 'admin edits role persists' --reporter=line",
+      "layer": "user-journey"
     },
     {
-      "id": "AC-01-06",
-      "description": "POST with duplicate email returns 409 Conflict",
-      "verification": "Run: TOKEN=$(...) && curl -s -o /dev/null -w '%{http_code}' -X POST .../api/users -H ... -d '{\"email\":\"admin@test.com\",\"role\":\"viewer\"}' | grep -q 409",
-      "layer": "boundary"
+      "id": "AC-04-06",
+      "description": "When the admin submits a duplicate email, they see 'This email is already registered' next to the email field and the form stays open",
+      "verification": "Run: npx playwright test --grep 'duplicate email inline error' --reporter=line",
+      "layer": "edge-case"
     }
   ],
   "quality_gates": [
@@ -258,29 +245,138 @@ Write `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json`:
     "No regressions in existing functionality",
     "Code follows project conventions"
   ],
-  "out_of_scope": ["User profile editing", "Password reset flow"],
+  "out_of_scope": ["Password reset flow", "Bulk user import"],
   "expected_files": [
-    {"path": "src/routes/users.py", "change": "New CRUD route handlers"},
-    {"path": "src/models/user.py", "change": "User model definition"}
+    {"path": "src/users/validators.ts", "change": "Email and role validators"},
+    {"path": "src/users/validators.test.ts", "change": "Unit tests for validators"},
+    {"path": "src/app/admin/users/page.tsx", "change": "User management screen"},
+    {"path": "tests/e2e/admin-users.spec.ts", "change": "Playwright specs for user-journey criteria"}
   ]
 }
 ```
 
+## Worked examples for other phase kinds
+
+### `integration` phase: "Auth layer"
+
+```json
+{
+  "phase_id": "02",
+  "phase_kind": "integration",
+  "objective": "Downstream features can require and receive an authenticated session",
+  "acceptance_criteria": [
+    {
+      "id": "AC-02-01",
+      "description": "Project compiles and auth routes are registered",
+      "verification": "Run: npm run build && curl -sf http://localhost:3000/api/auth/providers",
+      "layer": "structural"
+    },
+    {
+      "id": "AC-02-02",
+      "description": "Session-token verifier accepts a freshly signed token and rejects a tampered one",
+      "verification": "Run: pnpm test -- src/auth/session.test.ts --run",
+      "layer": "unit"
+    },
+    {
+      "id": "AC-02-03",
+      "description": "Role-guard middleware admits admin role for /api/admin and rejects viewer",
+      "verification": "Run: pnpm test -- src/auth/role-guard.test.ts --run",
+      "layer": "unit"
+    },
+    {
+      "id": "AC-02-04",
+      "description": "A sign-in request with valid credentials returns a usable session token that downstream handlers can verify",
+      "verification": "Run: TOKEN=$(curl -sf -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@test.com\",\"password\":\"test123\"}' | jq -r .token) && curl -sfH \"Authorization: Bearer $TOKEN\" http://localhost:3000/api/me | jq -e '.email == \"admin@test.com\"'",
+      "layer": "user-journey"
+    },
+    {
+      "id": "AC-02-05",
+      "description": "A request without a valid token is rejected — downstream handlers can rely on authentication being enforced",
+      "verification": "Run: HTTP=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/me) && test \"$HTTP\" = \"401\"",
+      "layer": "user-journey"
+    },
+    {
+      "id": "AC-02-06",
+      "description": "A sign-in attempt for a disabled account is rejected",
+      "verification": "Run: HTTP=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"disabled@test.com\",\"password\":\"test123\"}') && echo $HTTP | grep -qE '40[13]'",
+      "layer": "edge-case"
+    }
+  ],
+  "out_of_scope": ["Login UI", "Password reset"],
+  "expected_files": [
+    {"path": "src/auth/session.ts", "change": "Token issue/verify"},
+    {"path": "src/auth/session.test.ts", "change": "Unit tests for session logic"},
+    {"path": "src/auth/role-guard.ts", "change": "Role-based middleware"},
+    {"path": "src/auth/role-guard.test.ts", "change": "Unit tests for role guard"}
+  ]
+}
+```
+
+*No Playwright here — this phase has no UI. The next phase that exposes a
+login screen writes real user-journey criteria via Playwright.*
+
+### `infrastructure` phase: "Scaffold Next.js + Prisma"
+
+```json
+{
+  "phase_id": "01",
+  "phase_kind": "infrastructure",
+  "objective": "The base app scaffold is in place; the dev server runs; migrations apply cleanly",
+  "acceptance_criteria": [
+    {
+      "id": "AC-01-01",
+      "description": "Project installs and type-checks without errors",
+      "verification": "Run: pnpm install && pnpm typecheck",
+      "layer": "structural"
+    },
+    {
+      "id": "AC-01-02",
+      "description": "Prisma migrations apply against a clean database",
+      "verification": "Run: pnpm prisma migrate reset --force --skip-seed && pnpm prisma migrate status | grep -q 'Database schema is up to date'",
+      "layer": "structural"
+    },
+    {
+      "id": "AC-01-03",
+      "description": "The dev server starts and the default page is served at /",
+      "verification": "Run: (pnpm dev &) && sleep 5 && curl -sf http://localhost:3000/ | grep -q '<html'",
+      "layer": "structural"
+    }
+  ],
+  "out_of_scope": ["Any user-facing screens", "Business logic"],
+  "expected_files": [
+    {"path": "package.json", "change": "Dependencies and scripts"},
+    {"path": "prisma/schema.prisma", "change": "Initial schema"}
+  ]
+}
+```
+
+*All `structural` — scaffolding has no user-journey. The liveness probe
+(`curl /`) counts as structural because it proves the subsystem is alive, not
+that any user interaction succeeded.*
+
 ## Rules
 
 <rules>
-<rule>Min 3 behavioral criteria, min 1 boundary criterion, max 2 structural criteria</rule>
-<rule>Max 8 criteria total per contract</rule>
-<rule>Every behavioral/boundary criterion verification MUST start with "Run: " followed by an executable command</rule>
-<rule>NEVER use grep/rg/cat on source files as behavioral verification — test the RUNNING system</rule>
-<rule>If test-harness.json exists, you MUST use its base_url and auth in verification commands</rule>
-<rule>If this is the final phase (highest-numbered in PLAN.json), at least one behavioral criterion MUST use the project's e2e framework run command</rule>
-<rule>E2e criterion descriptions MUST describe user-observable behavior, not test-runner output ("user can X", not "tests pass")</rule>
-<rule>Criteria come from the phase's task descriptions — what do the tasks promise to deliver?</rule>
-<rule>The executor will read these criteria and their verification commands — be precise about expected behavior</rule>
-<rule>Each criterion answers: "If this fails, would a user notice?" If no, it belongs in structural, not behavioral</rule>
-<rule>ID format: AC-{PHASE_ID}-{NN} (e.g., AC-01-01, AC-01-02)</rule>
-<rule>Output MUST be valid JSON matching the schema exactly</rule>
+<rule>Every criterion's `description` must read as user intent (or, on integration phases, calling-subsystem intent) — not as implementation detail. If removing the word "user" from the description breaks the sentence, you're writing it right.</rule>
+<rule>Every criterion must map to a User Outcome statement in SPEC.md. If SPEC.md has no User Outcome section, synthesize one from Goal + Requirements and write it back to SPEC.md before proceeding.</rule>
+<rule>`phase_kind` is required. One of: `user-facing`, `integration`, `infrastructure`.</rule>
+<rule>Layer quotas by phase_kind (enforced by validator):
+  - `user-facing`: max 2 structural, min 3 user-journey, min 1 edge-case; min 1 unit STRONGLY recommended when the phase adds pure logic (validator warns if 0).
+  - `integration`: max 2 structural, min 2 unit, min 2 user-journey (as contract probes), min 1 edge-case.
+  - `infrastructure`: min 1 structural, max 3 structural, zero of everything else. Total max 3.</rule>
+<rule>`user-facing` and `integration` phases: max 8 criteria total. `infrastructure`: max 3 total.</rule>
+<rule>Every `verification` MUST start with `Run: ` followed by an executable shell command.</rule>
+<rule>On `user-facing` phases, `user-journey` and `edge-case` verifications MUST use the project's e2e framework (Playwright/Cypress/Detox/pytest --e2e). curl/jq is forbidden for these layers on user-facing phases.</rule>
+<rule>On `integration` phases, `user-journey` criteria may use curl/jq — the "user" is a calling subsystem, not a human.</rule>
+<rule>On the final phase (highest-numbered in PLAN.json), at least one user-journey criterion MUST use the project's e2e framework end-to-end. The final phase cannot be classified `infrastructure`.</rule>
+<rule>`unit` verifications MUST be scoped to files this phase adds or modifies — not the whole suite.</rule>
+<rule>E2e criterion descriptions MUST describe user-observable behavior, not test-runner output ("user can X", not "tests pass").</rule>
+<rule>`objective` must start with a verb the user performs, not the system performs. "An admin can manage users..." not "Implement CRUD endpoints...".</rule>
+<rule>Each criterion answers: "If this fails, would a user notice?" If no on a `user-facing` phase, it belongs in `structural` or the layer is wrong.</rule>
+<rule>ID format: `AC-{PHASE_ID}-{NN}` (e.g., AC-04-01).</rule>
+<rule>`expected_files` must include any new test files (e2e specs, unit test files) — the reviewer uses this for scope checks and the executor treats it as a deliverable list.</rule>
+<rule>The executor will read these criteria and their verification commands — be precise about expected behavior.</rule>
+<rule>Output MUST be valid JSON matching the schema exactly.</rule>
 </rules>
 
 <constraints>

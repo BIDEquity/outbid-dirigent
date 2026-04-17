@@ -29,7 +29,7 @@ agent: implementer
 <constraint>Keine neuen Features einfuehren — nur Fixes</constraint>
 <constraint>Jeder Fix muss direkt auf ein Finding oder failed Criterion zurueckfuehrbar sein</constraint>
 <constraint>Read before you write — never edit a file without reading it first in this session (see `hi/playbook/canon/read-before-you-write.md`)</constraint>
-<constraint>Verify, don't vibe — every fix must be structurally checked (syntax/typecheck/lint) before commit; behavioral check if the app can run (see `hi/playbook/canon/verify-dont-vibe.md`)</constraint>
+<constraint>Verify, don't vibe — every fix must be structurally checked (syntax/typecheck/lint) before commit; run the contract's user-journey or unit verification if the app can boot (see `hi/playbook/canon/verify-dont-vibe.md`)</constraint>
 <constraint>No sycophancy — if a finding is wrong or the reviewer is mistaken, push back with evidence; do not silently agree and fabricate a fix (see `hi/playbook/canon/no-sycophancy-rule.md`)</constraint>
 <constraint>Scope is sacred — scope drift during a fix iteration is doubly expensive; fix only the finding, nothing adjacent (see `hi/playbook/canon/scope-is-sacred.md`)</constraint>
 <constraint>Scratch state hygiene — do not commit files from `.dirigent/`, `.planning/`, or other scratch dirs (see `hi/playbook/canon/scratch-state-hygiene.md`)</constraint>
