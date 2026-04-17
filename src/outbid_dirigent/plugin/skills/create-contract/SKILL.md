@@ -23,11 +23,19 @@ experience, the criterion tested the wrong thing.
 ## Step 1: Read the SPEC's user outcome
 
 1. Read `${DIRIGENT_RUN_DIR}/SPEC.md`. Find the statements about what the user
-   can do or see when this feature is done — the "User Outcome."
-2. If the SPEC has no explicit user-outcome section, synthesize one from the
-   Goal and Requirements, and write it back to SPEC.md under a `## User
-   Outcome` heading so downstream phases inherit it. (This is a deliberate
-   forcing function — without an outcome anchor, contracts drift technical.)
+   can do or see when this feature is done — the "User Outcome." Look for any
+   section serving this purpose, regardless of heading or language:
+   `## User Outcome`, `## Success Criteria`, `## Acceptance`, `## Definition
+   of Done`, `## Erfolgreich wenn`, `## Success`, `## The prototype is
+   successful when...`, or a narrative intro that explicitly describes the
+   user perspective. Different specs phrase this differently — the semantic
+   test is "does this section say what the user can do / see / experience
+   when the feature ships?" If yes, it IS the anchor.
+2. Only if no such section or near-equivalent exists, synthesize one from
+   the Goal and Requirements and write it back to SPEC.md under a `## User
+   Outcome` heading. Do NOT duplicate an existing anchor — writing a
+   near-identical English section below a German one (or vice versa) creates
+   redundancy and looks like the skill didn't read the spec properly.
 3. Every criterion you write must map back to one of those user-outcome
    statements. If you can't map it, it's probably testing plumbing the user
    doesn't care about.
@@ -365,7 +373,7 @@ that any user interaction succeeded.*
 
 <rules>
 <rule>Every criterion's `description` must read as user intent (or, on integration phases, calling-subsystem intent) — not as implementation detail. If removing the word "user" from the description breaks the sentence, you're writing it right.</rule>
-<rule>Every criterion must map to a User Outcome statement in SPEC.md. If SPEC.md has no User Outcome section, synthesize one from Goal + Requirements and write it back to SPEC.md before proceeding.</rule>
+<rule>Every criterion must map to a User Outcome statement in SPEC.md. Check for an existing anchor first — "User Outcome", "Success Criteria", "Definition of Done", "Erfolgreich wenn", or any narrative section that describes the user perspective in any language. Only synthesize and write back if no equivalent exists. Never create a duplicate anchor.</rule>
 <rule>`phase_kind` is required. One of: `user-facing`, `integration`, `infrastructure`.</rule>
 <rule>Layer quotas by phase_kind (enforced by validator):
   - `user-facing`: max 2 structural, min 3 user-journey, min 1 edge-case; min 1 unit STRONGLY recommended when the phase adds pure logic (validator warns if 0).
@@ -378,7 +386,7 @@ that any user interaction succeeded.*
 <rule>On the final phase (highest-numbered in PLAN.json), at least one user-journey criterion MUST use the project's e2e framework end-to-end. The final phase cannot be classified `infrastructure`.</rule>
 <rule>`unit` verifications MUST be scoped to files this phase adds or modifies — not the whole suite.</rule>
 <rule>E2e criterion descriptions MUST describe user-observable behavior, not test-runner output ("user can X", not "tests pass").</rule>
-<rule>`objective` must start with a verb the user performs, not the system performs. "An admin can manage users..." not "Implement CRUD endpoints...".</rule>
+<rule>`objective` frames the user (or on integration phases, the calling subsystem) as the subject of a capability. Good shapes: "An admin can manage users...", "A staff user can scan a token and see the outcome...", "The coordinator sees live entry counts...". Do NOT start with system-perspective verbs: no "Implement", "Build", "Create", "Add", "Set up". If the first word is a verb at all, it names something the user does, not something the developer does.</rule>
 <rule>Each criterion answers: "If this fails, would a user notice?" If no on a `user-facing` phase, it belongs in `structural` or the layer is wrong.</rule>
 <rule>ID format: `AC-{PHASE_ID}-{NN}` (e.g., AC-04-01).</rule>
 <rule>`expected_files` must include any new test files (e2e specs, unit test files) — the reviewer uses this for scope checks and the executor treats it as a deliverable list.</rule>
