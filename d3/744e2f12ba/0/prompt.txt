@@ -32,3 +32,7 @@ dirigent --spec cuseum-vam-small.md --repo . --output json
  -> how can i write to stdout and file (probably tee) so you can read the output later for evaluation?
 
 please log the current version and commit hash on dirigent start (debug)
+
+---
+
+yes. any way we can make this work for wheel installs too?
