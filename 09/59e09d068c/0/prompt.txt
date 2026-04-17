@@ -11,3 +11,7 @@ can you try that plan generation skill directly on the @example-specs/cuseum-vam
 ---
 
 1 is a no-breainer - do it. 2: the 5*5 increase in exemptions is flexible enough while not too flexible at the same time.
+
+---
+
+yes. then: using the generated plan from the VAM step, can you generate the contract for a user-facing phase?
