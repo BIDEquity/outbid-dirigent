@@ -1,0 +1,116 @@
+spawne einen kritker-subagent. dieser soll die zwei dimensionen stack vs. arch pattern, die wir heute gebaut haben kritisieren und auseinandernehmen. sind es die richtigen, für greenfield projekte? was, wenn wir über einen prototypen hinausgehen wollen?
+
+---
+
+beide
+
+---
+
+I want to publish a version 2 of the dirigent today. please spawn subagents that look at each route and polish them for publication.
+
+---
+
+<task-notification>
+<task-id>a7166d6d54098f92c</task-id>
+<tool-use-id>toolu_01QQSMnMG4oCG3WCKPZwqhpH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a7166d6d54098f92c.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish quick-feature skill" completed</summary>
+<result>130 lines — within the 150 budget.
+
+## Changes Made
+- `quick-feature/SKILL.md` (81 → 130 lines): Added Scope Check table with 7 concrete redirect triggers at the top; added Steps At A Glance table (Agent / Input / Output per step); tightened the three agent prompts (absolute paths, scope-too-large verdict in Step 1, explicit verdict rules in Step 3, Conventional Commits in Step 2); added Anti-Patterns table (6 concrete failure modes with rationale); rewrote Rules with inline rationale — no platitudes; added constraints block matching greenfield style; introduced `QF-nn` acceptance-criteria IDs in the plan so reviewer's `criteria_results` schema has a real source.
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+- **AC-ID convention drift**: `quick-feature` uses `QF-nn`, but `plugin/agents/reviewer.md` documents `AC-NN-NN` (phase-scoped). The reviewer agent needs either a quick-route branch or a generic "use whatever IDs the plan declares" instruction. Fix belongs in `plugin/agents/reviewer.md`, not here.
+- **`disable-model-invocation: true`** frontmatter differs from greenfield's `context: fork` + `agent: infra-architect` header style. If the plugin loader treats these differently (route vs. direct-dispatch skills), the quick-feature metadata may need harmonization with whatever convention v2 settles on. Needs a look at the skill loader, not an in-file edit.
+- **Redirect target `/dirigent:start`** is the entry coach, not a direct "full pipeline" command. If v2 exposes a more specific command for "promote this to full pipeline", update the redirect text in Step 1 and Scope Check. Currently a coach hand-off, which is acceptable but not optimal.</result>
+<usage><total_tokens>51408</total_tokens><tool_uses>8</tool_uses><duration_ms>120459</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a8a74a96d3588a081</task-id>
+<tool-use-id>toolu_01FLku8bmWhbT1ftPhrDAAn4</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a8a74a96d3588a081.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish hybrid / quick-scan" completed</summary>
+<result>File is 251 lines — within the target range I suggested for the skill itself. Task complete.
+
+## Changes Made
+
+- `src/outbid_dirigent/plugin/skills/quick-scan/SKILL.md`: full rewrite from 45-line stub to 251-line polished skill. Added frontmatter-consistent intro paragraph explaining the Hybrid sweet-spot; added "When This Runs" block naming upstream (`run-init`) and downstream (`create-plan`) consumers; added 8-row "Steps At A Glance" table; added concrete file-discovery heuristics as an ordered grep strategy (feature name → domain terms → HTTP surface → adjacent feature analogy) with polyglot constraint (`--type` flag); added shallow import-following rule (depth ≤ 2); added explicit three-bucket classification (Modify / Read-only / Ignore); expanded CONTEXT.md template from 4 vague sections to 7 concrete sections (Entry Points, Files to Modify, Files to Read, Pattern Reference, Pattern Snippets, Integration Points, Out of Scope for This Scan) with in-template examples; added exclusion list (node_modules, dist, build, vendor, .venv, .git, lockfiles, generated code, migrations, fixtures, full file bodies); added explicit token budget table (200 lines / 3k tokens target, 300 / 5k hard cap, ≤15 files) with `wc -l` check and 10-minute stopping rule; added 10-row Anti-patterns table with rationale column; added 12 rules and 4 constraints; explicitly stated "no commit" since CONTEXT.md is transient planner fuel in `${DIRIGENT_RUN_DIR}`.
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+
+- `src/outbid_dirigent/plugin/skills/create-plan/SKILL.md` Step 1 line 84 only says "CONTEXT.md — relevant file analysis (Hybrid route)" — it does not document which sections to consume. If the quick-scan CONTEXT.md template is authoritative, create-plan should reference the specific section names (Entry Points, Files to Modify, Pattern Reference, Pattern Snippets) so tasks get `files_to_modify` / `files_to_create` fields pre-populated from the scan. Contract is implicit right now.
+- `src/outbid_dirigent/plugin/agents/infra-architect.md` line 62 lists `quick-scan → ${DIRIGENT_RUN_DIR}/CONTEXT.md` but does not distinguish quick-scan's "read selectively" posture from greenfield-scaffold's "produce everything" posture. The shared agent could default to greenfield habits (full scaffolding mindset) when invoked for quick-scan. Consider adding a one-line note: "quick-scan is read-selectively and produces ONE transient artifact; no commit, no start.sh, no test-harness.json."
+- `src/outbid_dirigent/plugin/skills/hi/lanes/routes.md` describes Hybrid's flow as "Init → Quick Scan → Plan → Execute → Entropy Min → Ship" but never ties the token/file budgets back to the user-visible route description. If a user picks Hybrid for a 50-file change, the budgets in quick-scan will force a Legacy re-route — worth surfacing in the route description.</result>
+<usage><total_tokens>59151</total_tokens><tool_uses>13</tool_uses><duration_ms>172575</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a0afbc79f0d449a31</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a0afbc79f0d449a31.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish legacy / extract-business-rules" completed</summary>
+<result>File grew from 46 to 301 lines, single-file polish as constrained. Here's the report:
+
+## Changes Made
+- `extract-business-rules/SKILL.md`: Full rewrite from 46 to 301 lines matching greenfield quality bar. Added: realism preamble with ~50-file / 30-min budget; Steps At A Glance table (8 steps); explicit downstream-consumer list (`oracle.py`, `task_runner.py`, `create-plan`, `implement-task`); Proteus decision rule (transcribe prior `.proteus/rules.json` rather than re-extract); three-tier scoping (read deeply / sample / skip) with concrete file categories; extraction heuristics table tied to common syntactic patterns (raise/assert/guards/schema constraints/state checks/magic numbers) with starter grep patterns; per-rule `BR-NN` template with mandatory source citation and confidence level; reshaped output skeleton with Scope, Not Reviewed, Open Questions sections; Anti-Patterns table (CSS, isinstance, null guards, historical migrations, logging, i18n, test-extraction, library defaults) with rationale; 10 rules each with rationale; constraints block enforcing read-only and no new support files.
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+- **Executor / Proteus coupling:** `executor.extract_business_rules()` (executor.py:342) runs Proteus directly and then re-compacts the spec — but it never writes `BUSINESS_RULES.md`. Yet `oracle.py:129`, `task_runner.py:265`, `create-plan:83`, and `implement-task:100` all read `BUSINESS_RULES.md`. In the Legacy route today, that file only materializes if the user invokes the skill manually via the coach lane. The skill now handles the transcription path, but the executor never triggers this skill — someone should decide whether `executor.extract_business_rules()` should also invoke this skill post-Proteus to produce the markdown artifact downstream expects.
+- **`spec_compactor.business_rules` vs `BUSINESS_RULES.md` duplication:** compactor inlines rules into `SPEC.compact.json`; the markdown file is then conditionally *also* loaded in `task_runner.py:558` (`if business_rules and not self._compact_spec_has_rules()`). This dual pathway is fragile but outside skill-polish scope.
+
+## Structural Concerns (report only)
+- The skill is advertised in the coach lane (`hi/SKILL.md:135`) as a standalone "deep domain extraction" skill, but the Legacy route's executor bypasses it. Users who read the coach list will expect this skill to be the thing the Legacy route runs — it isn't. Either wire the executor to invoke this skill after Proteus (so the markdown artifact exists), or update the coach description to clarify this is the manual/no-Proteus path. Polish can't fix that contract mismatch.
+- No test fixtures or examples in the skill — greenfield has `stacks/` with concrete per-stack command references. For Legacy, there is no equivalent artifact. Intentional per "no new complexity" guidance, but worth noting: the quality of extraction will vary more than greenfield scaffold because there's no stack-specific playbook to fall back on.</result>
+<usage><total_tokens>63197</total_tokens><tool_uses>19</tool_uses><duration_ms>238899</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a3e736bf71d445287</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-jk-projects-outbid-dirigent/2d1967c5-9024-4774-bd86-1c88f78e6eaf/tasks/a3e736bf71d445287.output</output-file>
+<status>completed</status>
+<summary>Agent "Polish tracking / add-posthog" completed</summary>
+<result>Datei ist sauber, 325 Zeilen (vorher 107), alle Sections drin. Abgeschlossen.
+
+---
+
+## Changes Made
+
+- `add-posthog/SKILL.md`: komplette Neufassung (107 → 325 Zeilen, eine Datei beibehalten — kein Subdir, da kein Cartesian-Product wie bei greenfield). Ergänzt:
+  - Preamble mit Downstream-Kette (Planner → Executor → Reviewer) und Scheitermodi (blind / noisy / PII-leak)
+  - **Steps At A Glance**-Tabelle (10 Steps)
+  - **Step 2** — Existing-Analytics-Detection als Tabelle mit Signal-Patterns für GA/Mixpanel/Segment/Amplitude/Plausible/PostHog und Migrations-Stance
+  - **Step 3** — Discovery-Heuristiken als Tabelle (Auth, Conversion, CRUD, Feature-Gates, Invite, Search, Errors) + Cap 5–15 Events
+  - **Step 4** — SDK-Matrix pro Stack (Next App/Pages, React, Vue, SvelteKit, Expo, FastAPI, Express, Go) + Init-Regeln
+  - **Step 5** — Identify-Regeln mit explizit erlaubten vs. verbotenen Properties, Email-Hashing-Hinweis, Group-Analytics
+  - **Step 8** — PII-Filter-Tabelle (direkte Identifier, Location, Financial, Free-Text, Auth, GDPR Art. 9, precise-timestamp-PII)
+  - **Step 9** — Consent/GDPR als 4-Stance-Tabelle (opt-in / CMP / server-only / keine) plus IP-Handling, Deletion-Hook, `reset()` on logout
+  - **Step 10** — JSON-Schema + separate "Field semantics"-Tabelle (required, meaning) inkl. `category`, `side`, `pii_check`, `consent`-Block
+  - **Event Naming Convention**-Tabelle (snake_case / past-tense / kein UI-Name / kein Domain-Prefix / redesign-stable)
+  - **Anti-Patterns**-Tabelle (10 Zeilen: button_clicked, overtracking, PII in properties, pre-consent tracking, JSON.stringify blob, property sprawl, duplicate tools, client-side payments, paywall-flag ohne Server-Check, fehlendes reset)
+  - **Rules** von 8 auf 12 gehärtet — jede hat Rationale
+  - stray closing tags (`&lt;/content&gt;&lt;/invoke&gt;`) entfernt
+
+## Still Needs Cross-Cutting Work (don't edit — report only)
+
+- `executor.py:291-307` erwartet `tracking-plan.json` aber validiert das Schema nicht — wenn der Executor die neuen Felder (`consent`, `events[].side`, `events[].pii_check`, `events[].category`) nutzen soll, braucht es einen Pydantic-Schema-File analog zu `test-harness.json`. Außerhalb Scope.
+- `hi/lanes/coach.md:16` beschreibt die Tracking-Route als `add-posthog → create-plan`. Der Planner muss wissen, wie er aus dem neuen Schema (insbesondere `side: server` und `consent.deletion_hook_needed`) Tasks generiert. Plan-Skill nicht aktualisiert.
+- Tracking-Route hat keinen Review-Step der PII-Compliance enforced — idealerweise hätte `review-phase` eine Checkbox "no PII in event properties" wenn `tracking-plan.json` existiert.
+
+## Structural Concerns (report only)
+
+- `add-posthog` läuft laut `executor.py` **vor** dem Planner — das passt. Aber: der Step "Detect existing analytics" kann false-negatives liefern wenn der Analytics-Code in einem nicht-analysierten Teilbaum sitzt. Heuristik reicht für MVP; langfristig würde ein `ANALYSIS.json`-Feld `analytics_tools: []` die Detection deterministisch machen.
+- PostHog ist hier hart gekoppelt (Skill-Name, SDK-Matrix). Wenn das Produkt-Team später Mixpanel/Segment als alternative Backends anbieten will, ist dieses Skill nicht wiederverwendbar. Kein Action-Item jetzt — nur dokumentieren.</result>
+<usage><total_tokens>57168</total_tokens><tool_uses>12</tool_uses><duration_ms>220691</duration_ms></usage>
+</task-notification>

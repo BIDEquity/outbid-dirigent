@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "6ce561aadd76",
+  "strategy": "manual-commit",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/skills/add-posthog/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/extract-business-rules/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/increase-testability/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/quick-feature/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/quick-scan/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6c/e561aadd76/0/metadata.json",
+      "transcript": "/6c/e561aadd76/0/full.jsonl",
+      "content_hash": "/6c/e561aadd76/0/content_hash.txt",
+      "prompt": "/6c/e561aadd76/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 446,
+    "cache_creation_tokens": 2111170,
+    "cache_read_tokens": 69548585,
+    "output_tokens": 216116,
+    "api_call_count": 244
+  }
+}

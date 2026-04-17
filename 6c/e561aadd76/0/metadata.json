@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "6ce561aadd76",
+  "session_id": "c78af251-0210-4f98-a06a-b9cd3ec3f203",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-17T07:19:23.301061Z",
+  "branch": "feat/v1.6",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/skills/add-posthog/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/extract-business-rules/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/increase-testability/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/quick-feature/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/quick-scan/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6[1m]",
+  "turn_id": "17ab57decdb9",
+  "token_usage": {
+    "input_tokens": 446,
+    "cache_creation_tokens": 2111170,
+    "cache_read_tokens": 69548585,
+    "output_tokens": 216116,
+    "api_call_count": 244
+  },
+  "session_metrics": {
+    "turn_count": 50
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-17T07:19:22.306429Z",
+    "agent_lines": 0,
+    "human_added": 931,
+    "human_modified": 174,
+    "human_removed": 0,
+    "total_committed": 931,
+    "agent_percentage": 0
+  }
+}
