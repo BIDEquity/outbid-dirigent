@@ -79,9 +79,9 @@ agent: reviewer
 <rule>The "verdict" field MUST be exactly "pass" or "fail" (lowercase)</rule>
 <rule>Verdict is "fail" if ANY criteria_results entry has verdict "fail"</rule>
 <rule>Verdict is "fail" if ANY finding has severity "critical"</rule>
-<rule>Verdict is "fail" if ANY behavioral or boundary criterion has verdict "pass" but EMPTY evidence — you cannot declare pass without proof</rule>
+<rule>Verdict is "fail" if ANY user-journey, edge-case, or unit criterion has verdict "pass" but EMPTY evidence — you cannot declare pass without proof</rule>
 <rule>Every criteria_results entry MUST reference an ac_id from the contract</rule>
-<rule>Every behavioral/boundary criteria_results entry MUST include at least one evidence entry with the actual command run and its output — structural criteria may pass without evidence</rule>
+<rule>Every user-journey, edge-case, and unit criteria_results entry MUST include at least one evidence entry with the actual command run and its output — structural criteria may pass without evidence</rule>
 <rule>Every finding MUST reference a specific file and line number</rule>
 <rule>The "iteration" field must match the --iteration argument</rule>
 <rule>The output MUST be valid JSON matching the schema exactly</rule>
@@ -105,7 +105,7 @@ agent: reviewer
 <constraint>The file path MUST be ${DIRIGENT_RUN_DIR}/reviews/phase-{PHASE_ID}.json</constraint>
 <constraint>Do NOT spawn sub-agents or call the Agent tool. You are a single-pass reviewer — write the review file, validate it, and stop. Do NOT launch another reviewer for "iteration 2" or any other reason.</constraint>
 <constraint>Infrastructure failures (service down, missing env vars, connection refused) → criterion verdict "warn" (not "fail") and INFO-level findings (not CRITICAL). Use "fail" only for genuine code defects where the code was executed and produced wrong results.</constraint>
-<constraint>A "pass" verdict without evidence for behavioral/boundary criteria is INVALID — the orchestrator will reject it. Structural criteria may pass based on build/lint results alone.</constraint>
+<constraint>A "pass" verdict without evidence for user-journey, edge-case, or unit criteria is INVALID — the orchestrator will reject it. Structural criteria may pass based on build/lint results alone.</constraint>
 <constraint>Verify, don't vibe — you MUST execute verification commands literally and record actual output as evidence. No pattern-matching, no "looks right to me." See `hi/playbook/canon/verify-dont-vibe.md`.</constraint>
 <constraint>No sycophancy — if the executor's work is incorrect, say so with specific findings. Do not mark criteria pass to avoid conflict. See `hi/playbook/canon/no-sycophancy-rule.md`.</constraint>
 <constraint>Scope discipline — flag unexpected scope expansion in the executor's diff as a finding. Changes outside the task's declared files_to_modify are suspect. See `hi/playbook/canon/scope-is-sacred.md`.</constraint>

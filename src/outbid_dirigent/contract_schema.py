@@ -20,9 +20,16 @@ from pydantic import BaseModel, Field
 # ══════════════════════════════════════════
 
 class CriterionLayer(str, Enum):
-    STRUCTURAL = "structural"   # File exists, compiles, router registered
-    BEHAVIORAL = "behavioral"   # Feature works: HTTP calls, auth, data persistence
-    BOUNDARY = "boundary"       # Edge cases: error paths, malformed input, duplicates
+    STRUCTURAL = "structural"       # Compile, lint, typecheck, subsystem liveness
+    UNIT = "unit"                   # Fast isolated tests for new logic in this phase
+    USER_JOURNEY = "user-journey"   # End-to-end: a user (or calling subsystem) observes X
+    EDGE_CASE = "edge-case"         # User or subsystem hits a bad path; graceful response
+
+
+class PhaseKind(str, Enum):
+    USER_FACING = "user-facing"        # Delivers UI surface or observable behavior change
+    INTEGRATION = "integration"        # Subsystem a later phase will expose to users
+    INFRASTRUCTURE = "infrastructure"  # Scaffolding, migrations, tooling — no consumer in-run
 
 
 class CriterionVerdict(str, Enum):
@@ -51,7 +58,7 @@ class AcceptanceCriterion(BaseModel):
     id: str = Field(..., description="Unique ID like AC-01-01")
     description: str = Field(..., description="What must be true")
     verification: str = Field(..., description="Executable command to verify (Run: ...)")
-    layer: CriterionLayer = CriterionLayer.BEHAVIORAL
+    layer: CriterionLayer = CriterionLayer.USER_JOURNEY
 
 
 class ExpectedFileChange(BaseModel):
@@ -64,7 +71,11 @@ class Contract(BaseModel):
     """Phase contract — acceptance criteria agreed before execution."""
     phase_id: str
     phase_name: str
-    objective: str = Field(..., description="One-sentence phase objective")
+    phase_kind: PhaseKind = Field(
+        default=PhaseKind.USER_FACING,
+        description="user-facing | integration | infrastructure — drives layer quotas",
+    )
+    objective: str = Field(..., description="Starts with a verb the user performs")
     acceptance_criteria: list[AcceptanceCriterion] = Field(
         ..., min_length=1, max_length=8,
         description="Measurable criteria (1-8)"
@@ -92,14 +103,24 @@ class Contract(BaseModel):
             return None
         try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-            # Backward compat: map old category field to new layer field
+            # Backward compat: map legacy fields to current schema
             for criterion in raw.get("acceptance_criteria", []):
+                # Pre-2025 'category' field → 'layer'
                 if "category" in criterion and "layer" not in criterion:
                     category = criterion.pop("category")
                     criterion["layer"] = {
-                        "functional": "behavioral",
+                        "functional": "user-journey",
                         "quality": "structural",
-                    }.get(category, "behavioral")
+                    }.get(category, "user-journey")
+                # Pre-UX-reframe layer names → current names
+                legacy_layer = criterion.get("layer")
+                if legacy_layer == "behavioral":
+                    criterion["layer"] = "user-journey"
+                elif legacy_layer == "boundary":
+                    criterion["layer"] = "edge-case"
+            # Pre-UX-reframe contracts have no phase_kind — default to user-facing
+            if "phase_kind" not in raw:
+                raw["phase_kind"] = "user-facing"
             return cls.model_validate(raw)
         except Exception:
             return None
@@ -107,27 +128,46 @@ class Contract(BaseModel):
     @staticmethod
     def json_template() -> str:
         return """{
-  "phase_id": "01",
-  "phase_name": "Phase Name",
-  "objective": "One sentence: what this phase achieves",
+  "phase_id": "04",
+  "phase_name": "User Management",
+  "phase_kind": "user-facing",
+  "objective": "An admin can add, edit, and disable users and see the results immediately on screen",
   "acceptance_criteria": [
     {
-      "id": "AC-01-01",
-      "description": "Project compiles without errors",
-      "verification": "Run: npm run build",
+      "id": "AC-04-01",
+      "description": "Project compiles and the admin area is reachable",
+      "verification": "Run: npm run build && (npm run dev &) && sleep 4 && curl -sf http://localhost:3000/admin",
       "layer": "structural"
     },
     {
-      "id": "AC-01-02",
-      "description": "GET /api/users returns list of users with correct schema",
-      "verification": "Run: curl -sf http://localhost:3000/api/users -H 'Authorization: Bearer $TOKEN' | jq '.[] | keys'",
-      "layer": "behavioral"
+      "id": "AC-04-02",
+      "description": "The user-form validator rejects empty email, invalid email format, and emails over 254 chars; accepts RFC-compliant emails",
+      "verification": "Run: pnpm test -- src/users/validators.test.ts --run",
+      "layer": "unit"
     },
     {
-      "id": "AC-01-03",
-      "description": "Unauthorized request returns 403",
-      "verification": "Run: curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/admin/users",
-      "layer": "boundary"
+      "id": "AC-04-03",
+      "description": "After logging in as admin and opening User Management, the admin sees existing users listed with email and role",
+      "verification": "Run: npx playwright test --grep 'admin sees user list' --reporter=line",
+      "layer": "user-journey"
+    },
+    {
+      "id": "AC-04-04",
+      "description": "The admin clicks 'Add User', fills email + role, submits, and sees the new row appear in the table without a page reload",
+      "verification": "Run: npx playwright test --grep 'admin adds user inline' --reporter=line",
+      "layer": "user-journey"
+    },
+    {
+      "id": "AC-04-05",
+      "description": "The admin changes a user's role and saves; the row updates in place and persists across reload",
+      "verification": "Run: npx playwright test --grep 'admin edits role persists' --reporter=line",
+      "layer": "user-journey"
+    },
+    {
+      "id": "AC-04-06",
+      "description": "When the admin submits a duplicate email, they see 'This email is already registered' next to the email field and the form stays open",
+      "verification": "Run: npx playwright test --grep 'duplicate email inline error' --reporter=line",
+      "layer": "edge-case"
     }
   ],
   "quality_gates": [
@@ -135,9 +175,12 @@ class Contract(BaseModel):
     "No regressions in existing functionality",
     "Code follows project conventions"
   ],
-  "out_of_scope": ["What this phase does NOT cover"],
+  "out_of_scope": ["Password reset flow", "Bulk user import"],
   "expected_files": [
-    {"path": "src/foo.py", "change": "Add new class"}
+    {"path": "src/users/validators.ts", "change": "Email and role validators"},
+    {"path": "src/users/validators.test.ts", "change": "Unit tests for validators"},
+    {"path": "src/app/admin/users/page.tsx", "change": "User management screen"},
+    {"path": "tests/e2e/admin-users.spec.ts", "change": "Playwright specs for user-journey criteria"}
   ]
 }"""
 

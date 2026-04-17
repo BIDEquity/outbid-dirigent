@@ -57,10 +57,11 @@ Use these only when genuinely blocked, not routinely:
 ## Contract Awareness
 
 Before starting implementation, read `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` if it exists. Each acceptance criterion has:
-- `layer`: structural, behavioral, or boundary
+- `layer`: `structural`, `unit`, `user-journey`, or `edge-case`
 - `verification`: the exact command the REVIEWER will run to check your work
+- The contract's `phase_kind` tells you whether this is `user-facing`, `integration`, or `infrastructure` work
 
-**Your code must pass these verification commands.** The reviewer will execute them literally — `curl` endpoints, check HTTP status codes, verify response bodies. If a behavioral criterion says "GET /api/users returns users with id and email fields", your endpoint must actually return that.
+**Your code must pass these verification commands.** The reviewer will execute them literally. For `user-journey` and `edge-case` criteria on user-facing phases, that usually means running Playwright specs that drive the real UI — so you need to write those specs alongside the implementation. For `unit` criteria it means the named test file exists and passes. If a user-journey criterion says "the admin sees the new user in the list", your UI must actually render that row.
 
 If any criterion seems unverifiable or contradicts the task description, note it in your summary as `DEVIATION: Contract-Concern — [explanation]`.
 
@@ -105,6 +106,6 @@ These rules are non-negotiable. Each links to a canon file with full rationale.
 
 - **Scope is sacred.** No features, refactors, or "improvements" beyond the task. A bug you notice while implementing is a `DEVIATION: Bug-Fix` note, not a silent scope expansion. See `hi/playbook/canon/scope-is-sacred.md`.
 - **Read before you write.** Never edit a file you haven't read in this session. Never reference a function, import path, or type you haven't confirmed exists. Grep + Read is cheaper than a revert, every time. See `hi/playbook/canon/read-before-you-write.md`.
-- **Verify, don't vibe.** Before committing any task, run a structural gate (`ruff`, `tsc --noEmit`, `ruby -c`, `cargo check`, whatever fits the stack). If the app can boot, run a behavioral gate too. "The LLM thinks it works" is not evidence. See `hi/playbook/canon/verify-dont-vibe.md`.
+- **Verify, don't vibe.** Before committing any task, run a structural gate (`ruff`, `tsc --noEmit`, `ruby -c`, `cargo check`, whatever fits the stack). If the app can boot, run a runtime gate too — the user-journey or unit command from the contract, not just a compile check. "The LLM thinks it works" is not evidence. See `hi/playbook/canon/verify-dont-vibe.md`.
 - **No sycophancy.** Do not say "you are absolutely right." Push back with evidence when the user or contract is wrong. Agreement without verification is a failure mode. See `hi/playbook/canon/no-sycophancy-rule.md`.
 - **Scratch state hygiene.** Never commit files from `.dirigent/`, `.dirigent-onboarding/`, `.planning/`, `.brv/` caches, or any scratch directory. Workspace is not deliverable. See `hi/playbook/canon/scratch-state-hygiene.md`.
