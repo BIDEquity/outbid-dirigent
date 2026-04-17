@@ -360,22 +360,16 @@ The Claude Code plugin (`plugin/.claude-plugin/`) provides skills invoked during
 | `/dirigent:implement-task` | TaskRunner | Behavioral rules for autonomous task execution |
 | `/dirigent:extract-business-rules` | Executor (Legacy) | Extract business rules from codebase |
 | `/dirigent:quick-scan` | Executor (Hybrid/Tracking) | Scan relevant files for context |
-| `/dirigent:greenfield-scaffold` | Executor (Greenfield) | Propose test setup and architecture best practices |
-| `/dirigent:run-init` | InitPhase | Bootstrap environment + test harness |
+| `/dirigent:greenfield-scaffold` | Executor (Greenfield) | Pick stack + architecture, scaffold, produce ARCHITECTURE.md + start.sh + test-harness.json |
 | `/dirigent:increase-testability` | Testability route | Improve test coverage score |
 | `/dirigent:add-posthog` | Tracking route | Add PostHog analytics events |
-| `/dirigent:build-manifest` | Testability route | Generate outbid-test-manifest.yaml |
-| `/dirigent:validate-manifest` | Testability route | Validate manifest against schema |
 | `/dirigent:entropy-minimization` | Executor (all routes) | Align docs, remove dead code, resolve contradictions |
 | `/dirigent:generate-spec` | CLI (spec resolution) | Generate SPEC.md from user description with 2-3 questions |
-| `/dirigent:generate-architecture` | InitPhase | Generate ARCHITECTURE.md for the target repo |
-| `/dirigent:generate-conventions` | InitPhase | Generate CONVENTIONS.md with codified coding patterns |
+| `/dirigent:generate-architecture` | InitPhase | Generate ARCHITECTURE.md (includes `<key-patterns>` for conventions) |
 | `/dirigent:quick-feature` | User (direct) | Implement small features end-to-end with focused subagents |
 | `/dirigent:build-plugin` | User (direct) | Build a Claude Code plugin tailored to a codebase |
 | `/dirigent:query-brv` | Research | Retrieve or store domain knowledge via ByteRover |
-| `/dirigent:find-edits` | Research | Find file changes from sessions |
-| `/dirigent:find-errors` | Recovery | Surface errors from sessions |
-| `/dirigent:search-memories` | Research | Search previous session logs |
+| `/dirigent:search-memories` | Research | Search previous session logs (advanced) |
 | `/dirigent:query-data` | Research | Run DuckDB queries on data files |
 | `/dirigent:show-plan` | Command | Render plan for user |
 | `/dirigent:show-progress` | Command | Render execution progress |

@@ -15,7 +15,7 @@ Classify the user's intent into one of these categories. LLM-mediated — no rul
 | **Test coverage** | "add tests for X", "improve coverage on Y", "make this testable" | `dirigent:increase-testability` → then `dirigent:generate-spec` | Testability route. |
 | **Tracking / analytics** | "add PostHog events", "instrument the checkout flow", "track user behavior in X" | `dirigent:add-posthog` → `dirigent:create-plan` | Tracking route. |
 | **Explore** | "how does X work?", "where is Y defined?", "explain this codebase" | (redirect — this is not a dirigent task) | Use the Explore subagent or plain Claude Code. Dirigent is for execution, not discovery. |
-| **Documentation** | "generate an ARCHITECTURE.md", "write CONVENTIONS.md", "update the README" | `dirigent:generate-architecture` or `dirigent:generate-conventions` directly | These skills are self-contained. |
+| **Documentation** | "generate an ARCHITECTURE.md", "write conventions", "update the README" | `dirigent:generate-architecture` directly | ARCHITECTURE.md includes `<key-patterns>` for conventions. |
 
 ## The narration pattern
 

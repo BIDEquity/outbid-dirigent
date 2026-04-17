@@ -135,9 +135,8 @@ These are the skills the coach routes to. You don't reimplement any of them — 
 - `dirigent:extract-business-rules` — deep domain extraction for legacy migrations
 - `dirigent:increase-testability` — analyze testability gaps
 - `dirigent:add-posthog` — tracking instrumentation plan
-- `dirigent:generate-architecture` — generate ARCHITECTURE.md
-- `dirigent:generate-conventions` — generate CONVENTIONS.md
-- `dirigent:run-init` — bootstrap test harness
+- `dirigent:generate-architecture` — generate ARCHITECTURE.md (includes conventions as `<key-patterns>`)
+- `dirigent:query-brv` — query or curate domain knowledge from `.brv/`
 
 You also use existing slash commands for display:
 - `/dirigent:show-plan` — render PLAN.json

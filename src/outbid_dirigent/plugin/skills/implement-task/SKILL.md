@@ -40,11 +40,9 @@ When you encounter situations not covered by the task description:
 
 Use these only when genuinely blocked, not routinely:
 
-- `/dirigent:search-memories <keyword>` — search past sessions
-- `/dirigent:find-edits <file>` — find previous changes to a file
-- `/dirigent:find-errors` — find known errors from past runs
+- `/dirigent:query-brv <question>` — query or curate domain knowledge from `.brv/`
+- `/dirigent:search-memories <keyword>` — search past Claude sessions (advanced debug tool)
 - `/dirigent:query-data <sql>` — ad-hoc DuckDB query on data files
-- `/dirigent:query-brv <question>` — query or curate domain knowledge from .brv/
 
 ## Completion
 
