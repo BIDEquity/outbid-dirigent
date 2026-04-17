@@ -6,12 +6,24 @@ Uses pydantic for validation, serialization, and deserialization.
 
 import json
 import logging
+from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+class PhaseKind(str, Enum):
+    """How a phase relates to the user.
+
+    Drives layer quotas in contracts and plan-level validation (max 1
+    infrastructure, final phase ≠ infrastructure, etc).
+    """
+    USER_FACING = "user-facing"        # Delivers UI surface or observable behavior change
+    INTEGRATION = "integration"        # Subsystem a later phase will expose to users
+    INFRASTRUCTURE = "infrastructure"  # Scaffolding, migrations, tooling — no consumer in-run
 
 
 class Task(BaseModel):
@@ -33,8 +45,16 @@ class Phase(BaseModel):
     """A group of related tasks executed sequentially."""
     id: str
     name: str
+    kind: PhaseKind = Field(
+        default=PhaseKind.USER_FACING,
+        description="user-facing | integration | infrastructure — drives contract layer quotas",
+    )
     description: str = ""
-    tasks: list[Task] = Field(default_factory=list)
+    merge_justification: str = Field(
+        default="",
+        description="One sentence: why this phase can't be merged with the next. Empty only if this is the last phase.",
+    )
+    tasks: list[Task] = Field(default_factory=list, max_length=5)
 
     def model_post_init(self, __context):
         # Normalize: accept both "id" and "phase" field names
@@ -46,7 +66,11 @@ class Plan(BaseModel):
     """The full execution plan for a dirigent run."""
     title: str = "Untitled"
     summary: str = ""
-    phases: list[Phase] = Field(default_factory=list)
+    size: Literal["standard", "large"] = Field(
+        default="standard",
+        description="'large' raises validator caps from 4 phases × 4 tasks to 5 × 5. Use only when the feature genuinely cannot fit 4×4 — summary must justify.",
+    )
+    phases: list[Phase] = Field(default_factory=list, max_length=5)
     estimated_complexity: str = "medium"
     risks: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
@@ -106,6 +130,10 @@ class Plan(BaseModel):
                     p["id"] = str(p.pop("phase"))
                 elif "id" in p:
                     p["id"] = str(p["id"])
+                # Pre-plan-tuning plans have no phase kind — default to user-facing
+                # (tightest downstream contract quotas; loudest if misclassified)
+                if "kind" not in p:
+                    p["kind"] = "user-facing"
                 for t in p.get("tasks", []):
                     # title → name
                     if "title" in t and "name" not in t:
@@ -127,6 +155,7 @@ class Plan(BaseModel):
         return """{
   "title": "Feature-Titel",
   "summary": "Kurze Beschreibung was implementiert wird",
+  "size": "standard",
   "assumptions": [
     "Annahmen die du über die Codebase/das Feature machst",
     "z.B. 'Tests laufen mit pytest', 'API ist REST-basiert'"
@@ -139,7 +168,9 @@ class Plan(BaseModel):
     {
       "id": "01",
       "name": "Phase-Name",
+      "kind": "user-facing|integration|infrastructure",
       "description": "Was in dieser Phase passiert",
+      "merge_justification": "Ein Satz: warum diese Phase nicht mit der naechsten gemerged werden kann. Leer nur bei der letzten Phase.",
       "tasks": [
         {
           "id": "01-01",

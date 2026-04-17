@@ -14,6 +14,10 @@ from typing import Optional
 from loguru import logger
 from pydantic import BaseModel, Field
 
+# PhaseKind is defined upstream in plan_schema (phases are planned before contracts are drafted).
+# Re-exported here so existing `from outbid_dirigent.contract_schema import PhaseKind` keeps working.
+from outbid_dirigent.plan_schema import PhaseKind  # noqa: F401
+
 
 # ══════════════════════════════════════════
 # ENUMS
@@ -24,12 +28,6 @@ class CriterionLayer(str, Enum):
     UNIT = "unit"                   # Fast isolated tests for new logic in this phase
     USER_JOURNEY = "user-journey"   # End-to-end: a user (or calling subsystem) observes X
     EDGE_CASE = "edge-case"         # User or subsystem hits a bad path; graceful response
-
-
-class PhaseKind(str, Enum):
-    USER_FACING = "user-facing"        # Delivers UI surface or observable behavior change
-    INTEGRATION = "integration"        # Subsystem a later phase will expose to users
-    INFRASTRUCTURE = "infrastructure"  # Scaffolding, migrations, tooling — no consumer in-run
 
 
 class CriterionVerdict(str, Enum):

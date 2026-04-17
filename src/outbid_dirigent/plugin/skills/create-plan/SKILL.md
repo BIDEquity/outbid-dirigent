@@ -112,7 +112,9 @@ Write `${DIRIGENT_RUN_DIR}/PLAN.json` with this exact format:
     {
       "id": "01",
       "name": "Phase-Name",
+      "kind": "user-facing",
       "description": "Was in dieser Phase passiert",
+      "merge_justification": "Ein Satz: warum diese Phase nicht mit der naechsten gemerged werden kann. Leer nur bei der letzten Phase.",
       "tasks": [
         {
           "id": "01-01",
@@ -135,21 +137,83 @@ Write `${DIRIGENT_RUN_DIR}/PLAN.json` with this exact format:
 }
 ```
 
+## Phase kind — how each phase relates to the user
+
+Every phase declares a `kind` at plan time. Pick one:
+
+| kind | when to pick | examples |
+|---|---|---|
+| `user-facing` | Phase delivers something a user clicks, types, or sees | "Admin user management UI", "Checkout flow", "Dark mode toggle" |
+| `integration` | Phase delivers a subsystem another phase will expose to users | "Auth middleware + session", "tRPC router scaffold", "Background job runner" |
+| `infrastructure` | Scaffolding, migrations, tooling, CI. No consumer within the run | "Scaffold Next.js + Prisma", "Set up CI" |
+
+Downstream the contract validator enforces layer quotas based on this kind.
+Pick wrong and the contract step will loudly reject the contract.
+
+**Constraints enforced by the validator:**
+- Max 1 `infrastructure` phase per plan. If you're thinking of two, merge them.
+- Final phase must NOT be `infrastructure` — every run has to end on
+  user-observable delivery.
+- Two consecutive same-kind phases are a merge warning. If you keep them
+  separate, the `merge_justification` must make a strong case.
+
+## The merge-justification rule
+
+Every phase except the last must have a `merge_justification` — one sentence
+on why this phase cannot be merged with the next. The sentence is the forcing
+function: if you can't write it, merge the phases.
+
+Good justifications:
+- "Exposes the auth API that phase 3's login UI consumes — splitting lets the
+  auth contract probe the backend in isolation before UI lands on top."
+- "Scaffolding Next.js and Prisma together produces a non-runnable
+  intermediate state if split — kept as one infrastructure phase."
+- "Delivers the admin user-management UI end-to-end; next phase introduces
+  reporting which depends on this screen being stable."
+
+Bad justifications (= merge these):
+- "Separate concern." (vague)
+- "Cleaner organization." (vague)
+- "Makes each phase smaller." (self-fulfilling; re-merge them)
+
+## When to use `size: "large"`
+
+Default is `"standard"` — 4 phases × 4 tasks. This cap is the forcing function
+that keeps plans atomic and reviewable. Set `"size": "large"` (raises caps to
+5 phases × 5 tasks) only when the spec genuinely doesn't fit 4×4 and the only
+alternative is a phase densely packed with multiple `effort: "high"` tasks.
+
+Appropriate for `"large"`:
+- Features with ≥3 distinct screens AND non-trivial logic per screen.
+- Subsystems requiring multiple integration phases with distinct downstream contracts.
+- Migrations that cannot be atomically split without leaving intermediate broken states.
+
+If you set `"large"`, the `summary` must explain why in one sentence so reviewers
+can evaluate the expansion. Don't use `large` to avoid thinking; use it when a
+4×4 plan would compress genuinely separate work into dense phases.
+
+Max 1 infrastructure phase and "final phase ≠ infrastructure" apply regardless
+of size.
+
 ## Rules
 
-1. **Max 4 phases, max 4 tasks per phase**
-2. Each task is atomic (does exactly one thing)
-3. No dependencies between tasks within a phase
-4. Tasks must be concrete and executable
-5. If `BUSINESS_RULES.md` exists: all rules must be preserved
-6. **model**: "haiku" for simple tasks, "sonnet" for standard, "opus" for complex architecture
-7. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic
-8. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed
-9. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command. The reviewer will use these to verify features end-to-end.
-10. **Plan for maintainability** — the agent executing these tasks is the long-term maintainer of the codebase. Task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies. Do not plan throwaway code.
-11. **Plan for real verification** — each phase will be reviewed with executable verification commands. Do not plan tasks that "work" only in the sense that they compile. The reviewer will hit real endpoints and run real test suites.
-12. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Be specific — a task creating a Ruby form object needs `["ruby-code-writing", "form-builder"]`, not the entire skill list. Empty array `[]` if no convention skills are relevant.
-13. **relevant_req_ids (spec coverage)**: If `${DIRIGENT_RUN_DIR}/SPEC.compact.json` exists, set `relevant_req_ids` on every task. The IDs come from the `requirements[].id` field of the compact spec (format `R\d+`). Together, all tasks must collectively reference every requirement at least once. Cross-cutting requirements (encryption, audit logging, GDPR) may be referenced by multiple tasks. Use the `category` field on each requirement as a hint: `data-model` reqs belong to schema/migration tasks, `ui` reqs to component tasks, `auth` reqs to permission/middleware tasks, etc. An empty array means "no specific requirement, this is mechanical work" and should be rare.
+1. **Max 4 phases × 4 tasks per phase** (default). Pydantic and the validator both reject violations. Set `"size": "large"` to raise caps to 5×5 when genuinely needed — otherwise split the SPEC into multiple dirigent runs.
+2. **Every phase has a `kind`** — `user-facing`, `integration`, or `infrastructure`. Required. See the table above.
+3. **Every phase except the last has a `merge_justification`** — one sentence, see the rule above.
+4. **Max 1 infrastructure phase.** Scaffolds, migrations, and CI setup almost always belong together.
+5. **Final phase MUST be `user-facing` or `integration`, not `infrastructure`.** A run that ends on infra delivered nothing observable.
+6. Each task is atomic (does exactly one thing).
+7. No dependencies between tasks within a phase.
+8. Tasks must be concrete and executable.
+9. If `BUSINESS_RULES.md` exists: all rules must be preserved.
+10. **model**: "haiku" for simple tasks, "sonnet" for standard, "opus" for complex architecture.
+11. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic.
+12. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed.
+13. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command.
+14. **Plan for maintainability** — task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies.
+15. **Plan for real verification** — each phase will be reviewed with executable commands. The reviewer will hit real endpoints and run real test suites.
+16. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Empty array `[]` if no convention skills are relevant.
+17. **relevant_req_ids (spec coverage)**: If `${DIRIGENT_RUN_DIR}/SPEC.compact.json` exists, set `relevant_req_ids` on every task. Together, all tasks must collectively reference every requirement at least once. Cross-cutting requirements (encryption, audit logging, GDPR) may be referenced by multiple tasks.
 
 ## Validation (MANDATORY)
 
