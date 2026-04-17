@@ -1,6 +1,8 @@
 ---
 name: add-posthog
 description: Analyze the app and produce a PostHog tracking instrumentation plan
+context: fork
+agent: infra-architect
 ---
 
 # Add PostHog

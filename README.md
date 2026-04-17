@@ -337,26 +337,20 @@ The Claude Code plugin ships 25 skills and 4 commands, invoked by the orchestrat
 | `/dirigent:implement-task` | Behavioral rules for autonomous task execution from a plan |
 | `/dirigent:extract-business-rules` | Extract all business rules from a legacy codebase |
 | `/dirigent:quick-scan` | Quick scan of relevant files for a feature (Hybrid route) |
-| `/dirigent:greenfield-scaffold` | Propose test setup and architecture best practices before planning |
-| `/dirigent:run-init` | Inspect repo and produce a test harness specification for e2e verification |
+| `/dirigent:greenfield-scaffold` | Pick stack + architecture, scaffold project, produce ARCHITECTURE.md + start.sh + test-harness.json |
 | `/dirigent:increase-testability` | Analyze testability gaps and show concrete ways to improve the testability score |
 | `/dirigent:add-posthog` | Analyze the app and produce a PostHog tracking instrumentation plan |
-| `/dirigent:build-manifest` | Analyze the current repo and generate outbid-test-manifest.yaml |
-| `/dirigent:validate-manifest` | Validate an outbid-test-manifest.yaml against the schema |
 | `/dirigent:entropy-minimization` | Align code and documentation, remove dead code, resolve contradictions after execution |
 | `/dirigent:generate-spec` | Generate a SPEC.md from a user description, asking max 2-3 clarifying questions |
-| `/dirigent:generate-architecture` | Generate ARCHITECTURE.md for the target repository |
-| `/dirigent:generate-conventions` | Generate CONVENTIONS.md — codified patterns agents must follow when writing code |
+| `/dirigent:generate-architecture` | Generate ARCHITECTURE.md (includes `<key-patterns>` for coding conventions) |
 
 ### Research & Utility Skills
 
 | Skill | Purpose |
 |---|---|
-| `/dirigent:find-edits` | Find all Edit/Write tool calls for a file from past Claude sessions |
-| `/dirigent:find-errors` | Find errors and failures from past Claude sessions, grouped by type |
-| `/dirigent:search-memories` | Search past Claude session logs for relevant context using DuckDB |
+| `/dirigent:query-brv` | Retrieve or store domain knowledge via ByteRover (`.brv/context-tree/`) |
+| `/dirigent:search-memories` | Search past Claude session logs for relevant context using DuckDB (advanced) |
 | `/dirigent:query-data` | Run ad-hoc DuckDB queries on any data file (CSV, Parquet, JSON, JSONL) |
-| `/dirigent:query-brv` | Retrieve or store domain knowledge via ByteRover (.brv/context-tree/) |
 | `/dirigent:quick-feature` | Implement a small feature end-to-end — plan, implement, review — using focused subagents |
 | `/dirigent:build-plugin` | Scan a codebase and build a Claude Code plugin tailored to its stack |
 

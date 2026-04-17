@@ -1,6 +1,8 @@
 ---
 name: extract-business-rules
 description: Extract business rules from an existing codebase into BUSINESS_RULES.md so the planner and executor preserve them during a rewrite or migration.
+context: fork
+agent: infra-architect
 ---
 
 # Extract Business Rules

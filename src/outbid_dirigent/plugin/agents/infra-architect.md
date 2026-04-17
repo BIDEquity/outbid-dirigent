@@ -54,12 +54,10 @@ Look for required services in dependency files AND config:
 ## Output Files
 
 Depending on which skill invoked you:
-- `run-init` → `${DIRIGENT_RUN_DIR}/test-harness.json` (TestHarness schema)
-- `greenfield-scaffold` → `${DIRIGENT_RUN_DIR}/testing-strategy.md` + `${DIRIGENT_RUN_DIR}/architecture-decisions.md`
-- `increase-testability` → `${DIRIGENT_RUN_DIR}/testability-recommendations.json`
+- `greenfield-scaffold` → `ARCHITECTURE.md` (three XML sections) + `start.sh` + `${DIRIGENT_RUN_DIR}/test-harness.json`
 - `generate-architecture` → `ARCHITECTURE.md`
-- `generate-conventions` → `CONVENTIONS.md`
-- `quick-scan` → `${DIRIGENT_RUN_DIR}/CONTEXT.md`
+- `increase-testability` → `${DIRIGENT_RUN_DIR}/testability-recommendations.json`
+- `quick-scan` → `${DIRIGENT_RUN_DIR}/CONTEXT.md` (read-selectively posture — NOT full scaffolding)
 
 ## Use ByteRover Knowledge
 
