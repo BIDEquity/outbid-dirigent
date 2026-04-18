@@ -5,13 +5,15 @@ Routes specs to execution paths using Claude structured outputs.
 Falls back to heuristic routing on API failure.
 """
 
+import asyncio
 import json
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-import anthropic
+from claude_agent_sdk import query as sdk_query
+from claude_agent_sdk.types import ClaudeAgentOptions, ResultMessage
 from pydantic import BaseModel, Field
 
 from outbid_dirigent.logger import get_logger
@@ -88,37 +90,33 @@ def determine_route_llm(
         user_parts.append("<test-harness>No test harness configured.</test-harness>")
 
     user_parts.append("Pick the best route and justify your decision.")
+    user_prompt = "\n\n".join(user_parts)
 
     try:
-        client = anthropic.Anthropic()
         start = datetime.now()
-
-        response = client.messages.parse(
-            model=model,
-            max_tokens=500,
-            system=ROUTE_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": "\n\n".join(user_parts)}],
-            output_config={"format": {"type": "json_schema", "schema": strict_json_schema(RouteDecision.model_json_schema())}},
-        )
-
+        structured, usage = asyncio.run(_aquery_route(user_prompt, model))
         duration_ms = int((datetime.now() - start).total_seconds() * 1000)
 
+        if structured is None:
+            logger.error("LLM router: no structured output returned")
+            return None
+
         try:
-            decision = RouteDecision.model_validate_json(response.content[0].text)
+            decision = RouteDecision.model_validate(structured)
         except Exception as e:
             logger.error(f"LLM router: failed to parse route decision: {e}")
             return None
 
-        # Log usage
-        usage = response.usage
+        input_tokens = int(usage.get("input_tokens", 0) or 0)
+        output_tokens = int(usage.get("output_tokens", 0) or 0)
         logger.api_usage(
             component="llm_router",
             model=model,
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
-            cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
-            cost_cents=int((usage.input_tokens * 1 + usage.output_tokens * 5) / 10000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_tokens=int(usage.get("cache_read_input_tokens", 0) or 0),
+            cache_write_tokens=int(usage.get("cache_creation_input_tokens", 0) or 0),
+            cost_cents=int((input_tokens * 1 + output_tokens * 5) / 10000),
             operation="route_decision",
             duration_ms=duration_ms,
         )
@@ -131,12 +129,29 @@ def determine_route_llm(
 
         return decision
 
-    except anthropic.APIError as e:
-        logger.error(f"LLM router API error: {e}")
-        return None
     except Exception as e:
         logger.error(f"LLM router error: {e}")
         return None
+
+
+async def _aquery_route(
+    user_prompt: str, model: str
+) -> tuple[Optional[dict], dict]:
+    """Run the route decision via claude_agent_sdk. Returns (structured_output, usage)."""
+    options = ClaudeAgentOptions(
+        model=model,
+        allowed_tools=[],
+        permission_mode="bypassPermissions",
+        system_prompt=ROUTE_SYSTEM_PROMPT,
+        output_format={
+            "type": "json_schema",
+            "schema": strict_json_schema(RouteDecision.model_json_schema()),
+        },
+    )
+    async for message in sdk_query(prompt=user_prompt, options=options):
+        if isinstance(message, ResultMessage) and not message.is_error:
+            return message.structured_output, (message.usage or {})
+    return None, {}
 
 
 def _save_llm_decision(dirigent_dir: Path, decision: RouteDecision, model: str, duration_ms: int):
