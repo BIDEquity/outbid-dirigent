@@ -245,18 +245,26 @@ def generate_harness_from_architecture(
 async def _aquery_harness(
     user_prompt: str, model: str
 ) -> tuple[Optional[dict], dict]:
-    """Run harness extraction via claude_agent_sdk. Returns (structured_output, usage)."""
+    """Run harness extraction via claude_agent_sdk. Returns (structured_output, usage).
+
+    Drains the generator to completion before returning — see the matching
+    comment in llm_router._aquery_route for the subprocess-cleanup reason.
+    """
     options = ClaudeAgentOptions(
         model=model,
         allowed_tools=[],
         permission_mode="bypassPermissions",
+        setting_sources=[],  # don't load user/project/local settings; minimal context
         system_prompt=HARNESS_SYSTEM_PROMPT,
         output_format={
             "type": "json_schema",
             "schema": strict_json_schema(TestHarness.model_json_schema()),
         },
     )
+    structured: Optional[dict] = None
+    usage: dict = {}
     async for message in sdk_query(prompt=user_prompt, options=options):
         if isinstance(message, ResultMessage) and not message.is_error:
-            return message.structured_output, (message.usage or {})
-    return None, {}
+            structured = message.structured_output
+            usage = message.usage or {}
+    return structured, usage
