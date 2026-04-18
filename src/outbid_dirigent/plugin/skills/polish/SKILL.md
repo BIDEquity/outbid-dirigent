@@ -127,17 +127,19 @@ Write `${DIRIGENT_RUN_DIR}/polish-PLAN.json`:
 For each planned fix:
 
 1. **Re-read the evidence_paths.** The gap report came from a subagent's view at audit time; the repo may have shifted since.
-2. **Make the minimum change** that delivers the `user_outcome`. No refactoring, no surrounding cleanup, no abstractions.
+2. **Make the minimum change** that delivers the `user_outcome`. No refactoring, no surrounding cleanup, no abstractions. **Remember every file path you touch** — you will stage them explicitly below.
 3. **Run the project's build/typecheck** (detect via `package.json` scripts / `pyproject.toml` / `Cargo.toml` / etc.). Must exit 0.
-4. **Commit atomically**:
+4. **Commit atomically, staging only the files you touched for THIS fix**:
    ```bash
-   git add -A && git commit -m "polish: <user_outcome in imperative form>
+   git add <path1> <path2> ...   # the specific files changed for this user_outcome — NEVER `git add -A` or `git add .`
+   git commit -m "polish: <user_outcome in imperative form>
 
    Req: <req_id>
    Fixes gap: <observed> → <expected>
    "
    ```
-5. If the build breaks after your change and you cannot fix it within one additional attempt, `git reset --hard HEAD` (only the un-committed attempt), record the fix in `fixes_abandoned[]`, and move to the next.
+   Staging by name matters: polish runs on third-party repos where the working tree may contain `.env`, credentials, large binaries, or other uncommitted work you must not sweep in.
+5. If the build breaks after your change and you cannot fix it within one additional attempt, revert **only the files you just touched** with `git checkout -- <path1> <path2> ...` (never `git reset --hard` — it clobbers unrelated working-tree state). Record the fix in `fixes_abandoned[]` and move to the next.
 
 **Do not batch fixes into one commit.** One commit per user-outcome keeps the closure audit and the git history interpretable.
 
