@@ -1,6 +1,6 @@
 # Read before you write
 
-**Track:** Agent rule (enforced in `implement-task`, `fix-review`)
+**Track:** Agent rule (enforced in `implement-task` skill, and in `implementer` agent — including its Review-Fix Mode)
 
 **Thesis:** Do not propose edits to code you haven't read. Grep + Read is cheaper than a revert, every time, without exception.
 
@@ -31,4 +31,4 @@ Reading feels slow. Typing feels productive. That's an illusion: the time spent 
 ## Enforced in
 
 - `skills/implement-task/SKILL.md` — engineering standards: "You are the long-term maintainer. Every line you write, you will read again in 6 months." (Canon strengthens this to explicit read-before-edit.)
-- `skills/fix-review/SKILL.md` — Fixes must be minimal and focused; impossible to do safely without reading the surrounding code first.
+- `agents/implementer.md` (Review-Fix Mode) — Fixes must be minimal and focused; impossible to do safely without reading the surrounding code first.

@@ -1,6 +1,6 @@
 # Scope is sacred
 
-**Track:** Agent rule (enforced in `implement-task`, `fix-review`)
+**Track:** Agent rule (enforced in `implement-task` skill, and in `implementer` agent — including its Review-Fix Mode)
 
 **Thesis:** The agent implements the task. Not the task *and* nearby cleanup. Not the task *and* speculative abstractions. Not the task *and* "while I was here, I noticed…" Just the task.
 
@@ -31,5 +31,5 @@ The global rule in CLAUDE.md already says this plainly: *"Don't add features, re
 ## Enforced in
 
 - `skills/implement-task/SKILL.md` — Constraints: "Stick to the task description. Do not add unrelated features."
-- `skills/fix-review/SKILL.md` — Constraint: fix only what the reviewer flagged.
-- `skills/review-phase/SKILL.md` — Reviewers flag unexpected scope expansion as a finding.
+- `agents/implementer.md` (Review-Fix Mode) — Constraint: fix only what the reviewer flagged.
+- `agents/reviewer.md` — Reviewers flag unexpected scope expansion as a finding.
