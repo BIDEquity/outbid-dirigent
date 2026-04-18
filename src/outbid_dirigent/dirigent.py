@@ -718,6 +718,19 @@ Beispiele:
     )
 
     parser.add_argument(
+        "--polish",
+        action="store_true",
+        help="Polish-Modus: Spec→Code Gap-Audit. Stateless. Läuft auch auf Repos die Dirigent nie angefasst hat.",
+    )
+
+    parser.add_argument(
+        "--polish-max-fixes",
+        type=int,
+        default=5,
+        help="Maximale Anzahl Fixes pro Polish-Lauf (default: 5)",
+    )
+
+    parser.add_argument(
         "--interactive",
         action="store_true",
         help="[DEPRECATED] Nutze --execution-mode interactive",
@@ -856,6 +869,44 @@ Beispiele:
             logger.warn(f"Execution Mode '{args.execution_mode}' benötigt Portal-Credentials (fehlen)")
 
     try:
+        # Polish-Modus: standalone spec→code gap audit. Skip analyze/route/plan/execute.
+        if args.polish:
+            logger.info("🔎 Polish-Modus — Spec→Code Gap-Audit")
+            # Check for uncommitted changes before starting (skill also checks, but fail loud here)
+            import subprocess as _sp
+            dirty = _sp.run(
+                ["git", "-C", str(repo_path), "status", "--porcelain"],
+                capture_output=True, text=True,
+            )
+            if dirty.stdout.strip():
+                logger.error("Working tree has uncommitted changes. Commit or stash first.")
+                sys.exit(1)
+
+            executor = create_executor(
+                str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model, args.effort,
+                portal_url=args.portal_url or "",
+                execution_id=args.execution_id or "",
+                reporter_token=args.reporter_token or "",
+            )
+            prompt = f"Run /dirigent:polish --max-fixes {args.polish_max_fixes}"
+            success, _, stderr = executor.runner._run_claude(prompt, timeout=2400)
+            if not success:
+                logger.error(f"Polish failed: {stderr[:300]}")
+                sys.exit(1)
+
+            report_file = executor.dirigent_dir / "polish-report.json"
+            if report_file.exists():
+                try:
+                    report = json.loads(report_file.read_text(encoding="utf-8"))
+                    applied = report.get("fixes_applied", 0)
+                    deferred = report.get("fixes_deferred", 0)
+                    abandoned = report.get("fixes_abandoned", 0)
+                    logger.info(f"Polish: {applied} fixes applied, {deferred} deferred, {abandoned} abandoned")
+                except Exception:
+                    pass
+            logger.info("Polish abgeschlossen.")
+            sys.exit(0)
+
         # Resume-Modus
         if args.resume:
             success = resume_execution(repo_path, spec_path, args.dry_run, args.use_proteus, args.model, args.effort)
