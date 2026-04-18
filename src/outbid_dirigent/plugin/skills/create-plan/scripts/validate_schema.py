@@ -18,6 +18,39 @@ LARGE_MAX_PHASES = 5
 LARGE_MAX_TASKS_PER_PHASE = 5
 
 MAX_INFRASTRUCTURE_PHASES = 1  # independent of size — scaffolds always monolithize
+MAX_SETUP_TASKS = 1            # vertical slicing — scaffold belongs in greenfield-scaffold, not PLAN.json
+
+# Patterns that mark a task as a horizontal-layer "setup" task. Matched against
+# the task name (lowercased) via re.search. A task is flagged if ANY pattern
+# matches — we tune patterns so they catch layer-named tasks but leave real
+# feature slices alone. A slice like "Admit an active DM-pass member" won't
+# trip any of these; "Pydantic and dataclass models" will.
+SETUP_TASK_PATTERNS = [
+    # Dependencies / packages as the task's subject
+    r"^((add|install|configure|set ?up) )?(python |node |ruby |go )?(deps|dependencies|packages)$",
+    r"^(add|install) (python |node |ruby |go )?(deps|dependencies|packages)\b",
+    # Models / schema as the trailing subject
+    r"\b(pydantic|sqlalchemy|django|orm|data|dataclass|domain)( and \w+)? models?$",
+    r"\bdata ?models?$",
+    # Config / configuration as the subject (optionally qualified)
+    r"^(config|configuration)( module)?( with .+)?$",
+    # Migrations / schema as the subject
+    r"\b(supabase |prisma |typeorm |database )?(migrations?|schema)( for (the )?(full |initial )?(data ?model|schema|tables?))?$",
+    # Endpoints / routes / router as a TRAILING noun ("admin CRUD endpoints",
+    # "POST /resolve endpoint", "visit query and export endpoints"). A feature
+    # slice names the outcome, not the transport.
+    r"\b(crud |admin |rest |api |http )?endpoints?$",
+    r"\b(routes?|router|routing)$",
+    # Layer-named tasks
+    r"\b(data access|service|repository|domain|business|presentation|persistence|storage) layer$",
+    # Event / pub-sub / message system as the subject
+    r"\b(event|events|pub ?/? ?sub|message|messaging) (system|bus|handler|handlers|framework)$",
+    # Standalone test-writing tasks (tests belong WITH the feature)
+    r"\btests?$",
+    r"\btests? for\b",
+    # Project bootstrap
+    r"^(project |initial )?(setup|bootstrap|scaffold(ing)?)\b",
+]
 
 
 def validate(path: str):
@@ -66,6 +99,7 @@ def validate(path: str):
     depends_on_refs = []      # (ref_task_id, location_str)
     phase_kinds_in_order = [] # list of (kind, phase_index, is_last_phase_flag_resolved_later)
     infrastructure_count = 0
+    setup_tasks = []          # list of (location_str, task_name) flagged as setup
 
     for i, phase in enumerate(phases):
         pprefix = f"phases[{i}]"
@@ -166,6 +200,15 @@ def validate(path: str):
                 errors.append(f"{tprefix}: missing 'name'")
             elif not isinstance(task["name"], str) or not task["name"].strip():
                 errors.append(f"{tprefix}.name: must be a non-empty string")
+            else:
+                # Detect horizontal-layer "setup" tasks — these should be folded
+                # into the feature slices they support, not split into their own
+                # tasks. See SKILL.md "Slice Vertically, Not Horizontally".
+                name_lc = task["name"].strip().lower()
+                for pattern in SETUP_TASK_PATTERNS:
+                    if re.search(pattern, name_lc):
+                        setup_tasks.append((tprefix, task["name"]))
+                        break
 
             # Optional: model
             if "model" in task:
@@ -221,6 +264,23 @@ def validate(path: str):
         errors.append(
             f"Plan has {infrastructure_count} infrastructure phases; max is {MAX_INFRASTRUCTURE_PHASES}. "
             f"Merge scaffolding/migrations/tooling into a single infrastructure phase."
+        )
+
+    # Setup-task cap: vertical slicing rule. Max 1 task may be pure scaffolding
+    # (dependencies, config, models, migrations, "REST endpoints" as a standalone
+    # layer, etc). Beyond that, fold setup work into the first feature slice
+    # that needs it. See SKILL.md "Slice Vertically, Not Horizontally".
+    if len(setup_tasks) > MAX_SETUP_TASKS:
+        flagged = ", ".join(
+            f"{loc} ('{name}')" for loc, name in setup_tasks
+        )
+        errors.append(
+            f"Plan has {len(setup_tasks)} horizontal-layer 'setup' tasks; max is "
+            f"{MAX_SETUP_TASKS}. Flagged: {flagged}. Rewrite these as vertical "
+            f"feature slices (e.g. 'Admit an active DM-pass member end-to-end' "
+            f"instead of 'Add Pydantic models' + 'Create REST endpoints'). "
+            f"Setup work belongs in the greenfield-scaffold step or folded into "
+            f"the first feature that needs it."
         )
 
     # Consecutive same-kind phases → merge candidates (warning, not error).

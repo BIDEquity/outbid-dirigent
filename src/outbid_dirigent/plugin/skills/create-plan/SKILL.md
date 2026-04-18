@@ -137,6 +137,65 @@ Write `${DIRIGENT_RUN_DIR}/PLAN.json` with this exact format:
 }
 ```
 
+## Slice Vertically, Not Horizontally — THE CORE RULE
+
+**Each task MUST deliver one user-visible outcome end-to-end through every
+layer it needs** (migration + model + endpoint + test, all in one task). A task
+is a feature slice, not a file.
+
+Plans that slice horizontally (one task per layer) produce three failures we
+keep seeing in real runs:
+
+1. **Bundled commits.** The implementer correctly senses that "domain logic"
+   without "data access" without "events" is untestable, so task-1 silently
+   grows to cover the whole phase and subsequent tasks become no-ops. The
+   per-task commit atomicity the spec promised is gone.
+2. **Setup-task inflation.** "Dependencies", "config module", "Pydantic
+   models" as standalone tasks burn LLM budget on work a scaffold template
+   does in 0 LLM calls. A 4×4 plan ends up spending 25% of its tasks on
+   boilerplate.
+3. **Ambition ceiling.** The tasks mirror the spec's nouns (data layer, API,
+   integrations) instead of the spec's *verbs* (admit a member, consume a
+   guest pass, record an override). The output ceiling becomes "functional
+   CRUD", not "the feature the user asked for".
+
+### Good slices vs bad slices
+
+| ❌ Bad (horizontal layer) | ✅ Good (vertical slice) |
+|---|---|
+| "Add Pydantic models" | "Admit an active DM-pass member end-to-end" |
+| "Add Python dependencies" | "Scan an expired token, show review card with renewal hint" |
+| "Build data access layer" | "Consume a guest pass on admit, decrement referrer's remaining count" |
+| "Supabase migrations for full schema" | "Create fraud rule, dupe-scan within its window triggers auto-deny" |
+| "Config module" | "Override a denied scan with typed reason, persist override event" |
+| "REST API endpoints" | "Export last-30-days visits as CSV with the dashboard filters applied" |
+| "Unit tests for domain" | (tests belong WITH the feature that needs them, not as a separate task) |
+
+The ✅ column names:
+- A user (scanner operator, admin, visitor) performing
+- A specific action producing
+- An observable outcome
+
+Each ✅ task forces design of the *full stack* for that one behaviour — which
+is where the planner's value lives. The ❌ column just enumerates files.
+
+### Max 1 setup task across the entire plan
+
+**Migrations, dependencies, config modules, model modules, and other
+scaffolding do NOT get standalone tasks.** The greenfield-scaffold step
+already produces dependencies, config, initial migration, and test harness;
+restating them in PLAN.json is pure redundancy.
+
+If the spec genuinely requires a setup task that scaffold didn't cover
+(new third-party integration needing env vars, new migration for an added
+subsystem), you may have **at most one** task tagged as setup across the
+whole plan. Beyond that, fold the setup work into the first feature slice
+that needs it.
+
+The validator enforces this — plans with >1 task whose description starts
+with verbs like "Add dependencies", "Set up config", "Create migration",
+"Scaffold models" will be rejected.
+
 ## Phase kind — how each phase relates to the user
 
 Every phase declares a `kind` at plan time. Pick one:
@@ -202,18 +261,19 @@ of size.
 3. **Every phase except the last has a `merge_justification`** — one sentence, see the rule above.
 4. **Max 1 infrastructure phase.** Scaffolds, migrations, and CI setup almost always belong together.
 5. **Final phase MUST be `user-facing` or `integration`, not `infrastructure`.** A run that ends on infra delivered nothing observable.
-6. Each task is atomic (does exactly one thing).
-7. No dependencies between tasks within a phase.
-8. Tasks must be concrete and executable.
-9. If `BUSINESS_RULES.md` exists: all rules must be preserved.
-10. **model**: "haiku" for simple tasks, "sonnet" for standard, "opus" for complex architecture.
-11. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic.
-12. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed.
-13. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command.
-14. **Plan for maintainability** — task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies.
-15. **Plan for real verification** — each phase will be reviewed with executable commands. The reviewer will hit real endpoints and run real test suites.
-16. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Empty array `[]` if no convention skills are relevant.
-17. **relevant_req_ids (spec coverage)**: If `${DIRIGENT_RUN_DIR}/SPEC.compact.json` exists, set `relevant_req_ids` on every task. Together, all tasks must collectively reference every requirement at least once. Cross-cutting requirements (encryption, audit logging, GDPR) may be referenced by multiple tasks.
+6. **Vertical slicing — each task delivers one user-visible outcome end-to-end.** Not a layer, not a file. See "Slice Vertically, Not Horizontally" above.
+7. **Max 1 setup task across the whole plan** (validator-enforced). Dependencies / config / models / migrations / "REST endpoints" as standalone tasks are rejected. Fold them into the feature slice that needs them.
+8. No dependencies between tasks within a phase.
+9. Tasks must be concrete and executable — each task name names a user, an action, and an outcome.
+10. If `BUSINESS_RULES.md` exists: all rules must be preserved.
+11. **model**: "haiku" for simple tasks, "sonnet" for standard, "opus" for complex architecture.
+12. **effort**: "low" for mechanical, "medium" for standard, "high" for complex logic.
+13. **test_level**: "L1" for unit tests/lint, "L2" for integration tests, empty if no testing needed.
+14. If `test-harness.json` exists: plan verification tasks that use its verification_commands and e2e_framework.run_command.
+15. **Plan for maintainability** — task descriptions should guide toward scalable patterns: clear interfaces, separation of concerns, explicit dependencies.
+16. **Plan for real verification** — each phase will be reviewed with executable commands. The reviewer will hit real endpoints and run real test suites.
+17. **convention_skills**: If `.opencode/skills/` exists, tag each task with the skill names the coder should load. Empty array `[]` if no convention skills are relevant.
+18. **relevant_req_ids (spec coverage)**: If `${DIRIGENT_RUN_DIR}/SPEC.compact.json` exists, set `relevant_req_ids` on every task. Together, all tasks must collectively reference every requirement at least once. Cross-cutting requirements (encryption, audit logging, GDPR) may be referenced by multiple tasks.
 
 ## Validation (MANDATORY)
 
