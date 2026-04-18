@@ -1,6 +1,6 @@
 # Verify, don't vibe
 
-**Track:** Agent rule (enforced in `implement-task`, `review-phase`, `fix-review`)
+**Track:** Agent rule (enforced in `implement-task` skill, and in `reviewer` + `implementer` agents — the latter also in Review-Fix Mode)
 
 **Thesis:** "The LLM thinks it works" is not evidence. Every task needs a runtime gate that actually executes. If the executor can't run the app, contracts can only claim *structural* correctness — and must say so explicitly.
 
@@ -29,5 +29,5 @@ If the contract asks for user-journey verification and the executor cannot run t
 ## Enforced in
 
 - `skills/implement-task/SKILL.md` — Contract awareness + convention skills block.
-- `skills/review-phase/SKILL.md` — "You MUST run the actual command and record the output as evidence. A 'pass' verdict without evidence for user-journey, edge-case, or unit criteria is INVALID."
-- `skills/fix-review/SKILL.md` — Fixes must satisfy the contract criteria that were flagged failed.
+- `agents/reviewer.md` — "You MUST run the actual command and record the output as evidence. A 'pass' verdict without evidence for user-journey, edge-case, or unit criteria is INVALID."
+- `agents/implementer.md` (Review-Fix Mode) — Fixes must satisfy the contract criteria that were flagged failed.
