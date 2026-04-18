@@ -11,12 +11,14 @@ is derived from it. The harness contains only deterministic commands (build,
 test, e2e, seed, dev) — no hallucinated curl or health check commands.
 """
 
+import asyncio
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import anthropic
+from claude_agent_sdk import query as sdk_query
+from claude_agent_sdk.types import ClaudeAgentOptions, ResultMessage
 from loguru import logger
 
 from outbid_dirigent.test_harness_schema import TestHarness
@@ -198,37 +200,33 @@ def generate_harness_from_architecture(
     )
 
     try:
-        client = anthropic.Anthropic()
         start = datetime.now()
-
-        response = client.messages.parse(
-            model=model,
-            max_tokens=4000,
-            system=HARNESS_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-            output_config={"format": {"type": "json_schema", "schema": strict_json_schema(TestHarness.model_json_schema())}},
-        )
-
+        structured, usage = asyncio.run(_aquery_harness(user_prompt, model))
         duration_ms = int((datetime.now() - start).total_seconds() * 1000)
 
+        if structured is None:
+            logger.error("Harness generation: no structured output returned")
+            return None
+
         try:
-            harness = TestHarness.model_validate_json(response.content[0].text)
+            harness = TestHarness.model_validate(structured)
         except Exception as e:
             logger.error(f"Harness generation: failed to parse output: {e}")
             return None
 
-        usage = response.usage
         try:
             from outbid_dirigent.logger import get_logger
             dlogger = get_logger()
+            input_tokens = int(usage.get("input_tokens", 0) or 0)
+            output_tokens = int(usage.get("output_tokens", 0) or 0)
             dlogger.api_usage(
                 component="harness_generator",
                 model=model,
-                input_tokens=usage.input_tokens,
-                output_tokens=usage.output_tokens,
-                cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
-                cache_write_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
-                cost_cents=int((usage.input_tokens * 1 + usage.output_tokens * 5) / 10000),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_read_tokens=int(usage.get("cache_read_input_tokens", 0) or 0),
+                cache_write_tokens=int(usage.get("cache_creation_input_tokens", 0) or 0),
+                cost_cents=int((input_tokens * 1 + output_tokens * 5) / 10000),
                 operation="generate_harness",
                 duration_ms=duration_ms,
             )
@@ -239,9 +237,26 @@ def generate_harness_from_architecture(
         logger.info(f"Test harness generated from ARCHITECTURE.md ({duration_ms}ms)")
         return harness
 
-    except anthropic.APIError as e:
-        logger.error(f"Harness generation API error: {e}")
-        return None
     except Exception as e:
         logger.error(f"Harness generation error: {e}")
         return None
+
+
+async def _aquery_harness(
+    user_prompt: str, model: str
+) -> tuple[Optional[dict], dict]:
+    """Run harness extraction via claude_agent_sdk. Returns (structured_output, usage)."""
+    options = ClaudeAgentOptions(
+        model=model,
+        allowed_tools=[],
+        permission_mode="bypassPermissions",
+        system_prompt=HARNESS_SYSTEM_PROMPT,
+        output_format={
+            "type": "json_schema",
+            "schema": strict_json_schema(TestHarness.model_json_schema()),
+        },
+    )
+    async for message in sdk_query(prompt=user_prompt, options=options):
+        if isinstance(message, ResultMessage) and not message.is_error:
+            return message.structured_output, (message.usage or {})
+    return None, {}
