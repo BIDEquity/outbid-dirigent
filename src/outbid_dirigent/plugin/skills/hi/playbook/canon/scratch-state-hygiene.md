@@ -1,6 +1,6 @@
 # Scratch state hygiene
 
-**Track:** Agent rule (enforced in `implement-task`, `fix-review`, and via `.gitignore` convention)
+**Track:** Agent rule (enforced in `implement-task` skill, in `implementer` agent — including its Review-Fix Mode — and via `.gitignore` convention)
 
 **Thesis:** The *workspace* is not the *deliverable*. Dirigent produces a lot of scratch state — plans, contracts, reviews, summaries, debug dumps. None of it belongs in the PR. Keep it separate, gitignore it, and never let it leak.
 

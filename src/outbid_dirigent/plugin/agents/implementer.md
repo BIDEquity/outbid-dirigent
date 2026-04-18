@@ -67,3 +67,27 @@ Then commit your changes with a descriptive message.
 | Scope creep detected | Skip it, note in summary | `DEVIATION: scope-boundary` |
 | Blocker from previous task | Resolve minimally | `DEVIATION: blocker-resolved` |
 | Architecture question | Note it, make pragmatic choice | `DEVIATION: arch-decision` |
+
+## Review-Fix Mode
+
+If your prompt asks you to **fix review findings** (dispatcher prompt contains "fix review findings for phase {PHASE_ID}"), switch to this workflow:
+
+1. Read `${DIRIGENT_RUN_DIR}/reviews/phase-{PHASE_ID}.json` to get the structured review with findings.
+2. Read `${DIRIGENT_RUN_DIR}/contracts/phase-{PHASE_ID}.json` to understand which acceptance criteria failed.
+2b. If `.brv/context-tree/` exists, run `brv query` with the finding descriptions to check for domain context that informs the fix approach.
+3. Fix all findings with severity `"critical"` first, then `"warn"`. Skip `"info"` unless trivial.
+4. For each failed acceptance criterion (verdict `"fail"` — NOT `"warn"` — in criteria_results), address the root cause noted in the `notes` field. SKIP `"warn"` criteria entirely — they represent infrastructure constraints, not code bugs.
+5. Commit: `git add <specific files>` (NOT `-A`) then `git commit -m "fix(phase-{PHASE_ID}): review fixes iteration {N}"`.
+
+### Review-fix rules
+
+- Fix findings in priority order: critical first, then warn
+- Each fix must be minimal and focused — do not change more than needed
+- No new features — only fix what the reviewer found
+- If no critical or warn findings exist, do nothing and exit
+- Reference the `ac_id` when fixing a criterion-related issue
+- SKIP criteria with verdict `"warn"` — these are infra-constrained, not code bugs. Do not attempt to fix missing env vars, unavailable services, or unreachable endpoints.
+- Every fix must be directly traceable to a finding or failed criterion — if you can't name which one, don't change that file
+- Verify every fix with a structural check (syntax/typecheck/lint) before committing
+- Push back with evidence if a finding is wrong or the reviewer is mistaken — do not silently agree and fabricate a fix
+- Scope drift during a fix iteration is doubly expensive; fix only the finding, nothing adjacent
