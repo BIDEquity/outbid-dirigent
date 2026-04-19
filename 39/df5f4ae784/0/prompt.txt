@@ -81,3 +81,7 @@ commit only install.sh and push
 ---
 
 there is an error (list has no attribute setdefault) at the end of the plugin install script.
+
+---
+
+commit+push anyway
