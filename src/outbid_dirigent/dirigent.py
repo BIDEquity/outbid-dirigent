@@ -188,6 +188,7 @@ def _generate_spec_interactive(repo_path: Path, description: str) -> Path:
     success, _, stderr = runner._run_claude(
         "Run /dirigent:generate-spec",
         timeout=300,
+        component="generate-spec",
     )
 
     spec_path = dirigent_dir / "SPEC.md"
@@ -889,7 +890,7 @@ Beispiele:
                 reporter_token=args.reporter_token or "",
             )
             prompt = f"Run /dirigent:polish --max-fixes {args.polish_max_fixes}"
-            success, _, stderr = executor.runner._run_claude(prompt, timeout=2400)
+            success, _, stderr = executor.runner._run_claude(prompt, timeout=2400, component="polish")
             if not success:
                 logger.error(f"Polish failed: {stderr[:300]}")
                 sys.exit(1)
