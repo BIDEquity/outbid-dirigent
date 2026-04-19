@@ -1,0 +1,51 @@
+recal project_hybrid_route_auth_followup.md.
+
+---
+
+what steps does hybrid route have
+
+---
+
+what is quick scan doing/looking at? specifically, can we tell it to look at files that our coding standards harness enforces (not part of this codebase but see the cuseum-vam-full repo, i let it run there and it added skills and started an assesment
+
+---
+
+a mix of 1 and 2 is probably the best.
+
+So: can you write the example-spec for a new vam feature: making the sms/crm in/outbound status visible to the operator in the dashboard.
+
+---
+
+this step needs to be included in the greenfield route btw (install harness , run /assess and the fix top3 items, probably after each sphase in the review)
+
+---
+
+park this. check the current run i started
+
+---
+
+recheck
+
+---
+
+still running?
+
+---
+
+please add a one-liner installscript (as e.g. duckdb and uv have). This should install the dirigent cli and plugin. Propose how to do that.
+
+---
+
+research 1 thoroughly before we proceed. default version should be main with ability to specify different tag. explain downsides of 3. 4. github
+
+---
+
+how to ensure plugin install works when plugin is already installed in another (older) version? how to make version selectable in plugin install
+
+---
+
+how does this plugin handle installationhttps://github.com/gsd-build/get-shit-done
+
+---
+
+yes
