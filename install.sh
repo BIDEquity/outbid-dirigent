@@ -98,9 +98,18 @@ import json, pathlib, sys
 ref = sys.argv[1]
 p = pathlib.Path.home() / ".claude" / "settings.json"
 d = json.loads(p.read_text()) if p.exists() else {}
-mkt = d.setdefault("extraKnownMarketplaces", {}).setdefault("outbid-dirigent", {})
-src = mkt.setdefault("source", {"source": "github", "repo": "BIDEquity/outbid-dirigent"})
-src["ref"] = ref
+# Coerce to dict — claude plugin CLI may have written a list/other shape.
+if not isinstance(d.get("extraKnownMarketplaces"), dict):
+    d["extraKnownMarketplaces"] = {}
+# Replace the outbid-dirigent entry wholesale; we just re-added it via CLI and
+# only need to pin the ref. No prior state worth merging.
+d["extraKnownMarketplaces"]["outbid-dirigent"] = {
+    "source": {
+        "source": "github",
+        "repo": "BIDEquity/outbid-dirigent",
+        "ref": ref,
+    }
+}
 p.write_text(json.dumps(d, indent=2))
 PY
     claude plugin marketplace update "$MARKET_NAME" 2>/dev/null || true
