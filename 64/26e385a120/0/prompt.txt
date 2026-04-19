@@ -49,3 +49,31 @@ how does this plugin handle installationhttps://github.com/gsd-build/get-shit-do
 ---
 
 yes
+
+---
+
+yep
+
+---
+
+and now?
+
+---
+
+and now?
+
+---
+
+its done, right?
+
+---
+
+how would i instal the diriget using the script from this branch ee are on
+
+---
+
+sure that the curl works?
+
+---
+
+commit only install.sh and push
