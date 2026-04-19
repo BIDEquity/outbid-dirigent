@@ -240,7 +240,7 @@ class Executor:
         """Propose test setup and architecture best practices for greenfield projects."""
         logger.info("Running greenfield scaffold...")
         prompt = "Run /dirigent:greenfield-scaffold"
-        success, _, stderr = self.runner._run_claude(prompt, timeout=900)
+        success, _, stderr = self.runner._run_claude(prompt, timeout=900, component="greenfield-scaffold")
 
         if not success:
             logger.error(f"Greenfield scaffold failed: {stderr[:200]}")
@@ -263,7 +263,7 @@ class Executor:
         """Run testability analysis and produce recommendations."""
         logger.info("Running testability analysis...")
         prompt = "Run /dirigent:increase-testability"
-        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
+        success, _, stderr = self.runner._run_claude(prompt, timeout=600, component="increase-testability")
 
         if not success:
             logger.error(f"Testability analysis failed: {stderr[:200]}")

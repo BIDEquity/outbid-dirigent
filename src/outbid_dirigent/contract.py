@@ -83,6 +83,7 @@ class ContractManager:
             prompt,
             output_format={"type": "json_schema", "schema": strict_json_schema(Contract.model_json_schema())},
             timeout=600,
+            component=f"contract-negotiator:phase-{phase.id}",
         )
         if not success or structured is None:
             logger.error(f"Contract creation failed for phase {phase.id}")
@@ -195,6 +196,7 @@ class ContractManager:
             prompt,
             output_format={"type": "json_schema", "schema": strict_json_schema(Review.model_json_schema())},
             timeout=1200,
+            component=f"reviewer:phase-{phase.id}-i{iteration}",
         )
         if not success or structured is None:
             logger.warning(f"Phase {phase.id} review subprocess failed")
@@ -305,7 +307,9 @@ class ContractManager:
                 f"{', '.join(warned_ids)}"
             )
         head_before = self.runner._get_latest_commit_hash()
-        success, _, stderr = self.runner._run_claude(prompt, timeout=600)
+        success, _, stderr = self.runner._run_claude(
+            prompt, timeout=600, component=f"fix-review:phase-{phase.id}"
+        )
 
         # Send portal event (import here to avoid circular dependency)
         from outbid_dirigent.dirigent import get_portal_reporter

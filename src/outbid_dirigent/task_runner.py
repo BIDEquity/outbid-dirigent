@@ -24,11 +24,35 @@ from claude_agent_sdk.types import (
     ClaudeAgentOptions,
     ResultMessage,
     TextBlock,
+    ToolResultBlock,
     ToolUseBlock,
+    UserMessage,
 )
 
+from outbid_dirigent.logger import get_logger as get_dirigent_logger
 from outbid_dirigent.plan_schema import Plan, Task
 from outbid_dirigent.router import load_state, save_state
+
+
+# Approximate per-model pricing (USD per million tokens) for api_usage cost tracking.
+# Kept simple — exact pricing is downstream; we just want per-step visibility.
+_MODEL_PRICING = {
+    "haiku":  (1.0, 5.0),
+    "sonnet": (3.0, 15.0),
+    "opus":   (15.0, 75.0),
+}
+
+
+def _estimate_cost_cents(model: str, input_tokens: int, output_tokens: int) -> int:
+    """Rough cost in cents based on model family. Used only for dashboard telemetry."""
+    family = "sonnet"  # default
+    lower = (model or "").lower()
+    for k in _MODEL_PRICING:
+        if k in lower:
+            family = k
+            break
+    in_per_m, out_per_m = _MODEL_PRICING[family]
+    return int((input_tokens * in_per_m + output_tokens * out_per_m) / 10000)
 
 
 class TaskResult:
@@ -121,8 +145,15 @@ class TaskRunner:
         system_prompt: str = "",
         output_format: dict | None = None,
         agents: dict[str, AgentDefinition] | None = None,
+        component: str = "orchestrator",
     ) -> tuple[bool, str, str, dict | None]:
-        """Async query via claude_agent_sdk. Returns (success, result_text, error_text, structured_output)."""
+        """Async query via claude_agent_sdk. Returns (success, result_text, error_text, structured_output).
+
+        `component` is a short label for cost/telemetry (e.g. "implementer:04-01",
+        "reviewer:phase-03"). Emitted via logger.api_usage on success so every
+        orchestrator call — not just router/compactor/harness — is visible to the
+        portal and the gain CLI. rc4 observability change.
+        """
         timeout = timeout or self.DEFAULT_TIMEOUT
         model = model or self.default_model
         effort = effort or self.default_effort
@@ -185,17 +216,37 @@ class TaskRunner:
         result_text = ""
         error_text = ""
         structured: dict | None = None
+        usage_dict: dict = {}
 
         async def _consume():
-            nonlocal result_text, error_text, structured
+            nonlocal result_text, error_text, structured, usage_dict
             async for message in query(prompt=prompt, options=options):
                 if isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock) and block.text.strip():
-                            logger.debug(f"[claude:text] {block.text[:300]}")
+                            logger.debug(f"[claude:text] {block.text[:2000]}")
                         elif isinstance(block, ToolUseBlock):
-                            logger.debug(f"[claude:tool] {block.name}({str(block.input)[:120]})")
+                            logger.debug(f"[claude:tool] {block.name}({str(block.input)[:600]})")
+                elif isinstance(message, UserMessage):
+                    # Tool results come back as UserMessage blocks — logging them
+                    # surfaces what subagents (contract-negotiator, reviewer,
+                    # implementer) actually saw, which was invisible in rc3.
+                    blocks = getattr(message, "content", None)
+                    if isinstance(blocks, list):
+                        for block in blocks:
+                            if isinstance(block, ToolResultBlock):
+                                content = block.content
+                                if isinstance(content, list):
+                                    # content is [{"type":"text","text":...}] — flatten
+                                    content = " ".join(
+                                        str(c.get("text", c)) if isinstance(c, dict) else str(c)
+                                        for c in content
+                                    )
+                                content_str = str(content or "")
+                                prefix = "[claude:tool_err]" if block.is_error else "[claude:tool_result]"
+                                logger.debug(f"{prefix} {content_str[:500]}")
                 elif isinstance(message, ResultMessage):
+                    usage_dict = message.usage or {}
                     if message.is_error:
                         error_text = message.result or "Unknown error"
                         logger.info(f"[claude:error] {error_text[:500]}")
@@ -204,8 +255,11 @@ class TaskRunner:
                         structured = message.structured_output
                         logger.info(f"[claude:result] {result_text[:500]}")
 
+        start_ts = datetime.now()
         try:
             await asyncio.wait_for(_consume(), timeout=timeout)
+            duration_ms = int((datetime.now() - start_ts).total_seconds() * 1000)
+            self._emit_api_usage(component, model or self.default_model, usage_dict, duration_ms)
             return True, result_text, error_text, structured
         except asyncio.TimeoutError:
             error_text = f"Timeout after {timeout}s"
@@ -216,6 +270,34 @@ class TaskRunner:
             logger.error(f"[claude:error] {error_text}")
             return False, "", error_text, None
 
+    def _emit_api_usage(
+        self, component: str, model: str, usage: dict, duration_ms: int
+    ) -> None:
+        """Emit a cost/tokens event for this orchestrator call. rc4 change."""
+        if not usage:
+            return
+        try:
+            dlogger = get_dirigent_logger()
+        except RuntimeError:
+            return  # logger not initialized (e.g. standalone unit test)
+        input_tokens = int(usage.get("input_tokens", 0) or 0)
+        output_tokens = int(usage.get("output_tokens", 0) or 0)
+        if input_tokens == 0 and output_tokens == 0:
+            return
+        dlogger.api_usage(
+            component=component,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_tokens=int(usage.get("cache_read_input_tokens", 0) or 0),
+            cache_write_tokens=int(usage.get("cache_creation_input_tokens", 0) or 0),
+            cost_cents=_estimate_cost_cents(model, input_tokens, output_tokens),
+            operation=component.split(":", 1)[0],
+            task_id=self._current_task_id,
+            phase=self._current_phase,
+            duration_ms=duration_ms,
+        )
+
     def _run_claude(
         self,
         prompt: str,
@@ -223,11 +305,13 @@ class TaskRunner:
         model: str = "",
         effort: str = "",
         system_prompt: str = "",
+        component: str = "orchestrator",
     ) -> tuple[bool, str, str]:
         """Run Claude Code with a prompt. Returns (success, stdout, stderr)."""
         success, stdout, stderr, _ = asyncio.run(
             self._aquery_claude(prompt, timeout=timeout, model=model,
-                                effort=effort, system_prompt=system_prompt)
+                                effort=effort, system_prompt=system_prompt,
+                                component=component)
         )
         return success, stdout, stderr
 
@@ -240,12 +324,14 @@ class TaskRunner:
         effort: str = "",
         system_prompt: str = "",
         agents: dict | None = None,
+        component: str = "orchestrator",
     ) -> tuple[bool, dict | None]:
         """Run Claude Code and return structured output. Returns (success, structured_dict)."""
         success, _, stderr, structured = asyncio.run(
             self._aquery_claude(prompt, timeout=timeout, model=model,
                                 effort=effort, system_prompt=system_prompt,
-                                output_format=output_format, agents=agents)
+                                output_format=output_format, agents=agents,
+                                component=component)
         )
         if not success or structured is None:
             logger.error(f"Structured query failed: {stderr[:200]}")
@@ -688,6 +774,7 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
             success, stdout, stderr = self._run_claude(
                 prompt, model=task_model, effort=task_effort,
                 system_prompt=self.AGENT_SYSTEM_PROMPT,
+                component=f"implementer:{task.id}",
             )
 
             if success:
