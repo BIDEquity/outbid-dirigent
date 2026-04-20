@@ -8,8 +8,7 @@ WICHTIG: Dieser Test sollte FEHLSCHLAGEN solange der Bug nicht gefixt ist!
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
-from pathlib import Path
+from unittest.mock import Mock
 
 from outbid_dirigent.plan_schema import Phase, Task, Plan
 # NOTE: Wir importieren den Executor nicht direkt, weil er viele Dependencies hat.
@@ -33,10 +32,12 @@ class TestExecutorWithPhaseIds:
         plan = Plan(
             title="Test",
             phases=[
-                Phase(id="01", name="Phase 1", tasks=[
-                    Task(id="01-01", name="Test Task", description="Do something")
-                ])
-            ]
+                Phase(
+                    id="01",
+                    name="Phase 1",
+                    tasks=[Task(id="01-01", name="Test Task", description="Do something")],
+                )
+            ],
         )
 
         # Der Executor braucht einige Dependencies - wir mocken sie
@@ -67,10 +68,12 @@ class TestExecutorWithPhaseIds:
         plan = Plan(
             title="Test",
             phases=[
-                Phase(id="phase-1", name="Create Feature", tasks=[
-                    Task(id="task-1-1", name="Test Task", description="Do something")
-                ])
-            ]
+                Phase(
+                    id="phase-1",
+                    name="Create Feature",
+                    tasks=[Task(id="task-1-1", name="Test Task", description="Do something")],
+                )
+            ],
         )
 
         mock_logger = Mock()

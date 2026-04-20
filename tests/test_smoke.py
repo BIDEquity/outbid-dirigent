@@ -7,10 +7,8 @@ und keine offensichtlichen Bugs hat, die zum Crash führen.
 Läuft bei jedem Push in GitHub Actions.
 """
 
-import json
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from outbid_dirigent.plan_schema import Plan, Phase, Task
 from outbid_dirigent.utils import extract_phase_number
@@ -23,9 +21,8 @@ class TestSmokeBasics:
     def test_can_import_all_modules(self):
         """Alle wichtigen Module können importiert werden."""
         # Diese Imports sollten nicht crashen
-        from outbid_dirigent.plan_schema import Plan, Phase, Task
+        from outbid_dirigent.plan_schema import Plan
         from outbid_dirigent.utils import extract_phase_number
-        from outbid_dirigent.logger import DirigentLogger
 
         assert Plan is not None
         assert extract_phase_number is not None
@@ -48,9 +45,9 @@ class TestSmokeBasics:
                     Phase(
                         id=phase_id,
                         name=f"Phase {phase_id}",
-                        tasks=[Task(id=f"{phase_id}-01", name="Test Task")]
+                        tasks=[Task(id=f"{phase_id}-01", name="Test Task")],
                     )
-                ]
+                ],
             )
 
             # Sollte nicht crashen
@@ -91,16 +88,16 @@ class TestSmokePlanExecution:
                     tasks=[
                         Task(id="task-1-1", name="Create file"),
                         Task(id="task-1-2", name="Add content"),
-                    ]
+                    ],
                 ),
                 Phase(
                     id="phase-2",
                     name="Ship",
                     tasks=[
                         Task(id="task-2-1", name="Create PR"),
-                    ]
+                    ],
                 ),
-            ]
+            ],
         )
 
         # Mock Logger
@@ -121,7 +118,13 @@ class TestSmokePlanExecution:
                 logger.task_done(task.id, commit_hash="abc1234", phase=phase_num)
 
             # Phase Complete
-            logger.phase_complete(phase.id, phase.name, len(phase.tasks), commit_count=len(phase.tasks), deviation_count=0)
+            logger.phase_complete(
+                phase.id,
+                phase.name,
+                len(phase.tasks),
+                commit_count=len(phase.tasks),
+                deviation_count=0,
+            )
 
         # Wenn wir hier ankommen, hat nichts gecrasht
         assert True
@@ -140,13 +143,13 @@ class TestSmokePortalReporter:
         from outbid_dirigent.portal_reporter import PortalReporter
 
         # Mock requests.post
-        with patch('outbid_dirigent.portal_reporter.requests.post') as mock_post:
+        with patch("outbid_dirigent.portal_reporter.requests.post") as mock_post:
             mock_post.return_value = Mock(status_code=200, json=lambda: {"success": True})
 
             reporter = PortalReporter(
                 portal_url="https://test.portal.com",
                 execution_id="test-123",
-                reporter_token="test-token"
+                reporter_token="test-token",
             )
 
             # Diese Calls sollten nicht crashen und valide Events senden

@@ -59,7 +59,13 @@ class DirigentLogger:
         "lint": "🔧",
     }
 
-    def __init__(self, repo_path: str, verbose: bool = True, output_json: bool = False, dirigent_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        repo_path: str,
+        verbose: bool = True,
+        output_json: bool = False,
+        dirigent_dir: Optional[Path] = None,
+    ):
         self.repo_path = Path(repo_path)
         self.verbose = verbose
         self.output_json = output_json
@@ -98,7 +104,10 @@ class DirigentLogger:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def _iso_timestamp(self) -> str:
-        return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.") + f"{datetime.utcnow().microsecond // 1000:03d}Z"
+        return (
+            datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.")
+            + f"{datetime.utcnow().microsecond // 1000:03d}Z"
+        )
 
     def _emit_json(self, event_type: str, data: dict):
         """Emits a @@JSON@@ prefixed line to stdout if --output json is active."""
@@ -131,8 +140,13 @@ class DirigentLogger:
         with open(self.json_log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-    def _log(self, icon_key: str, message: str, level: LogLevel = LogLevel.INFO,
-             data: Optional[dict] = None):
+    def _log(
+        self,
+        icon_key: str,
+        message: str,
+        level: LogLevel = LogLevel.INFO,
+        data: Optional[dict] = None,
+    ):
         """Interner Log-Aufruf."""
         icon = self.ICONS.get(icon_key, "•")
         timestamp = self._timestamp()
@@ -173,8 +187,11 @@ class DirigentLogger:
         self._log("stats", f"Erkannt: {language}, {commits} Commits, {age_info}")
 
     def route(self, route_type: str, confidence: str):
-        self._log("route", f"Route: {route_type.upper()} (confidence: {confidence})",
-                  data={"route": route_type, "confidence": confidence})
+        self._log(
+            "route",
+            f"Route: {route_type.upper()} (confidence: {confidence})",
+            data={"route": route_type, "confidence": confidence},
+        )
 
     def reason(self, reason: str):
         self._log("reason", f"Grund: {reason}")
@@ -183,15 +200,21 @@ class DirigentLogger:
         self._log("extract", "Starte Business Rule Extraktion...")
 
     def extract_done(self, rule_count: int):
-        self._log("rules", f"Business Rules extrahiert ({rule_count} Regeln gefunden)",
-                  data={"rule_count": rule_count})
+        self._log(
+            "rules",
+            f"Business Rules extrahiert ({rule_count} Regeln gefunden)",
+            data={"rule_count": rule_count},
+        )
 
     def plan_start(self):
         self._log("plan", "Erstelle Ausführungsplan...")
 
     def plan_done(self, phases: int, tasks: int, phase_details: Optional[list] = None):
-        self._log("rules", f"Plan: {phases} Phasen, {tasks} Tasks",
-                  data={"phases": phases, "tasks": tasks})
+        self._log(
+            "rules",
+            f"Plan: {phases} Phasen, {tasks} Tasks",
+            data={"phases": phases, "tasks": tasks},
+        )
         self._total_phases = phases
         self._total_tasks = tasks
         plan_data = {
@@ -203,24 +226,38 @@ class DirigentLogger:
         self._emit_json("plan", plan_data)
 
     def phase_start(self, phase_id: str, phase_name: str, task_count: int = 0):
-        self._log("phase", f"Starte Ausführung: Phase {phase_id} – {phase_name}",
-                  data={"phase_id": phase_id, "phase_name": phase_name})
-        self._emit_json("phase_start", {
-            "phase": int(phase_id) if phase_id.isdigit() else phase_id,
-            "name": phase_name,
-            "taskCount": task_count,
-        })
+        self._log(
+            "phase",
+            f"Starte Ausführung: Phase {phase_id} – {phase_name}",
+            data={"phase_id": phase_id, "phase_name": phase_name},
+        )
+        self._emit_json(
+            "phase_start",
+            {
+                "phase": int(phase_id) if phase_id.isdigit() else phase_id,
+                "name": phase_name,
+                "taskCount": task_count,
+            },
+        )
 
     def task_start(self, task_id: str, task_name: str, phase: Optional[int] = None):
-        self._log("task", f"Task {task_id}: {task_name}",
-                  data={"task_id": task_id, "task_name": task_name})
+        self._log(
+            "task",
+            f"Task {task_id}: {task_name}",
+            data={"task_id": task_id, "task_name": task_name},
+        )
         data = {"taskId": task_id, "name": task_name}
         if phase is not None:
             data["phase"] = phase
         self._emit_json("task_start", data)
 
-    def task_done(self, task_id: str, commit_hash: Optional[str] = None,
-                  task_name: Optional[str] = None, phase: Optional[int] = None):
+    def task_done(
+        self,
+        task_id: str,
+        commit_hash: Optional[str] = None,
+        task_name: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         msg = f"Task {task_id} abgeschlossen"
         if commit_hash:
             msg += f" (Commit: {commit_hash[:7]})"
@@ -229,7 +266,11 @@ class DirigentLogger:
         # Emit commit event
         if commit_hash:
             self._total_commits += 1
-            commit_data = {"taskId": task_id, "hash": commit_hash[:7], "message": f"Task {task_id} abgeschlossen"}
+            commit_data = {
+                "taskId": task_id,
+                "hash": commit_hash[:7],
+                "message": f"Task {task_id} abgeschlossen",
+            }
             if phase is not None:
                 commit_data["phase"] = phase
             self._emit_json("commit", commit_data)
@@ -257,8 +298,12 @@ class DirigentLogger:
             self._emit_json("progress", progress_data)
 
     def task_failed(self, task_id: str, error: str, attempt: int):
-        self._log("error", f"Task {task_id} fehlgeschlagen (Versuch {attempt}): {error}",
-                  level=LogLevel.ERROR, data={"task_id": task_id, "attempt": attempt, "error": error})
+        self._log(
+            "error",
+            f"Task {task_id} fehlgeschlagen (Versuch {attempt}): {error}",
+            level=LogLevel.ERROR,
+            data={"task_id": task_id, "attempt": attempt, "error": error},
+        )
 
     def task_retry(self, task_id: str, attempt: int):
         self._log("retry", f"Task {task_id} wird wiederholt (Versuch {attempt})")
@@ -267,18 +312,36 @@ class DirigentLogger:
         self._log("oracle", f"Oracle-Anfrage: {question[:100]}...")
 
     def oracle_decision(self, decision: str, reason: str):
-        self._log("decision", f"Oracle-Entscheidung: {decision} – {reason[:100]}",
-                  data={"decision": decision, "reason": reason})
+        self._log(
+            "decision",
+            f"Oracle-Entscheidung: {decision} – {reason[:100]}",
+            data={"decision": decision, "reason": reason},
+        )
 
-    def deviation(self, deviation_type: str, description: str,
-                  task_id: Optional[str] = None, phase: Optional[int] = None):
-        self._log("deviation", f"Deviation ({deviation_type}): {description}",
-                  level=LogLevel.WARN, data={"type": deviation_type, "description": description})
+    def deviation(
+        self,
+        deviation_type: str,
+        description: str,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
+        self._log(
+            "deviation",
+            f"Deviation ({deviation_type}): {description}",
+            level=LogLevel.WARN,
+            data={"type": deviation_type, "description": description},
+        )
         self._total_deviations += 1
         severity_map = {
-            "Bug-Fix": "bug-fix", "bug-fix": "bug-fix", "bugfix": "bug-fix",
-            "Added-Missing": "missing", "Added Missing": "missing", "missing": "missing",
-            "Resolved-Blocker": "resolved", "Resolved Blocker": "resolved", "resolved": "resolved",
+            "Bug-Fix": "bug-fix",
+            "bug-fix": "bug-fix",
+            "bugfix": "bug-fix",
+            "Added-Missing": "missing",
+            "Added Missing": "missing",
+            "missing": "missing",
+            "Resolved-Blocker": "resolved",
+            "Resolved Blocker": "resolved",
+            "resolved": "resolved",
         }
         severity = severity_map.get(deviation_type, deviation_type.lower())
         data = {"severity": severity, "message": description}
@@ -288,17 +351,26 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("deviation", data)
 
-    def phase_complete(self, phase_id: str, phase_name: str, tasks_completed: int,
-                       deviation_count: int, commit_count: int):
+    def phase_complete(
+        self,
+        phase_id: str,
+        phase_name: str,
+        tasks_completed: int,
+        deviation_count: int,
+        commit_count: int,
+    ):
         """Emits a phase_complete JSON event."""
         self._phases_complete += 1
-        self._emit_json("phase_complete", {
-            "phase": int(phase_id) if phase_id.isdigit() else phase_id,
-            "name": phase_name,
-            "tasksCompleted": tasks_completed,
-            "deviationCount": deviation_count,
-            "commitCount": commit_count,
-        })
+        self._emit_json(
+            "phase_complete",
+            {
+                "phase": int(phase_id) if phase_id.isdigit() else phase_id,
+                "name": phase_name,
+                "tasksCompleted": tasks_completed,
+                "deviationCount": deviation_count,
+                "commitCount": commit_count,
+            },
+        )
 
     def api_usage(
         self,
@@ -359,18 +431,24 @@ class DirigentLogger:
         total_output_tokens: int,
     ):
         """Emits the final summary event with execution report."""
-        self._emit_json("summary", {
-            "markdown": markdown,
-            "filesChanged": files_changed,
-            "decisions": decisions,
-            "deviations": deviations,
-            "totalCostCents": total_cost_cents,
-            "totalInputTokens": total_input_tokens,
-            "totalOutputTokens": total_output_tokens,
-        })
+        self._emit_json(
+            "summary",
+            {
+                "markdown": markdown,
+                "filesChanged": files_changed,
+                "decisions": decisions,
+                "deviations": deviations,
+                "totalCostCents": total_cost_cents,
+                "totalInputTokens": total_input_tokens,
+                "totalOutputTokens": total_output_tokens,
+            },
+        )
 
         # Log summary to file
-        self._log("done", f"Summary: ${total_cost_cents/100:.2f}, {len(files_changed)} Dateien, {len(decisions)} Entscheidungen")
+        self._log(
+            "done",
+            f"Summary: ${total_cost_cents / 100:.2f}, {len(files_changed)} Dateien, {len(decisions)} Entscheidungen",
+        )
 
     def get_cost_totals(self) -> dict:
         """Returns accumulated token/cost totals."""
@@ -394,18 +472,26 @@ class DirigentLogger:
             duration_str = f"{minutes}m {seconds}s"
         else:
             duration_str = f"{seconds}s"
-        self._emit_json("complete", {
-            "success": success,
-            "totalPhases": self._total_phases,
-            "totalTasks": self._total_tasks,
-            "totalCommits": self._total_commits,
-            "totalDeviations": self._total_deviations,
-            "duration": duration_str,
-            "durationMs": int(elapsed.total_seconds() * 1000),
-        })
+        self._emit_json(
+            "complete",
+            {
+                "success": success,
+                "totalPhases": self._total_phases,
+                "totalTasks": self._total_tasks,
+                "totalCommits": self._total_commits,
+                "totalDeviations": self._total_deviations,
+                "duration": duration_str,
+                "durationMs": int(elapsed.total_seconds() * 1000),
+            },
+        )
 
-    def error_json(self, message: str, phase: Optional[int] = None,
-                   task_id: Optional[str] = None, fatal: bool = False):
+    def error_json(
+        self,
+        message: str,
+        phase: Optional[int] = None,
+        task_id: Optional[str] = None,
+        fatal: bool = False,
+    ):
         """Emits a structured error JSON event."""
         data = {"message": message, "fatal": fatal}
         if phase is not None:
@@ -473,8 +559,13 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("file_operation", data)
 
-    def file_write(self, file_path: str, lines_changed: int = 0,
-                   task_id: Optional[str] = None, phase: Optional[int] = None):
+    def file_write(
+        self,
+        file_path: str,
+        lines_changed: int = 0,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         """Emits event when a file is written/modified."""
         msg = f"Schreibe: {file_path}"
         if lines_changed:
@@ -487,7 +578,9 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("file_operation", data)
 
-    def file_create(self, file_path: str, task_id: Optional[str] = None, phase: Optional[int] = None):
+    def file_create(
+        self, file_path: str, task_id: Optional[str] = None, phase: Optional[int] = None
+    ):
         """Emits event when a new file is created."""
         self._log("file_create", f"Erstelle: {file_path}")
         data = {"path": file_path, "action": "create"}
@@ -497,8 +590,13 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("file_operation", data)
 
-    def bash_command(self, command: str, exit_code: Optional[int] = None,
-                     task_id: Optional[str] = None, phase: Optional[int] = None):
+    def bash_command(
+        self,
+        command: str,
+        exit_code: Optional[int] = None,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         """Emits event when a bash command is executed."""
         # Truncate long commands for display
         display_cmd = command[:100] + "..." if len(command) > 100 else command
@@ -512,8 +610,13 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("bash", data)
 
-    def search(self, query: str, results_count: int = 0,
-               task_id: Optional[str] = None, phase: Optional[int] = None):
+    def search(
+        self,
+        query: str,
+        results_count: int = 0,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         """Emits event when searching the codebase."""
         self._log("search", f"Suche: '{query}' ({results_count} Ergebnisse)")
         data = {"query": query, "resultsCount": results_count}
@@ -523,8 +626,14 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("search", data)
 
-    def test_run(self, test_command: str, passed: bool = True, details: str = "",
-                 task_id: Optional[str] = None, phase: Optional[int] = None):
+    def test_run(
+        self,
+        test_command: str,
+        passed: bool = True,
+        details: str = "",
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         """Emits event when tests are run."""
         status = "bestanden" if passed else "fehlgeschlagen"
         self._log("test", f"Tests {status}: {test_command}")
@@ -537,10 +646,18 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("test", data)
 
-    def lint_run(self, passed: bool = True, errors: int = 0, warnings: int = 0,
-                 task_id: Optional[str] = None, phase: Optional[int] = None):
+    def lint_run(
+        self,
+        passed: bool = True,
+        errors: int = 0,
+        warnings: int = 0,
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         """Emits event when linting is run."""
-        status = "bestanden" if passed else f"fehlgeschlagen ({errors} Fehler, {warnings} Warnungen)"
+        status = (
+            "bestanden" if passed else f"fehlgeschlagen ({errors} Fehler, {warnings} Warnungen)"
+        )
         self._log("lint", f"Linting {status}")
         data = {"passed": passed, "errors": errors, "warnings": warnings}
         if task_id:
@@ -549,8 +666,14 @@ class DirigentLogger:
             data["phase"] = phase
         self._emit_json("lint", data)
 
-    def tool_use(self, tool_name: str, tool_input: dict, tool_use_id: str = "",
-                 task_id: Optional[str] = None, phase: Optional[int] = None):
+    def tool_use(
+        self,
+        tool_name: str,
+        tool_input: dict,
+        tool_use_id: str = "",
+        task_id: Optional[str] = None,
+        phase: Optional[int] = None,
+    ):
         """Emits event for any Claude tool use - enables hook integration."""
         self._log("stats", f"Tool: {tool_name}", data={"tool": tool_name})
         data = {
@@ -570,7 +693,12 @@ class DirigentLogger:
 _logger_instance: Optional[DirigentLogger] = None
 
 
-def init_logger(repo_path: str, verbose: bool = True, output_json: bool = False, dirigent_dir: Optional[Path] = None) -> DirigentLogger:
+def init_logger(
+    repo_path: str,
+    verbose: bool = True,
+    output_json: bool = False,
+    dirigent_dir: Optional[Path] = None,
+) -> DirigentLogger:
     """Initialisiert den globalen Logger."""
     global _logger_instance
     _logger_instance = DirigentLogger(repo_path, verbose, output_json, dirigent_dir=dirigent_dir)

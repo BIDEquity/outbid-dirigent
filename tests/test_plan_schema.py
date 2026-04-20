@@ -5,9 +5,7 @@ Covers: properties, save/load roundtrip, backward compatibility normalization.
 """
 
 import json
-from pathlib import Path
 
-import pytest
 
 from outbid_dirigent.plan_schema import Phase, Plan, Task
 
@@ -16,17 +14,26 @@ from outbid_dirigent.plan_schema import Phase, Plan, Task
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _simple_plan() -> Plan:
     return Plan(
         title="Test Feature",
         phases=[
-            Phase(id="01", name="Core", tasks=[
-                Task(id="01-01", name="Setup DB"),
-                Task(id="01-02", name="Add API"),
-            ]),
-            Phase(id="02", name="Ship", tasks=[
-                Task(id="02-01", name="Create PR"),
-            ]),
+            Phase(
+                id="01",
+                name="Core",
+                tasks=[
+                    Task(id="01-01", name="Setup DB"),
+                    Task(id="01-02", name="Add API"),
+                ],
+            ),
+            Phase(
+                id="02",
+                name="Ship",
+                tasks=[
+                    Task(id="02-01", name="Create PR"),
+                ],
+            ),
         ],
     )
 
@@ -34,6 +41,7 @@ def _simple_plan() -> Plan:
 # ---------------------------------------------------------------------------
 # TestPlanProperties
 # ---------------------------------------------------------------------------
+
 
 class TestPlanProperties:
     def test_total_tasks(self):
@@ -62,6 +70,7 @@ class TestPlanProperties:
 # ---------------------------------------------------------------------------
 # TestTaskPosition
 # ---------------------------------------------------------------------------
+
 
 class TestTaskPosition:
     def test_first_task_no_prev_has_next(self):
@@ -109,6 +118,7 @@ class TestTaskPosition:
 # ---------------------------------------------------------------------------
 # TestPlanSaveLoad
 # ---------------------------------------------------------------------------
+
 
 class TestPlanSaveLoad:
     def test_roundtrip(self, tmp_path):

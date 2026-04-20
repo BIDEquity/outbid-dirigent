@@ -21,6 +21,7 @@ COMMAND_KEYS = Literal["build", "test", "e2e", "seed", "dev"]
 
 class CommandSpec(BaseModel):
     """A single executable command with explanation of what it does and its boundaries."""
+
     command: str = Field(..., description="Exact runnable command (e.g. 'npm run build')")
     explanation: str = Field(
         ...,
@@ -30,6 +31,7 @@ class CommandSpec(BaseModel):
 
 class EnvVar(BaseModel):
     """An environment variable required by the project."""
+
     source: Literal["doppler", "env", "hardcoded", "generated"] = Field(
         ..., description="Where this value comes from"
     )
@@ -39,6 +41,7 @@ class EnvVar(BaseModel):
 
 class DemoLogin(BaseModel):
     """Credentials for demo/test access."""
+
     email: str = ""
     password_env_var: str = Field(
         "", description="Env var name containing password — never the value"
@@ -47,6 +50,7 @@ class DemoLogin(BaseModel):
 
 class PortalConfig(BaseModel):
     """Info the Outbid portal needs to show a live preview."""
+
     start_command: str = Field(..., description="Command to start dev server")
     port: int = Field(..., description="Port the dev server listens on")
     url_after_start: str = Field("/", description="Path to open after server starts")
@@ -60,6 +64,7 @@ class TestHarness(BaseModel):
     Generated via anthropic structured output (messages.parse) or from an init script.
     Lives at ${DIRIGENT_RUN_DIR}/test-harness.json.
     """
+
     model_config = ConfigDict(populate_by_name=True)
 
     commands: dict[COMMAND_KEYS, CommandSpec] = Field(
@@ -82,9 +87,7 @@ class TestHarness(BaseModel):
 
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            self.model_dump_json(indent=2, by_alias=True), encoding="utf-8"
-        )
+        path.write_text(self.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
 
     @classmethod
     def load(cls, path: Path) -> Optional["TestHarness"]:

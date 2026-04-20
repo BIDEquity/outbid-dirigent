@@ -6,14 +6,13 @@ Definiert die Ausführungspfade (Greenfield, Legacy, Hybrid, Testability, Tracki
 
 import json
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import List, Dict, Optional
 from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, ValidationError
 
-from outbid_dirigent.analyzer import AnalysisResult
 from outbid_dirigent.logger import get_logger
 
 
@@ -43,6 +42,7 @@ class StepType(Enum):
 @dataclass
 class RouteStep:
     """Ein einzelner Schritt im Ausführungsplan."""
+
     step_type: StepType
     name: str
     description: str
@@ -52,6 +52,7 @@ class RouteStep:
 @dataclass
 class Route:
     """Der komplette Ausführungsplan."""
+
     route_type: RouteType
     reason: str
     steps: List[RouteStep]
@@ -338,13 +339,23 @@ class Router:
         steps = steps_map.get(route_type, self.HYBRID_STEPS)
 
         return self._build_route_from_data(
-            route_type, route_reason, estimated_scope,
-            file_count, commit_count, steps,
+            route_type,
+            route_reason,
+            estimated_scope,
+            file_count,
+            commit_count,
+            steps,
         )
 
-    def _build_route_from_data(self, route_type: RouteType, reason: str,
-                                estimated_scope: str, file_count: int,
-                                commit_count: int, steps: list) -> Route:
+    def _build_route_from_data(
+        self,
+        route_type: RouteType,
+        reason: str,
+        estimated_scope: str,
+        file_count: int,
+        commit_count: int,
+        steps: list,
+    ) -> Route:
         """Baut eine Route aus den Daten."""
         estimated_tasks = self._estimate_tasks(estimated_scope)
 
@@ -457,7 +468,10 @@ def save_state(repo_path: str, state: Dict, dirigent_dir: Optional[Path] = None)
 
 def mark_step_complete(repo_path: str, step: str, dirigent_dir: Optional[Path] = None):
     """Markiert einen Schritt als abgeschlossen."""
-    state = load_state(repo_path, dirigent_dir=dirigent_dir) or {"completed_steps": [], "started_at": datetime.now().isoformat()}
+    state = load_state(repo_path, dirigent_dir=dirigent_dir) or {
+        "completed_steps": [],
+        "started_at": datetime.now().isoformat(),
+    }
 
     if "completed_steps" not in state:
         state["completed_steps"] = []

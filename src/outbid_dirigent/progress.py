@@ -22,14 +22,14 @@ class ProgressRenderer:
 
     # Progress bar characters
     FILLED = "\u2588"  # █
-    EMPTY = "\u2591"   # ░
+    EMPTY = "\u2591"  # ░
 
     # Status icons
     ICONS = {
-        "done": "\u2705",       # ✅
-        "current": "\U0001f528", # 🔨
-        "pending": "\u23f3",    # ⏳
-        "failed": "\u274c",     # ❌
+        "done": "\u2705",  # ✅
+        "current": "\U0001f528",  # 🔨
+        "pending": "\u23f3",  # ⏳
+        "failed": "\u274c",  # ❌
         "contract_pass": "\U0001f4cb PASS",  # 📋
         "contract_fail": "\U0001f4cb FAIL",
         "contract_pending": "\U0001f4cb PENDING",
@@ -43,7 +43,9 @@ class ProgressRenderer:
         """Load plan, state, and route data."""
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
         state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir) or {
-            "completed_phases": [], "completed_tasks": [], "failed_tasks": [],
+            "completed_phases": [],
+            "completed_tasks": [],
+            "failed_tasks": [],
         }
         route = load_route(str(self.repo_path), dirigent_dir=self.dirigent_dir)
         return plan, state, route
@@ -118,7 +120,9 @@ class ProgressRenderer:
 
         completed_tasks = set(state.get("completed_tasks", []))
         completed_phases = set(state.get("completed_phases", []))
-        failed_task_ids = {t["task_id"] for t in state.get("failed_tasks", []) if isinstance(t, dict)}
+        failed_task_ids = {
+            t["task_id"] for t in state.get("failed_tasks", []) if isinstance(t, dict)
+        }
 
         total_tasks = plan.total_tasks
         done_tasks = len(completed_tasks)
@@ -134,7 +138,7 @@ class ProgressRenderer:
             "\u2550" * 55,
             "",
             f"  Route: {route_type}",
-            f"  Plan:  \"{plan.title}\" ({len(plan.phases)} phases, {total_tasks} tasks)",
+            f'  Plan:  "{plan.title}" ({len(plan.phases)} phases, {total_tasks} tasks)',
             "",
         ]
 
@@ -186,13 +190,15 @@ class ProgressRenderer:
         # Summary line
         pct = int(100 * done_tasks / total_tasks) if total_tasks > 0 else 0
         phases_done = len(completed_phases)
-        lines.extend([
-            "\u2500" * 55,
-            f"  Progress: {done_tasks}/{total_tasks} tasks ({pct}%) | {phases_done}/{len(plan.phases)} phases done",
-            f"  Deviations: {deviations} | Reviews: {review_pass} pass, {review_fail} fail",
-            f"  Duration: {duration}",
-            "\u2550" * 55,
-        ])
+        lines.extend(
+            [
+                "\u2500" * 55,
+                f"  Progress: {done_tasks}/{total_tasks} tasks ({pct}%) | {phases_done}/{len(plan.phases)} phases done",
+                f"  Deviations: {deviations} | Reviews: {review_pass} pass, {review_fail} fail",
+                f"  Duration: {duration}",
+                "\u2550" * 55,
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -217,7 +223,9 @@ class ProgressRenderer:
         for phase in plan.phases:
             for task in phase.tasks:
                 if task.id not in completed_tasks:
-                    current_desc = f'Phase {phase.id} "{phase.name}" \u2014 Task {task.id} "{task.name}"'
+                    current_desc = (
+                        f'Phase {phase.id} "{phase.name}" \u2014 Task {task.id} "{task.name}"'
+                    )
                     break
             else:
                 continue
@@ -248,13 +256,15 @@ class ProgressRenderer:
             for task in phase.tasks:
                 status = "completed" if task.id in completed_tasks else "pending"
                 tasks.append({"id": task.id, "name": task.name, "status": status})
-            phases.append({
-                "id": phase.id,
-                "name": phase.name,
-                "status": "completed" if phase.id in completed_phases else "pending",
-                "contract": self._get_contract_status(phase.id),
-                "tasks": tasks,
-            })
+            phases.append(
+                {
+                    "id": phase.id,
+                    "name": phase.name,
+                    "status": "completed" if phase.id in completed_phases else "pending",
+                    "contract": self._get_contract_status(phase.id),
+                    "tasks": tasks,
+                }
+            )
 
         return {
             "title": plan.title,
@@ -355,7 +365,9 @@ class PlanRenderer:
         return json.loads(plan_file.read_text(encoding="utf-8"))
 
 
-def print_progress(repo_path: str, fmt: str = "console", dirigent_dir: Optional[Path] = None) -> str:
+def print_progress(
+    repo_path: str, fmt: str = "console", dirigent_dir: Optional[Path] = None
+) -> str:
     """Print progress in the given format. Returns the formatted string."""
     renderer = ProgressRenderer(repo_path, dirigent_dir=dirigent_dir)
     if fmt == "json":

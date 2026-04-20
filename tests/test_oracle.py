@@ -4,7 +4,6 @@ import json
 import hashlib
 from pathlib import Path
 
-import pytest
 
 from outbid_dirigent.oracle import Oracle
 
@@ -13,16 +12,29 @@ from outbid_dirigent.oracle import Oracle
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_oracle(tmp_path: Path) -> Oracle:
     """Instantiate Oracle bypassing __init__ to avoid Anthropic client creation."""
     (tmp_path / ".dirigent").mkdir(exist_ok=True)
     oracle = Oracle.__new__(Oracle)
     oracle.repo_path = tmp_path
     oracle.model = "test-model"
-    oracle.logger = type("L", (), {
-        k: (lambda *a, **kw: None)
-        for k in ["debug", "info", "error", "oracle_query", "oracle_decision", "api_usage", "warn"]
-    })()
+    oracle.logger = type(
+        "L",
+        (),
+        {
+            k: (lambda *a, **kw: None)
+            for k in [
+                "debug",
+                "info",
+                "error",
+                "oracle_query",
+                "oracle_decision",
+                "api_usage",
+                "warn",
+            ]
+        },
+    )()
     oracle.decisions_file = tmp_path / ".dirigent" / "DECISIONS.json"
     oracle.decisions = {"decisions": [], "created_at": "2026-04-02T10:00:00"}
     return oracle
@@ -31,6 +43,7 @@ def _make_oracle(tmp_path: Path) -> Oracle:
 # ---------------------------------------------------------------------------
 # TestGetCacheKey
 # ---------------------------------------------------------------------------
+
 
 class TestGetCacheKey:
     def test_deterministic(self, tmp_path):
@@ -69,6 +82,7 @@ class TestGetCacheKey:
 # ---------------------------------------------------------------------------
 # TestCheckCache
 # ---------------------------------------------------------------------------
+
 
 class TestCheckCache:
     def test_cache_hit_returns_dict(self, tmp_path):
@@ -115,6 +129,7 @@ class TestCheckCache:
 # TestRelevantDecisions
 # ---------------------------------------------------------------------------
 
+
 class TestRelevantDecisions:
     def _make_decision(self, question: str, decision: str = "X") -> dict:
         return {
@@ -155,9 +170,7 @@ class TestRelevantDecisions:
 
     def test_respects_top_n_limit(self, tmp_path):
         oracle = _make_oracle(tmp_path)
-        oracle.decisions["decisions"] = [
-            self._make_decision(f"question {i}") for i in range(20)
-        ]
+        oracle.decisions["decisions"] = [self._make_decision(f"question {i}") for i in range(20)]
         result = oracle._relevant_decisions("question relevance", top_n=5)
         assert len(result) <= 5
 
@@ -173,16 +186,19 @@ class TestRelevantDecisions:
 # TestSaveLoadDecisions
 # ---------------------------------------------------------------------------
 
+
 class TestSaveLoadDecisions:
     def test_save_and_reload_roundtrip(self, tmp_path):
         oracle = _make_oracle(tmp_path)
-        oracle.decisions["decisions"].append({
-            "cache_key": "abc123def456abcd",
-            "question": "Which database?",
-            "decision": "postgres",
-            "reason": "Best choice",
-            "confidence": "high",
-        })
+        oracle.decisions["decisions"].append(
+            {
+                "cache_key": "abc123def456abcd",
+                "question": "Which database?",
+                "decision": "postgres",
+                "reason": "Best choice",
+                "confidence": "high",
+            }
+        )
         oracle._save_decisions()
 
         # Reload via _load_decisions
@@ -205,23 +221,27 @@ class TestSaveLoadDecisions:
 
     def test_clear_cache_empties_decisions(self, tmp_path):
         oracle = _make_oracle(tmp_path)
-        oracle.decisions["decisions"].append({
-            "cache_key": "abc123def456abcd",
-            "question": "Q",
-            "decision": "D",
-            "reason": "R",
-        })
+        oracle.decisions["decisions"].append(
+            {
+                "cache_key": "abc123def456abcd",
+                "question": "Q",
+                "decision": "D",
+                "reason": "R",
+            }
+        )
         oracle.clear_cache()
         assert oracle.decisions["decisions"] == []
 
     def test_clear_cache_persists_to_file(self, tmp_path):
         oracle = _make_oracle(tmp_path)
-        oracle.decisions["decisions"].append({
-            "cache_key": "abc123def456abcd",
-            "question": "Q",
-            "decision": "D",
-            "reason": "R",
-        })
+        oracle.decisions["decisions"].append(
+            {
+                "cache_key": "abc123def456abcd",
+                "question": "Q",
+                "decision": "D",
+                "reason": "R",
+            }
+        )
         oracle._save_decisions()
         oracle.clear_cache()
         # Re-read from file

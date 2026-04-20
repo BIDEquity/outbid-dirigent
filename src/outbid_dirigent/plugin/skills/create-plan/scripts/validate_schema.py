@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate Plan JSON. Standalone — stdlib only."""
+
 import json
 import re
 import sys
@@ -18,7 +19,7 @@ LARGE_MAX_PHASES = 5
 LARGE_MAX_TASKS_PER_PHASE = 5
 
 MAX_INFRASTRUCTURE_PHASES = 1  # independent of size — scaffolds always monolithize
-MAX_SETUP_TASKS = 1            # vertical slicing — scaffold belongs in greenfield-scaffold, not PLAN.json
+MAX_SETUP_TASKS = 1  # vertical slicing — scaffold belongs in greenfield-scaffold, not PLAN.json
 
 # Patterns that mark a task as a horizontal-layer "setup" task. Matched against
 # the task name (lowercased) via re.search. A task is flagged if ANY pattern
@@ -80,30 +81,33 @@ def validate(path: str):
         errors.append(f"'size' must be one of {sorted(VALID_SIZES)} (got '{size}')")
         size = "standard"  # fall through with default caps for the rest of validation
     max_phases = LARGE_MAX_PHASES if size == "large" else DEFAULT_MAX_PHASES
-    max_tasks_per_phase = LARGE_MAX_TASKS_PER_PHASE if size == "large" else DEFAULT_MAX_TASKS_PER_PHASE
+    max_tasks_per_phase = (
+        LARGE_MAX_TASKS_PER_PHASE if size == "large" else DEFAULT_MAX_TASKS_PER_PHASE
+    )
 
     if len(phases) < 1:
         errors.append("'phases' must have at least 1 item")
     if len(phases) > max_phases:
         hint = (
             " Or set 'size': 'large' to raise caps to 5×5 if the feature genuinely doesn't fit."
-            if size == "standard" else ""
+            if size == "standard"
+            else ""
         )
         errors.append(
             f"'phases' has {len(phases)} items; max is {max_phases} (size='{size}'). "
             f"If the feature genuinely needs more, split the SPEC into multiple runs.{hint}"
         )
 
-    all_task_ids = {}         # task_id -> "phase[i].tasks[j]"
-    phase_ids = {}            # phase_id -> "phases[i]"
-    depends_on_refs = []      # (ref_task_id, location_str)
-    phase_kinds_in_order = [] # list of (kind, phase_index, is_last_phase_flag_resolved_later)
+    all_task_ids = {}  # task_id -> "phase[i].tasks[j]"
+    phase_ids = {}  # phase_id -> "phases[i]"
+    depends_on_refs = []  # (ref_task_id, location_str)
+    phase_kinds_in_order = []  # list of (kind, phase_index, is_last_phase_flag_resolved_later)
     infrastructure_count = 0
-    setup_tasks = []          # list of (location_str, task_name) flagged as setup
+    setup_tasks = []  # list of (location_str, task_name) flagged as setup
 
     for i, phase in enumerate(phases):
         pprefix = f"phases[{i}]"
-        is_last_phase = (i == len(phases) - 1)
+        is_last_phase = i == len(phases) - 1
 
         if not isinstance(phase, dict):
             errors.append(f"{pprefix}: must be an object")
@@ -117,7 +121,9 @@ def validate(path: str):
         else:
             pid = phase["id"]
             if pid in phase_ids:
-                errors.append(f"{pprefix}.id: duplicate phase id '{pid}' (first seen at {phase_ids[pid]})")
+                errors.append(
+                    f"{pprefix}.id: duplicate phase id '{pid}' (first seen at {phase_ids[pid]})"
+                )
             else:
                 phase_ids[pid] = pprefix
 
@@ -131,13 +137,10 @@ def validate(path: str):
         kind = phase.get("kind")
         if kind is None:
             errors.append(
-                f"{pprefix}: missing 'kind' "
-                f"(one of: user-facing | integration | infrastructure)"
+                f"{pprefix}: missing 'kind' (one of: user-facing | integration | infrastructure)"
             )
         elif kind not in VALID_PHASE_KINDS:
-            errors.append(
-                f"{pprefix}.kind: '{kind}' must be one of {sorted(VALID_PHASE_KINDS)}"
-            )
+            errors.append(f"{pprefix}.kind: '{kind}' must be one of {sorted(VALID_PHASE_KINDS)}")
         else:
             phase_kinds_in_order.append(kind)
             if kind == "infrastructure":
@@ -191,7 +194,9 @@ def validate(path: str):
             else:
                 tid = task["id"]
                 if tid in all_task_ids:
-                    errors.append(f"{tprefix}.id: duplicate task id '{tid}' (first seen at {all_task_ids[tid]})")
+                    errors.append(
+                        f"{tprefix}.id: duplicate task id '{tid}' (first seen at {all_task_ids[tid]})"
+                    )
                 else:
                     all_task_ids[tid] = tprefix
 
@@ -215,21 +220,27 @@ def validate(path: str):
                 if not isinstance(task["model"], str):
                     errors.append(f"{tprefix}.model: must be a string")
                 elif task["model"] not in VALID_MODELS:
-                    errors.append(f"{tprefix}.model: '{task['model']}' must be one of {sorted(VALID_MODELS)}")
+                    errors.append(
+                        f"{tprefix}.model: '{task['model']}' must be one of {sorted(VALID_MODELS)}"
+                    )
 
             # Optional: effort
             if "effort" in task:
                 if not isinstance(task["effort"], str):
                     errors.append(f"{tprefix}.effort: must be a string")
                 elif task["effort"] not in VALID_EFFORTS:
-                    errors.append(f"{tprefix}.effort: '{task['effort']}' must be one of {sorted(VALID_EFFORTS)}")
+                    errors.append(
+                        f"{tprefix}.effort: '{task['effort']}' must be one of {sorted(VALID_EFFORTS)}"
+                    )
 
             # Optional: test_level
             if "test_level" in task:
                 if not isinstance(task["test_level"], str):
                     errors.append(f"{tprefix}.test_level: must be a string")
                 elif task["test_level"] not in VALID_TEST_LEVELS:
-                    errors.append(f"{tprefix}.test_level: '{task['test_level']}' must be one of {sorted(VALID_TEST_LEVELS)}")
+                    errors.append(
+                        f"{tprefix}.test_level: '{task['test_level']}' must be one of {sorted(VALID_TEST_LEVELS)}"
+                    )
 
             # Optional: relevant_req_ids
             if "relevant_req_ids" in task:
@@ -255,7 +266,9 @@ def validate(path: str):
                 else:
                     for dep in deps:
                         if not isinstance(dep, str):
-                            errors.append(f"{tprefix}.depends_on: each item must be a string, got {type(dep).__name__}")
+                            errors.append(
+                                f"{tprefix}.depends_on: each item must be a string, got {type(dep).__name__}"
+                            )
                         else:
                             depends_on_refs.append((dep, tprefix))
 
@@ -271,9 +284,7 @@ def validate(path: str):
     # layer, etc). Beyond that, fold setup work into the first feature slice
     # that needs it. See SKILL.md "Slice Vertically, Not Horizontally".
     if len(setup_tasks) > MAX_SETUP_TASKS:
-        flagged = ", ".join(
-            f"{loc} ('{name}')" for loc, name in setup_tasks
-        )
+        flagged = ", ".join(f"{loc} ('{name}')" for loc, name in setup_tasks)
         errors.append(
             f"Plan has {len(setup_tasks)} horizontal-layer 'setup' tasks; max is "
             f"{MAX_SETUP_TASKS}. Flagged: {flagged}. Rewrite these as vertical "

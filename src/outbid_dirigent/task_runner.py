@@ -31,15 +31,15 @@ from claude_agent_sdk.types import (
 
 from outbid_dirigent.logger import get_logger as get_dirigent_logger
 from outbid_dirigent.plan_schema import Plan, Task
-from outbid_dirigent.router import load_state, save_state
+from outbid_dirigent.router import load_state
 
 
 # Approximate per-model pricing (USD per million tokens) for api_usage cost tracking.
 # Kept simple — exact pricing is downstream; we just want per-step visibility.
 _MODEL_PRICING = {
-    "haiku":  (1.0, 5.0),
+    "haiku": (1.0, 5.0),
     "sonnet": (3.0, 15.0),
-    "opus":   (15.0, 75.0),
+    "opus": (15.0, 75.0),
 }
 
 
@@ -57,6 +57,7 @@ def _estimate_cost_cents(model: str, input_tokens: int, output_tokens: int) -> i
 
 class TaskResult:
     """Result of a single task execution."""
+
     def __init__(
         self,
         task_id: str,
@@ -130,8 +131,7 @@ class TaskRunner:
             return []
         image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
         return [
-            f for f in assets_dir.iterdir()
-            if f.is_file() and f.suffix.lower() in image_extensions
+            f for f in assets_dir.iterdir() if f.is_file() and f.suffix.lower() in image_extensions
         ]
 
     # ── Claude Code invocation ──
@@ -167,7 +167,8 @@ class TaskRunner:
 
         # Clean env: strip venv vars so subprocess uses target repo's venv
         clean_env = {
-            k: v for k, v in os.environ.items()
+            k: v
+            for k, v in os.environ.items()
             if k not in ("VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV")
         }
         if "VIRTUAL_ENV" in os.environ:
@@ -196,7 +197,17 @@ class TaskRunner:
 
         # "Agent" is always needed: plugin agents (contract-negotiator, reviewer, implementer)
         # are available whenever plugins are loaded — they must not be passed inline.
-        allowed_tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "WebFetch", "WebSearch", "mcp__context7"]
+        allowed_tools = [
+            "Read",
+            "Write",
+            "Edit",
+            "Bash",
+            "Glob",
+            "Grep",
+            "WebFetch",
+            "WebSearch",
+            "mcp__context7",
+        ]
         if plugins:
             allowed_tools.append("Agent")
 
@@ -243,7 +254,11 @@ class TaskRunner:
                                         for c in content
                                     )
                                 content_str = str(content or "")
-                                prefix = "[claude:tool_err]" if block.is_error else "[claude:tool_result]"
+                                prefix = (
+                                    "[claude:tool_err]"
+                                    if block.is_error
+                                    else "[claude:tool_result]"
+                                )
                                 logger.debug(f"{prefix} {content_str[:500]}")
                 elif isinstance(message, ResultMessage):
                     usage_dict = message.usage or {}
@@ -270,9 +285,7 @@ class TaskRunner:
             logger.error(f"[claude:error] {error_text}")
             return False, "", error_text, None
 
-    def _emit_api_usage(
-        self, component: str, model: str, usage: dict, duration_ms: int
-    ) -> None:
+    def _emit_api_usage(self, component: str, model: str, usage: dict, duration_ms: int) -> None:
         """Emit a cost/tokens event for this orchestrator call. rc4 change."""
         if not usage:
             return
@@ -309,9 +322,14 @@ class TaskRunner:
     ) -> tuple[bool, str, str]:
         """Run Claude Code with a prompt. Returns (success, stdout, stderr)."""
         success, stdout, stderr, _ = asyncio.run(
-            self._aquery_claude(prompt, timeout=timeout, model=model,
-                                effort=effort, system_prompt=system_prompt,
-                                component=component)
+            self._aquery_claude(
+                prompt,
+                timeout=timeout,
+                model=model,
+                effort=effort,
+                system_prompt=system_prompt,
+                component=component,
+            )
         )
         return success, stdout, stderr
 
@@ -328,10 +346,16 @@ class TaskRunner:
     ) -> tuple[bool, dict | None]:
         """Run Claude Code and return structured output. Returns (success, structured_dict)."""
         success, _, stderr, structured = asyncio.run(
-            self._aquery_claude(prompt, timeout=timeout, model=model,
-                                effort=effort, system_prompt=system_prompt,
-                                output_format=output_format, agents=agents,
-                                component=component)
+            self._aquery_claude(
+                prompt,
+                timeout=timeout,
+                model=model,
+                effort=effort,
+                system_prompt=system_prompt,
+                output_format=output_format,
+                agents=agents,
+                component=component,
+            )
         )
         if not success or structured is None:
             logger.error(f"Structured query failed: {stderr[:200]}")
@@ -358,6 +382,7 @@ class TaskRunner:
             return False
         try:
             import json
+
             data = json.loads(compact_path.read_text(encoding="utf-8"))
             return bool(data.get("business_rules"))
         except Exception:
@@ -378,9 +403,7 @@ class TaskRunner:
         if task.convention_skills:
             catalog_by_name = {s["name"]: s for s in self.opencode_skill_catalog}
             relevant = [
-                catalog_by_name[name]
-                for name in task.convention_skills
-                if name in catalog_by_name
+                catalog_by_name[name] for name in task.convention_skills if name in catalog_by_name
             ]
         else:
             # Fallback: include all skills (let the agent decide)
@@ -405,6 +428,7 @@ class TaskRunner:
             return None
         content = arch_file.read_text(encoding="utf-8")
         import re
+
         match = re.search(rf"<{tag}>(.*?)</{tag}>", content, re.DOTALL)
         if not match:
             return None
@@ -417,7 +441,10 @@ class TaskRunner:
         try:
             result = subprocess.run(
                 ["git", "log", f"-{max_commits}", "--oneline", "--stat", "--no-color"],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return ""
@@ -434,11 +461,16 @@ class TaskRunner:
             count = len(state["completed_tasks"]) + 2
             result = subprocess.run(
                 ["git", "diff", "--name-only", f"HEAD~{count}"],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return ""
-            files = [f for f in result.stdout.strip().splitlines() if not f.startswith(".dirigent/")]
+            files = [
+                f for f in result.stdout.strip().splitlines() if not f.startswith(".dirigent/")
+            ]
             return "\n".join(files) if files else ""
         except Exception:
             return ""
@@ -447,7 +479,9 @@ class TaskRunner:
         try:
             result = subprocess.run(
                 ["git", "log", "-1", "--format=%H"],
-                cwd=self.repo_path, capture_output=True, text=True,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
             )
             return result.stdout.strip() if result.returncode == 0 else None
         except Exception:
@@ -467,7 +501,10 @@ class TaskRunner:
         """Query past Claude session logs via DuckDB for lessons learned."""
         try:
             duckdb_check = subprocess.run(
-                ["which", "duckdb"], capture_output=True, text=True, timeout=5,
+                ["which", "duckdb"],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if duckdb_check.returncode != 0:
                 return ""
@@ -504,7 +541,9 @@ LIMIT 45;
 """
             result = subprocess.run(
                 ["duckdb", ":memory:", "-csv", "-c", query],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode != 0 or not result.stdout.strip():
                 return ""
@@ -531,14 +570,18 @@ LIMIT 45;
                 return unique
 
             lines = []
-            for kind, prefix in [("LESSON", "lesson"), ("WARNING", "warning"), ("DEVIATION", "deviation")]:
+            for kind, prefix in [
+                ("LESSON", "lesson"),
+                ("WARNING", "warning"),
+                ("DEVIATION", "deviation"),
+            ]:
                 for entry in dedupe(tagged[kind])[:8]:
                     lines.append(f"[{prefix}] {entry}")
 
             if not lines:
                 return ""
 
-            return "\n".join(f"- {l}" for l in lines)[:max_chars]
+            return "\n".join(f"- {line}" for line in lines)[:max_chars]
         except Exception:
             return ""
 
@@ -551,23 +594,33 @@ LIMIT 45;
         run_files = self._get_run_file_list()
         business_rules = self._load_business_rules()
 
-        sections = [f"<task id=\"{task.id}\">{task.name}</task>"]
+        sections = [f'<task id="{task.id}">{task.name}</task>']
 
         # Plan position
         pos = plan.task_position(task.id)
         if pos:
-            sections.append(f"<plan-position task=\"{pos['index']}/{pos['total']}\" phase=\"{pos['phase_id']}/{pos['total_phases']}\" phase-name=\"{pos['phase_name']}\">")
+            sections.append(
+                f'<plan-position task="{pos["index"]}/{pos["total"]}" phase="{pos["phase_id"]}/{pos["total_phases"]}" phase-name="{pos["phase_name"]}">'
+            )
             if "prev_id" in pos:
-                sections.append(f"<prev-task id=\"{pos['prev_id']}\">{pos['prev_name']}</prev-task>")
+                sections.append(f'<prev-task id="{pos["prev_id"]}">{pos["prev_name"]}</prev-task>')
             if "next_id" in pos:
-                sections.append(f"<next-task id=\"{pos['next_id']}\">{pos['next_name']}</next-task>")
+                sections.append(f'<next-task id="{pos["next_id"]}">{pos["next_name"]}</next-task>')
             sections.append("</plan-position>")
 
         # Assumptions & out of scope
         if plan.assumptions:
-            sections.append("<assumptions>\n" + "\n".join(f"- {a}" for a in plan.assumptions) + "\n</assumptions>")
+            sections.append(
+                "<assumptions>\n"
+                + "\n".join(f"- {a}" for a in plan.assumptions)
+                + "\n</assumptions>"
+            )
         if plan.out_of_scope:
-            sections.append("<out-of-scope>\n" + "\n".join(f"- {x}" for x in plan.out_of_scope) + "\n</out-of-scope>")
+            sections.append(
+                "<out-of-scope>\n"
+                + "\n".join(f"- {x}" for x in plan.out_of_scope)
+                + "\n</out-of-scope>"
+            )
 
         # Spec — prefer compacted form, fall back to full blob
         spec_block: Optional[str] = None
@@ -575,18 +628,15 @@ LIMIT 45;
         if compact_path.exists():
             try:
                 from outbid_dirigent.spec_compactor import CompactSpec
-                compact = CompactSpec.model_validate_json(
-                    compact_path.read_text(encoding="utf-8")
-                )
+
+                compact = CompactSpec.model_validate_json(compact_path.read_text(encoding="utf-8"))
                 # If task has no relevant_req_ids, inject ALL reqs (safe fallback
                 # so we never silently drop requirements when the planner forgot
                 # to tag a task).
                 relevant = set(task.relevant_req_ids) if task.relevant_req_ids else None
                 spec_block = compact.render_xml(only_req_ids=relevant)
             except Exception as e:
-                logger.warning(
-                    f"Compact spec load failed, falling back to full spec: {e}"
-                )
+                logger.warning(f"Compact spec load failed, falling back to full spec: {e}")
 
         if spec_block is None:
             spec_block = f"<spec>\n{self.spec_content}\n</spec>"
@@ -595,21 +645,29 @@ LIMIT 45;
         # Reference spec images if available
         if self.spec_images:
             img_list = "\n".join(f"- .planning/assets/{img.name}" for img in self.spec_images)
-            sections.append(f"<visual-references hint=\"nutze Read tool um sie zu betrachten\">\n{img_list}\n</visual-references>")
+            sections.append(
+                f'<visual-references hint="nutze Read tool um sie zu betrachten">\n{img_list}\n</visual-references>'
+            )
 
         # Progress
         sections.append(f"<previous-progress>\n{previous_summaries}\n</previous-progress>")
 
         # Recent changes
         if recent_diff:
-            sections.append(f"<recent-changes hint=\"was vorherige Tasks gemacht haben\">\n{recent_diff}\n</recent-changes>")
+            sections.append(
+                f'<recent-changes hint="was vorherige Tasks gemacht haben">\n{recent_diff}\n</recent-changes>'
+            )
         if run_files:
             sections.append(f"<files-changed-this-run>\n{run_files}\n</files-changed-this-run>")
 
         # Task description
         sections.append(f"<your-task>\n<description>{task.description}</description>")
-        sections.append(f"<files-to-create>{', '.join(task.files_to_create) or 'keine'}</files-to-create>")
-        sections.append(f"<files-to-modify>{', '.join(task.files_to_modify) or 'keine'}</files-to-modify>")
+        sections.append(
+            f"<files-to-create>{', '.join(task.files_to_create) or 'keine'}</files-to-create>"
+        )
+        sections.append(
+            f"<files-to-modify>{', '.join(task.files_to_modify) or 'keine'}</files-to-modify>"
+        )
         sections.append("</your-task>")
 
         # Key patterns — ALWAYS injected, non-negotiable tooling and library choices.
@@ -619,10 +677,10 @@ LIMIT 45;
         if patterns:
             sections.append(
                 '<key-patterns hint="MANDATORY — these are non-negotiable project conventions. '
-                'Use EXACTLY these tools and libraries. Do NOT substitute alternatives '
+                "Use EXACTLY these tools and libraries. Do NOT substitute alternatives "
                 '(e.g. do NOT use pandas when polars is specified, do NOT use pip when uv is specified).">\n'
-                f'{patterns}\n'
-                '</key-patterns>'
+                f"{patterns}\n"
+                "</key-patterns>"
             )
 
         # Convention skills — tell the agent which project-specific skills to load
@@ -637,12 +695,14 @@ LIMIT 45;
         ]:
             section = self._load_architecture_section(tag, max_chars=3000)
             if section:
-                sections.append(f"<{tag} hint=\"{hint}\">\n{section}\n</{tag}>")
+                sections.append(f'<{tag} hint="{hint}">\n{section}\n</{tag}>')
 
         # Business rules — only inject separately if CompactSpec doesn't contain them
         # (CompactSpec now includes business_rules from Proteus extraction)
         if business_rules and not self._compact_spec_has_rules():
-            sections.append(f"<business-rules hint=\"MUESSEN erhalten bleiben!\">\n{business_rules[:2000]}\n</business-rules>")
+            sections.append(
+                f'<business-rules hint="MUESSEN erhalten bleiben!">\n{business_rules[:2000]}\n</business-rules>'
+            )
 
         # Session recall — lessons from past runs
         recall = self._recall_from_sessions()
@@ -658,16 +718,17 @@ LIMIT 45;
                 sections.append(
                     '<knowledge-store hint="domain knowledge from .brv/context-tree/ '
                     '— use /dirigent:query-brv for deeper queries">\n'
-                    f'{brv_ctx}\n'
-                    '</knowledge-store>'
+                    f"{brv_ctx}\n"
+                    "</knowledge-store>"
                 )
 
         # Test harness context (build/test/dev commands, env vars)
         from outbid_dirigent.test_harness_schema import TestHarness
+
         harness = TestHarness.load(self.dirigent_dir / "test-harness.json")
         if harness:
             sections.append(
-                f"<test-harness hint=\"project commands and environment\">\n"
+                f'<test-harness hint="project commands and environment">\n'
                 f"{harness.summary_for_prompt()}\n"
                 f"</test-harness>"
             )
@@ -676,12 +737,13 @@ LIMIT 45;
         phase_pos = plan.task_position(task.id)
         if phase_pos:
             from outbid_dirigent.contract_schema import Contract
+
             contract = Contract.load(
                 self.dirigent_dir / "contracts" / f"phase-{phase_pos['phase_id']}.json"
             )
             if contract:
                 sections.append(
-                    f"<phase-contract hint=\"dein Task muss zu diesen Kriterien beitragen\">\n"
+                    f'<phase-contract hint="dein Task muss zu diesen Kriterien beitragen">\n'
                     f"{contract.summary_for_prompt()}\n"
                     f"</phase-contract>"
                 )
@@ -715,7 +777,10 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
         try:
             result = subprocess.run(
                 ["git", "status", "--porcelain"],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode != 0:
                 return False
@@ -730,7 +795,9 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
 
     def _auto_commit(self, task: Task) -> Optional[str]:
         """Auto-commit uncommitted changes the agent forgot to commit."""
-        msg = f"feat({task.id}): {task.name}\n\n[auto-committed by dirigent — agent forgot to commit]"
+        msg = (
+            f"feat({task.id}): {task.name}\n\n[auto-committed by dirigent — agent forgot to commit]"
+        )
         return self._auto_commit_msg(msg)
 
     def _auto_commit_msg(self, msg: str) -> Optional[str]:
@@ -738,11 +805,17 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
         try:
             subprocess.run(
                 ["git", "add", "-A"],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             result = subprocess.run(
                 ["git", "commit", "-m", msg],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0:
                 return self._get_latest_commit_hash()
@@ -772,7 +845,9 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
             head_before = self._get_latest_commit_hash()
 
             success, stdout, stderr = self._run_claude(
-                prompt, model=task_model, effort=task_effort,
+                prompt,
+                model=task_model,
+                effort=task_effort,
                 system_prompt=self.AGENT_SYSTEM_PROMPT,
                 component=f"implementer:{task.id}",
             )
@@ -782,7 +857,9 @@ Erstelle ${{DIRIGENT_RUN_DIR}}/summaries/{task.id}-SUMMARY.md mit:
 
                 # Agent forgot to commit — rescue uncommitted work
                 if commit_hash == head_before and self._has_uncommitted_changes():
-                    logger.warning(f"Task {task.id}: agent did not commit — auto-committing changes")
+                    logger.warning(
+                        f"Task {task.id}: agent did not commit — auto-committing changes"
+                    )
                     auto_hash = self._auto_commit(task)
                     if auto_hash:
                         commit_hash = auto_hash

@@ -17,6 +17,7 @@ from outbid_dirigent.utils import extract_phase_number  # Die echte Funktion!
 # UNIT TESTS
 # ══════════════════════════════════════════
 
+
 class TestExtractPhaseNumber:
     """Tests für die extract_phase_number Helper-Funktion."""
 
@@ -53,6 +54,7 @@ class TestExtractPhaseNumber:
 # INTEGRATION TESTS - Plan/Phase Handling
 # ══════════════════════════════════════════
 
+
 class TestPlanPhaseIdHandling:
     """Tests die sicherstellen, dass Plans mit verschiedenen Phase-ID Formaten funktionieren."""
 
@@ -61,13 +63,9 @@ class TestPlanPhaseIdHandling:
         plan = Plan(
             title="Test Plan",
             phases=[
-                Phase(id="01", name="Phase 1", tasks=[
-                    Task(id="01-01", name="Task 1")
-                ]),
-                Phase(id="02", name="Phase 2", tasks=[
-                    Task(id="02-01", name="Task 2")
-                ]),
-            ]
+                Phase(id="01", name="Phase 1", tasks=[Task(id="01-01", name="Task 1")]),
+                Phase(id="02", name="Phase 2", tasks=[Task(id="02-01", name="Task 2")]),
+            ],
         )
 
         assert len(plan.phases) == 2
@@ -82,13 +80,11 @@ class TestPlanPhaseIdHandling:
         plan = Plan(
             title="Test Plan",
             phases=[
-                Phase(id="phase-1", name="Create Feature", tasks=[
-                    Task(id="task-1-1", name="Task 1")
-                ]),
-                Phase(id="phase-2", name="Ship", tasks=[
-                    Task(id="task-2-1", name="Task 2")
-                ]),
-            ]
+                Phase(
+                    id="phase-1", name="Create Feature", tasks=[Task(id="task-1-1", name="Task 1")]
+                ),
+                Phase(id="phase-2", name="Ship", tasks=[Task(id="task-2-1", name="Task 2")]),
+            ],
         )
 
         assert len(plan.phases) == 2
@@ -103,6 +99,7 @@ class TestPlanPhaseIdHandling:
 # ══════════════════════════════════════════
 # REGRESSION TEST - Der originale Bug
 # ══════════════════════════════════════════
+
 
 class TestExecutorPhaseIdBug:
     """
@@ -145,4 +142,6 @@ class TestExecutorPhaseIdBug:
 
         for phase_id, expected in test_cases:
             result = extract_phase_number(phase_id)
-            assert result == expected, f"extract_phase_number('{phase_id}') sollte {expected} sein, war aber {result}"
+            assert result == expected, (
+                f"extract_phase_number('{phase_id}') sollte {expected} sein, war aber {result}"
+            )

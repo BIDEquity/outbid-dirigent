@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate Contract JSON against the Pydantic schema. Standalone — no imports beyond stdlib."""
+
 import json
 import re
 import sys
@@ -36,7 +37,9 @@ def validate(path: str):
     # Reject unknown top-level keys
     unknown_keys = set(data.keys()) - VALID_TOP_LEVEL_KEYS
     if unknown_keys:
-        errors.append(f"Unknown top-level keys: {sorted(unknown_keys)} — did you mean 'acceptance_criteria'?")
+        errors.append(
+            f"Unknown top-level keys: {sorted(unknown_keys)} — did you mean 'acceptance_criteria'?"
+        )
 
     # Required fields
     for field in ("phase_id", "phase_name", "objective"):
@@ -96,7 +99,9 @@ def validate(path: str):
         elif not isinstance(criterion["verification"], str):
             errors.append(f"{prefix}.verification: must be a string")
         elif not criterion["verification"].startswith("Run: "):
-            errors.append(f"{prefix}.verification: must start with 'Run: ' (got '{criterion['verification'][:20]}...')")
+            errors.append(
+                f"{prefix}.verification: must start with 'Run: ' (got '{criterion['verification'][:20]}...')"
+            )
 
         # layer
         if "layer" not in criterion:
@@ -105,8 +110,7 @@ def validate(path: str):
             layer = criterion["layer"]
             if layer in LEGACY_LAYER_RENAMES:
                 warnings.append(
-                    f"{prefix}.layer: '{layer}' is deprecated; "
-                    f"use '{LEGACY_LAYER_RENAMES[layer]}'"
+                    f"{prefix}.layer: '{layer}' is deprecated; use '{LEGACY_LAYER_RENAMES[layer]}'"
                 )
                 layer = LEGACY_LAYER_RENAMES[layer]  # count it under the new name
             if layer not in VALID_LAYERS:

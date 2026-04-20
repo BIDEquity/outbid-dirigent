@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate TestHarness JSON against the new strict schema. Standalone — stdlib only."""
+
 import json
 import sys
 
@@ -26,7 +27,9 @@ def validate(path: str):
     else:
         for key, cmd in data["commands"].items():
             if key not in VALID_COMMAND_KEYS:
-                errors.append(f"commands.{key}: invalid key — must be one of {sorted(VALID_COMMAND_KEYS)}")
+                errors.append(
+                    f"commands.{key}: invalid key — must be one of {sorted(VALID_COMMAND_KEYS)}"
+                )
             if not isinstance(cmd, dict):
                 errors.append(f"commands.{key}: must be an object")
                 continue
@@ -60,7 +63,9 @@ def validate(path: str):
                 if "source" not in var:
                     errors.append(f"{prefix}: missing 'source'")
                 elif var["source"] not in VALID_ENV_SOURCES:
-                    errors.append(f"{prefix}.source: must be one of {sorted(VALID_ENV_SOURCES)}, got '{var['source']}'")
+                    errors.append(
+                        f"{prefix}.source: must be one of {sorted(VALID_ENV_SOURCES)}, got '{var['source']}'"
+                    )
 
     # Optional: notes (string)
     if "notes" in data and not isinstance(data["notes"], str):

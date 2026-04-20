@@ -23,11 +23,12 @@ from outbid_dirigent.plan_schema import PhaseKind  # noqa: F401
 # ENUMS
 # ══════════════════════════════════════════
 
+
 class CriterionLayer(str, Enum):
-    STRUCTURAL = "structural"       # Compile, lint, typecheck, subsystem liveness
-    UNIT = "unit"                   # Fast isolated tests for new logic in this phase
-    USER_JOURNEY = "user-journey"   # End-to-end: a user (or calling subsystem) observes X
-    EDGE_CASE = "edge-case"         # User or subsystem hits a bad path; graceful response
+    STRUCTURAL = "structural"  # Compile, lint, typecheck, subsystem liveness
+    UNIT = "unit"  # Fast isolated tests for new logic in this phase
+    USER_JOURNEY = "user-journey"  # End-to-end: a user (or calling subsystem) observes X
+    EDGE_CASE = "edge-case"  # User or subsystem hits a bad path; graceful response
 
 
 class CriterionVerdict(str, Enum):
@@ -51,8 +52,10 @@ class FindingSeverity(str, Enum):
 # CONTRACT SCHEMA
 # ══════════════════════════════════════════
 
+
 class AcceptanceCriterion(BaseModel):
     """A single measurable acceptance criterion."""
+
     id: str = Field(..., description="Unique ID like AC-01-01")
     description: str = Field(..., description="What must be true")
     verification: str = Field(..., description="Executable command to verify (Run: ...)")
@@ -61,12 +64,14 @@ class AcceptanceCriterion(BaseModel):
 
 class ExpectedFileChange(BaseModel):
     """A file expected to change during the phase."""
+
     path: str
     change: str = Field(..., description="What changes in this file")
 
 
 class Contract(BaseModel):
     """Phase contract — acceptance criteria agreed before execution."""
+
     phase_id: str
     phase_name: str
     phase_kind: PhaseKind = Field(
@@ -75,8 +80,7 @@ class Contract(BaseModel):
     )
     objective: str = Field(..., description="Starts with a verb the user performs")
     acceptance_criteria: list[AcceptanceCriterion] = Field(
-        ..., min_length=1, max_length=8,
-        description="Measurable criteria (1-8)"
+        ..., min_length=1, max_length=8, description="Measurable criteria (1-8)"
     )
     quality_gates: list[str] = Field(
         default_factory=lambda: [
@@ -185,22 +189,20 @@ class Contract(BaseModel):
     def summary_for_prompt(self) -> str:
         """Compact summary for injection into task prompts — includes verification commands."""
         criteria = "\n".join(
-            f"  - [{c.id}] ({c.layer.value}) {c.description}\n"
-            f"    Verify: {c.verification}"
+            f"  - [{c.id}] ({c.layer.value}) {c.description}\n    Verify: {c.verification}"
             for c in self.acceptance_criteria
         )
-        return (
-            f"Phase {self.phase_id} Contract: {self.objective}\n"
-            f"Acceptance Criteria:\n{criteria}"
-        )
+        return f"Phase {self.phase_id} Contract: {self.objective}\nAcceptance Criteria:\n{criteria}"
 
 
 # ══════════════════════════════════════════
 # REVIEW SCHEMA
 # ══════════════════════════════════════════
 
+
 class VerificationEvidence(BaseModel):
     """Proof that a verification command was actually executed."""
+
     command: str = Field(..., description="The command that was run")
     exit_code: int = Field(..., description="Exit code of the command")
     stdout_snippet: str = Field("", description="First 500 chars of stdout")
@@ -209,6 +211,7 @@ class VerificationEvidence(BaseModel):
 
 class CriterionResult(BaseModel):
     """Evaluation of a single acceptance criterion."""
+
     ac_id: str = Field(..., description="References AcceptanceCriterion.id")
     verdict: CriterionVerdict
     notes: str = ""
@@ -221,6 +224,7 @@ class CriterionResult(BaseModel):
 
 class Finding(BaseModel):
     """A code quality finding from the review."""
+
     severity: FindingSeverity
     file: str
     line: int = 0
@@ -230,14 +234,15 @@ class Finding(BaseModel):
 
 class Review(BaseModel):
     """Phase review — evaluation of changes against the contract."""
+
     phase_id: str
     iteration: int = 1
     verdict: Verdict
-    confidence: str = "static"     # e2e | integration | unit | mocked | static | none
-    infra_tier: str = "7_none"      # InfraTier value active during execution
+    confidence: str = "static"  # e2e | integration | unit | mocked | static | none
+    infra_tier: str = "7_none"  # InfraTier value active during execution
     tests_run: int = 0
     tests_skipped_infra: int = 0
-    caveat: str = ""                # human-readable explanation of what wasn't verified
+    caveat: str = ""  # human-readable explanation of what wasn't verified
     criteria_results: list[CriterionResult] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     summary: str = ""
@@ -262,7 +267,8 @@ class Review(BaseModel):
     def criteria_without_evidence(self) -> list[CriterionResult]:
         """Criteria marked as pass but with no verification evidence."""
         return [
-            r for r in self.criteria_results
+            r
+            for r in self.criteria_results
             if r.verdict == CriterionVerdict.PASS and not r.evidence
         ]
 
@@ -274,11 +280,7 @@ class Review(BaseModel):
     @property
     def infra_constrained_only(self) -> bool:
         """True when all failures are infra-constrained (WARN) with no real code failures."""
-        return (
-            not self.failed_criteria
-            and self.critical_count == 0
-            and bool(self.warned_criteria)
-        )
+        return not self.failed_criteria and self.critical_count == 0 and bool(self.warned_criteria)
 
     def save(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -348,9 +350,17 @@ class Review(BaseModel):
 
         # Strip unknown top-level fields that Pydantic might reject
         known_fields = {
-            "phase_id", "iteration", "verdict", "confidence", "infra_tier",
-            "tests_run", "tests_skipped_infra", "caveat", "criteria_results",
-            "findings", "summary",
+            "phase_id",
+            "iteration",
+            "verdict",
+            "confidence",
+            "infra_tier",
+            "tests_run",
+            "tests_skipped_infra",
+            "caveat",
+            "criteria_results",
+            "findings",
+            "summary",
         }
         unknown = set(raw.keys()) - known_fields
         for key in unknown:

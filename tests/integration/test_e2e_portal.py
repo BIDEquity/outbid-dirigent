@@ -18,6 +18,7 @@ These tests:
 3. Verify events arrived in Portal
 4. Cleanup test data
 """
+
 import os
 import stat
 import subprocess
@@ -210,14 +211,23 @@ class TestE2EPortalIntegration:
 
             result = subprocess.run(
                 [
-                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
-                    "--spec", str(spec_file),
-                    "--repo", str(test_repo),
-                    "--execution-mode", "autonomous",
-                    "--portal-url", PORTAL_URL,
-                    "--execution-id", execution_id,
-                    "--reporter-token", reporter_token,
-                    "--output", "json",
+                    PYTHON_EXE,
+                    "-m",
+                    "outbid_dirigent.dirigent",
+                    "--spec",
+                    str(spec_file),
+                    "--repo",
+                    str(test_repo),
+                    "--execution-mode",
+                    "autonomous",
+                    "--portal-url",
+                    PORTAL_URL,
+                    "--execution-id",
+                    execution_id,
+                    "--reporter-token",
+                    reporter_token,
+                    "--output",
+                    "json",
                 ],
                 cwd=test_repo,
                 env=env,
@@ -252,7 +262,7 @@ class TestE2EPortalIntegration:
                 f"Execution still pending - status should have changed. Status: {execution['status']}"
             )
 
-            print(f"✅ E2E test passed!")
+            print("✅ E2E test passed!")
             print(f"   - Execution status: {execution['status']}")
             print(f"   - Events received: {len(events)}")
             print(f"   - Event types: {list(set(event_types))}")
@@ -287,14 +297,23 @@ class TestE2EPortalIntegration:
 
             subprocess.run(
                 [
-                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
-                    "--spec", str(spec_file),
-                    "--repo", str(test_repo),
-                    "--execution-mode", "autonomous",
-                    "--portal-url", PORTAL_URL,
-                    "--execution-id", execution_id,
-                    "--reporter-token", reporter_token,
-                    "--output", "json",
+                    PYTHON_EXE,
+                    "-m",
+                    "outbid_dirigent.dirigent",
+                    "--spec",
+                    str(spec_file),
+                    "--repo",
+                    str(test_repo),
+                    "--execution-mode",
+                    "autonomous",
+                    "--portal-url",
+                    PORTAL_URL,
+                    "--execution-id",
+                    execution_id,
+                    "--reporter-token",
+                    reporter_token,
+                    "--output",
+                    "json",
                 ],
                 cwd=test_repo,
                 env=env,
@@ -310,7 +329,7 @@ class TestE2EPortalIntegration:
             assert "stage_start" in event_types, f"Missing stage_start. Got: {event_types}"
             assert "stage_complete" in event_types, f"Missing stage_complete. Got: {event_types}"
 
-            print(f"✅ Stage events verified in Portal")
+            print("✅ Stage events verified in Portal")
 
         finally:
             if execution_id:
@@ -338,14 +357,23 @@ class TestE2EPortalIntegration:
 
             subprocess.run(
                 [
-                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
-                    "--spec", str(spec_file),
-                    "--repo", str(test_repo),
-                    "--execution-mode", "autonomous",
-                    "--portal-url", PORTAL_URL,
-                    "--execution-id", execution_id,
-                    "--reporter-token", reporter_token,
-                    "--output", "json",
+                    PYTHON_EXE,
+                    "-m",
+                    "outbid_dirigent.dirigent",
+                    "--spec",
+                    str(spec_file),
+                    "--repo",
+                    str(test_repo),
+                    "--execution-mode",
+                    "autonomous",
+                    "--portal-url",
+                    PORTAL_URL,
+                    "--execution-id",
+                    execution_id,
+                    "--reporter-token",
+                    reporter_token,
+                    "--output",
+                    "json",
                 ],
                 cwd=test_repo,
                 env=env,
@@ -358,7 +386,9 @@ class TestE2EPortalIntegration:
 
             # Find analysis_result event
             analysis_events = [e for e in events if e["event_type"] == "analysis_result"]
-            assert len(analysis_events) > 0, f"No analysis_result event. Got: {[e['event_type'] for e in events]}"
+            assert len(analysis_events) > 0, (
+                f"No analysis_result event. Got: {[e['event_type'] for e in events]}"
+            )
 
             analysis = analysis_events[0]
             assert "route" in analysis["event_data"], f"analysis_result missing 'route': {analysis}"
@@ -431,14 +461,23 @@ class TestE2EWithMockedClaude:
 
             result = subprocess.run(
                 [
-                    PYTHON_EXE, "-m", "outbid_dirigent.dirigent",
-                    "--spec", str(spec_file),
-                    "--repo", str(test_repo),
-                    "--execution-mode", "autonomous",
-                    "--portal-url", PORTAL_URL,
-                    "--execution-id", execution_id,
-                    "--reporter-token", reporter_token,
-                    "--output", "json",
+                    PYTHON_EXE,
+                    "-m",
+                    "outbid_dirigent.dirigent",
+                    "--spec",
+                    str(spec_file),
+                    "--repo",
+                    str(test_repo),
+                    "--execution-mode",
+                    "autonomous",
+                    "--portal-url",
+                    PORTAL_URL,
+                    "--execution-id",
+                    execution_id,
+                    "--reporter-token",
+                    reporter_token,
+                    "--output",
+                    "json",
                 ],
                 cwd=test_repo,
                 env=env,
@@ -468,9 +507,9 @@ class TestE2EWithMockedClaude:
             if missing:
                 print(f"⚠️ Missing events: {missing}")
             else:
-                print(f"✅ All core events received")
+                print("✅ All core events received")
 
-            print(f"✅ Mocked E2E test passed!")
+            print("✅ Mocked E2E test passed!")
 
         finally:
             if execution_id:

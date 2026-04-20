@@ -85,7 +85,9 @@ def spec_resource() -> str:
     """The current SPEC.md, or a hint if none exists."""
     text = _read_text_safe(_dirigent_dir() / "SPEC.md")
     if text is None:
-        return "(no SPEC.md in .dirigent/ — run /dirigent:hi or /dirigent:generate-spec to create one)"
+        return (
+            "(no SPEC.md in .dirigent/ — run /dirigent:hi or /dirigent:generate-spec to create one)"
+        )
     return text
 
 

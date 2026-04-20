@@ -20,6 +20,7 @@ from pathlib import Path
 # Arg parsing
 # ─────────────────────────────────────────────────────────────
 
+
 def parse_args():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--dangerously-skip-permissions", action="store_true")
@@ -68,6 +69,7 @@ def detect_skill(prompt: str) -> str:
 # Helpers
 # ─────────────────────────────────────────────────────────────
 
+
 def dirigent_dir() -> Path:
     d = Path(os.getcwd()) / ".dirigent"
     d.mkdir(parents=True, exist_ok=True)
@@ -85,14 +87,20 @@ def git_commit(msg: str):
         ["git", "commit", "-m", msg],
         cwd=os.getcwd(),
         check=False,
-        env={**os.environ, "GIT_AUTHOR_NAME": "fake-claude", "GIT_AUTHOR_EMAIL": "fake@claude.test",
-             "GIT_COMMITTER_NAME": "fake-claude", "GIT_COMMITTER_EMAIL": "fake@claude.test"},
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "fake-claude",
+            "GIT_AUTHOR_EMAIL": "fake@claude.test",
+            "GIT_COMMITTER_NAME": "fake-claude",
+            "GIT_COMMITTER_EMAIL": "fake@claude.test",
+        },
     )
 
 
 # ─────────────────────────────────────────────────────────────
 # Skill handlers
 # ─────────────────────────────────────────────────────────────
+
 
 def handle_create_plan(prompt: str):
     plan = {
@@ -182,7 +190,7 @@ def handle_create_contract(prompt: str):
             {
                 "id": f"AC-{phase_id}-02",
                 "description": "Core function returns expected value",
-                "verification": f"Run: python -c \"from src.task_{phase_id.replace('-','_')}_01 import *; print('ok')\"",
+                "verification": f"Run: python -c \"from src.task_{phase_id.replace('-', '_')}_01 import *; print('ok')\"",
                 "layer": "user-journey",
             },
         ],
@@ -281,7 +289,8 @@ def handle_greenfield_scaffold(prompt: str):
 
     # Write ARCHITECTURE.md with the three sections
     arch = cwd / "ARCHITECTURE.md"
-    arch.write_text("""\
+    arch.write_text(
+        """\
 # Architecture
 
 <testing-verification>
@@ -350,17 +359,22 @@ start.sh
 - Naming: snake_case for files and functions
 - Config access: pydantic-settings from .env
 </key-patterns>
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
     # Write start.sh
     start_sh = cwd / "start.sh"
-    start_sh.write_text("""\
+    start_sh.write_text(
+        """\
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
 uv sync
 exec uv run streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
     start_sh.chmod(0o755)
 
     # Write test-harness.json

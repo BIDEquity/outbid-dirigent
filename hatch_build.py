@@ -7,6 +7,7 @@ a fallback when git isn't available (e.g. wheel installed from PyPI).
 Gracefully degrades to COMMIT = "unknown" when git isn't available at build
 time (e.g. building from an archive or a non-git source tree).
 """
+
 import subprocess
 from pathlib import Path
 

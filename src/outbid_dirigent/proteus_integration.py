@@ -8,7 +8,7 @@ import subprocess
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Dict
 
 from outbid_dirigent.logger import get_logger
 
@@ -123,7 +123,7 @@ class ProteusIntegration:
         """Phase 1: Survey - Architektur-Profil erstellen."""
         self.logger.info("Proteus Phase 1: Survey...")
 
-        prompt = f"""Führe eine Proteus Survey auf diesem Repository durch.
+        prompt = """Führe eine Proteus Survey auf diesem Repository durch.
 
 Erstelle das Verzeichnis .proteus/ falls es nicht existiert.
 
@@ -449,10 +449,12 @@ Diese Dependency Map ist kritisch für die Migration.
                     rules = data.get("rules", [])
                     # Alle Rules als Kontext (könnte gefiltert werden)
                     if rules:
-                        rules_text = "\n".join([
-                            f"- [{r.get('id', 'N/A')}] {r.get('name', 'Unknown')}: {r.get('description', '')}"
-                            for r in rules[:20]  # Max 20 Rules
-                        ])
+                        rules_text = "\n".join(
+                            [
+                                f"- [{r.get('id', 'N/A')}] {r.get('name', 'Unknown')}: {r.get('description', '')}"
+                                for r in rules[:20]  # Max 20 Rules
+                            ]
+                        )
                         context_parts.append(f"## Business Rules\n{rules_text}")
             except Exception:
                 pass

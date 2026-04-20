@@ -8,7 +8,6 @@ This module handles communication with the portal API for:
 - Error reporting
 """
 
-import json
 import time
 from typing import Any, Dict, List, Optional
 from pathlib import Path
@@ -85,10 +84,13 @@ class PortalReporter:
 
         Stages: 'analysis', 'routing', 'manifest', 'planning', 'execution', 'shipping'
         """
-        return self._send_event("stage_start", {
-            "stage": stage,
-            "description": description,
-        })
+        return self._send_event(
+            "stage_start",
+            {
+                "stage": stage,
+                "description": description,
+            },
+        )
 
     def stage_complete(
         self,
@@ -114,14 +116,17 @@ class PortalReporter:
         confidence: str,
     ) -> bool:
         """Send the analysis result summary."""
-        return self._send_event("analysis_result", {
-            "language": language,
-            "framework": framework,
-            "commitCount": commit_count,
-            "fileCount": file_count,
-            "route": route,
-            "confidence": confidence,
-        })
+        return self._send_event(
+            "analysis_result",
+            {
+                "language": language,
+                "framework": framework,
+                "commitCount": commit_count,
+                "fileCount": file_count,
+                "route": route,
+                "confidence": confidence,
+            },
+        )
 
     def route_determined(
         self,
@@ -131,12 +136,15 @@ class PortalReporter:
         estimated_tasks: int,
     ) -> bool:
         """Send the routing decision."""
-        return self._send_event("route_determined", {
-            "routeType": route_type,
-            "reason": reason,
-            "steps": steps,
-            "estimatedTasks": estimated_tasks,
-        })
+        return self._send_event(
+            "route_determined",
+            {
+                "routeType": route_type,
+                "reason": reason,
+                "steps": steps,
+                "estimatedTasks": estimated_tasks,
+            },
+        )
 
     def testing_complete(self, success: bool, dirigent_dir: Optional[Path] = None) -> bool:
         """Send testing completion."""
@@ -156,11 +164,14 @@ class PortalReporter:
         expected_files_count: int = 0,
     ) -> bool:
         """Signal that a contract was created for a phase."""
-        return self._send_event("contract_created", {
-            "phaseId": phase_id,
-            "criteriaCount": criteria_count,
-            "expectedFilesCount": expected_files_count,
-        })
+        return self._send_event(
+            "contract_created",
+            {
+                "phaseId": phase_id,
+                "criteriaCount": criteria_count,
+                "expectedFilesCount": expected_files_count,
+            },
+        )
 
     def review_result(
         self,
@@ -173,15 +184,18 @@ class PortalReporter:
         warn_count: int = 0,
     ) -> bool:
         """Signal the result of a phase review."""
-        return self._send_event("review_result", {
-            "phaseId": phase_id,
-            "verdict": verdict,
-            "iteration": iteration,
-            "passedCount": passed_count,
-            "failedCount": failed_count,
-            "criticalCount": critical_count,
-            "warnCount": warn_count,
-        })
+        return self._send_event(
+            "review_result",
+            {
+                "phaseId": phase_id,
+                "verdict": verdict,
+                "iteration": iteration,
+                "passedCount": passed_count,
+                "failedCount": failed_count,
+                "criticalCount": critical_count,
+                "warnCount": warn_count,
+            },
+        )
 
     def review_fix(
         self,
@@ -190,11 +204,14 @@ class PortalReporter:
         success: bool,
     ) -> bool:
         """Signal that fixes were applied for a failed review."""
-        return self._send_event("review_fix", {
-            "phaseId": phase_id,
-            "iteration": iteration,
-            "success": success,
-        })
+        return self._send_event(
+            "review_fix",
+            {
+                "phaseId": phase_id,
+                "iteration": iteration,
+                "success": success,
+            },
+        )
 
     # ══════════════════════════════════════════
     # PLAN EVENTS
@@ -248,10 +265,13 @@ class PortalReporter:
 
     def search(self, query: str, results_count: int = 0) -> bool:
         """Send a search event."""
-        return self._send_event("search", {
-            "query": query,
-            "resultsCount": results_count,
-        })
+        return self._send_event(
+            "search",
+            {
+                "query": query,
+                "resultsCount": results_count,
+            },
+        )
 
     def tool_use(
         self,
@@ -277,20 +297,26 @@ class PortalReporter:
     ) -> bool:
         """Send a progress update."""
         percent = round(tasks_complete / total_tasks * 100) if total_tasks > 0 else 0
-        return self._send_event("progress", {
-            "tasksComplete": tasks_complete,
-            "totalTasks": total_tasks,
-            "phasesComplete": phases_complete,
-            "percentComplete": percent,
-        })
+        return self._send_event(
+            "progress",
+            {
+                "tasksComplete": tasks_complete,
+                "totalTasks": total_tasks,
+                "phasesComplete": phases_complete,
+                "percentComplete": percent,
+            },
+        )
 
     def task_start(self, task_id: str, task_name: str) -> bool:
         """Signal that a task has started."""
         self._current_task_id = task_id
-        return self._send_event("task_start", {
-            "taskId": task_id,
-            "name": task_name,
-        })
+        return self._send_event(
+            "task_start",
+            {
+                "taskId": task_id,
+                "name": task_name,
+            },
+        )
 
     def task_complete(
         self,
@@ -309,11 +335,14 @@ class PortalReporter:
     def phase_start(self, phase_id: str, phase_name: str, task_count: int = 0) -> bool:
         """Signal that a phase has started."""
         self._current_phase = int(phase_id) if phase_id.isdigit() else None
-        return self._send_event("phase_start", {
-            "phase": self._current_phase or phase_id,
-            "name": phase_name,
-            "taskCount": task_count,
-        })
+        return self._send_event(
+            "phase_start",
+            {
+                "phase": self._current_phase or phase_id,
+                "name": phase_name,
+                "taskCount": task_count,
+            },
+        )
 
     def phase_complete(
         self,
@@ -324,13 +353,16 @@ class PortalReporter:
         commit_count: int = 0,
     ) -> bool:
         """Signal that a phase has completed."""
-        return self._send_event("phase_complete", {
-            "phase": int(phase_id) if phase_id.isdigit() else phase_id,
-            "name": phase_name,
-            "tasksCompleted": tasks_completed,
-            "deviationCount": deviation_count,
-            "commitCount": commit_count,
-        })
+        return self._send_event(
+            "phase_complete",
+            {
+                "phase": int(phase_id) if phase_id.isdigit() else phase_id,
+                "name": phase_name,
+                "tasksCompleted": tasks_completed,
+                "deviationCount": deviation_count,
+                "commitCount": commit_count,
+            },
+        )
 
     # ══════════════════════════════════════════
     # ERROR & COMPLETION EVENTS
@@ -338,17 +370,23 @@ class PortalReporter:
 
     def error(self, message: str, fatal: bool = False) -> bool:
         """Send an error event."""
-        return self._send_event("error", {
-            "message": message,
-            "fatal": fatal,
-        })
+        return self._send_event(
+            "error",
+            {
+                "message": message,
+                "fatal": fatal,
+            },
+        )
 
     def deviation(self, severity: str, message: str) -> bool:
         """Send a deviation event."""
-        return self._send_event("deviation", {
-            "severity": severity,
-            "message": message,
-        })
+        return self._send_event(
+            "deviation",
+            {
+                "severity": severity,
+                "message": message,
+            },
+        )
 
     def complete(
         self,
@@ -387,19 +425,22 @@ class PortalReporter:
         total_commits: int = 0,
     ) -> bool:
         """Send the final summary event."""
-        return self._send_event("summary", {
-            "markdown": markdown,
-            "filesChanged": files_changed,
-            "decisions": decisions,
-            "deviations": deviations,
-            "totalCostCents": total_cost_cents,
-            "totalInputTokens": total_input_tokens,
-            "totalOutputTokens": total_output_tokens,
-            "branchName": branch_name,
-            "prUrl": pr_url,
-            "durationMs": duration_ms,
-            "totalCommits": total_commits,
-        })
+        return self._send_event(
+            "summary",
+            {
+                "markdown": markdown,
+                "filesChanged": files_changed,
+                "decisions": decisions,
+                "deviations": deviations,
+                "totalCostCents": total_cost_cents,
+                "totalInputTokens": total_input_tokens,
+                "totalOutputTokens": total_output_tokens,
+                "branchName": branch_name,
+                "prUrl": pr_url,
+                "durationMs": duration_ms,
+                "totalCommits": total_commits,
+            },
+        )
 
 
 def create_portal_reporter(

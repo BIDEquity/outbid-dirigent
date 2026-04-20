@@ -83,11 +83,13 @@ class OpenCodeBridge:
                 converted += 1
 
             meta = self._extract_frontmatter(dst if dst.exists() else src)
-            self._catalog.append({
-                "name": meta.get("name", name),
-                "description": meta.get("description", ""),
-                "type": "skill",
-            })
+            self._catalog.append(
+                {
+                    "name": meta.get("name", name),
+                    "description": meta.get("description", ""),
+                    "type": "skill",
+                }
+            )
 
         # Convert agents: .opencode/agents/{name}.md → skills/agent-{name}/SKILL.md
         if self.agents_dir.is_dir():
@@ -103,11 +105,13 @@ class OpenCodeBridge:
                     converted += 1
 
                 meta = self._extract_frontmatter(dst if dst.exists() else src)
-                self._catalog.append({
-                    "name": meta.get("name", agent_file.stem),
-                    "description": meta.get("description", "").split("\n")[0][:200],
-                    "type": "agent",
-                })
+                self._catalog.append(
+                    {
+                        "name": meta.get("name", agent_file.stem),
+                        "description": meta.get("description", "").split("\n")[0][:200],
+                        "type": "agent",
+                    }
+                )
 
         if not self._catalog:
             return None
@@ -121,9 +125,7 @@ class OpenCodeBridge:
             "description": f"Project conventions imported from {self.repo_path.name}/.opencode",
             "version": "1.0.0",
         }
-        (manifest_dir / "plugin.json").write_text(
-            json.dumps(manifest, indent=2), encoding="utf-8"
-        )
+        (manifest_dir / "plugin.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
         skill_count = sum(1 for c in self._catalog if c["type"] == "skill")
         agent_count = sum(1 for c in self._catalog if c["type"] == "agent")

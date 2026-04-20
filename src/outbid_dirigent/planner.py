@@ -19,7 +19,13 @@ from outbid_dirigent.utils import strict_json_schema
 class Planner:
     """Creates PLAN.json via Claude Code."""
 
-    def __init__(self, repo_path: Path, spec_content: str, runner: TaskRunner, dirigent_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        repo_path: Path,
+        spec_content: str,
+        runner: TaskRunner,
+        dirigent_dir: Optional[Path] = None,
+    ):
         self.repo_path = repo_path
         self.spec_content = spec_content
         self.runner = runner
@@ -37,7 +43,10 @@ class Planner:
 
         success, structured = self.runner._run_claude_structured(
             prompt,
-            output_format={"type": "json_schema", "schema": strict_json_schema(Plan.model_json_schema())},
+            output_format={
+                "type": "json_schema",
+                "schema": strict_json_schema(Plan.model_json_schema()),
+            },
             timeout=1800,
         )
         if not success or structured is None:

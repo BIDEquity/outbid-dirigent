@@ -21,22 +21,23 @@ from outbid_dirigent.contract import ContractManager
 from outbid_dirigent.init_phase import InitPhase
 from outbid_dirigent.brv_bridge import BrvBridge
 from outbid_dirigent.opencode_bridge import OpenCodeBridge
-from outbid_dirigent.oracle import Oracle, create_oracle
+from outbid_dirigent.oracle import create_oracle
 from outbid_dirigent.plan_schema import Plan
 from outbid_dirigent.planner import Planner
 from outbid_dirigent.progress import ProgressRenderer
-from outbid_dirigent.proteus_integration import ProteusIntegration, create_proteus_integration
+from outbid_dirigent.proteus_integration import create_proteus_integration
 from outbid_dirigent.contract_schema import Review
 
-from outbid_dirigent.router import load_state, save_state, mark_step_complete
+from outbid_dirigent.router import load_state, save_state
 from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.shipper import Shipper
-from outbid_dirigent.task_runner import TaskRunner, TaskResult
+from outbid_dirigent.task_runner import TaskRunner
 from outbid_dirigent.test_harness_schema import TestHarness
 
 
 class _NullLogger:
     """Drop-in no-op for DirigentLogger when unavailable (avoids 22 None-guards)."""
+
     _start_time = None
     _total_commits = 0
 
@@ -55,16 +56,16 @@ class _NullLogger:
 # Cache pricing: reads = 0.1x input, writes = 1.25x input
 CLAUDE_PRICING = {
     # Opus models
-    "claude-opus-4-5": (5.0, 25.0),    # Opus 4.5/4.6
-    "claude-4-opus": (15.0, 75.0),      # Opus 4/4.1
+    "claude-opus-4-5": (5.0, 25.0),  # Opus 4.5/4.6
+    "claude-4-opus": (15.0, 75.0),  # Opus 4/4.1
     # Sonnet models
-    "claude-sonnet-4": (3.0, 15.0),     # Sonnet 4/4.5/4.6
-    "claude-3-5-sonnet": (3.0, 15.0),   # Sonnet 3.5
-    "claude-3-sonnet": (3.0, 15.0),     # Sonnet 3
+    "claude-sonnet-4": (3.0, 15.0),  # Sonnet 4/4.5/4.6
+    "claude-3-5-sonnet": (3.0, 15.0),  # Sonnet 3.5
+    "claude-3-sonnet": (3.0, 15.0),  # Sonnet 3
     # Haiku models
-    "claude-haiku-4": (1.0, 5.0),       # Haiku 4.5
-    "claude-3-5-haiku": (0.80, 4.0),    # Haiku 3.5
-    "claude-3-haiku": (0.25, 1.25),     # Haiku 3
+    "claude-haiku-4": (1.0, 5.0),  # Haiku 4.5
+    "claude-3-5-haiku": (0.80, 4.0),  # Haiku 3.5
+    "claude-3-haiku": (0.25, 1.25),  # Haiku 3
 }
 
 # Fallback pricing if model not matched (use Sonnet pricing as reasonable default)
@@ -151,6 +152,7 @@ class Executor:
         # Compact spec — best-effort, never aborts the run.
         # Writes $DIRIGENT_RUN_DIR/SPEC.compact.json which task_runner consumes.
         from outbid_dirigent.spec_compactor import compact_spec
+
         try:
             compact_spec(self.spec_content, dirigent_dir=self.dirigent_dir)
         except Exception as e:
@@ -189,7 +191,9 @@ class Executor:
             self.runner.brv_bridge = brv
 
         # Contract manager for review/fix iteration loop
-        self.contract_manager = ContractManager(self.repo_path, self.runner, dirigent_dir=self.dirigent_dir)
+        self.contract_manager = ContractManager(
+            self.repo_path, self.runner, dirigent_dir=self.dirigent_dir
+        )
 
         # Init phase handler
         self.init_phase = InitPhase(self.repo_path, self.runner, dirigent_dir=self.dirigent_dir)
@@ -204,6 +208,7 @@ class Executor:
         # Legacy logger bridge — keep the old logger working until fully migrated
         try:
             from outbid_dirigent.logger import get_logger
+
             self._legacy_logger = get_logger()
         except Exception:
             self._legacy_logger = _NullLogger()
@@ -240,7 +245,9 @@ class Executor:
         """Propose test setup and architecture best practices for greenfield projects."""
         logger.info("Running greenfield scaffold...")
         prompt = "Run /dirigent:greenfield-scaffold"
-        success, _, stderr = self.runner._run_claude(prompt, timeout=900, component="greenfield-scaffold")
+        success, _, stderr = self.runner._run_claude(
+            prompt, timeout=900, component="greenfield-scaffold"
+        )
 
         if not success:
             logger.error(f"Greenfield scaffold failed: {stderr[:200]}")
@@ -263,7 +270,9 @@ class Executor:
         """Run testability analysis and produce recommendations."""
         logger.info("Running testability analysis...")
         prompt = "Run /dirigent:increase-testability"
-        success, _, stderr = self.runner._run_claude(prompt, timeout=600, component="increase-testability")
+        success, _, stderr = self.runner._run_claude(
+            prompt, timeout=600, component="increase-testability"
+        )
 
         if not success:
             logger.error(f"Testability analysis failed: {stderr[:200]}")
@@ -364,6 +373,7 @@ class Executor:
         if proteus_rules:
             logger.info("Re-compacting spec with Proteus business rules...")
             from outbid_dirigent.spec_compactor import compact_spec
+
             try:
                 compact_spec(
                     self.spec_content,
@@ -424,7 +434,9 @@ class Executor:
                 "name": p.name,
                 "description": p.description,
                 "taskCount": len(p.tasks),
-                "tasks": [{"id": t.id, "name": t.name, "description": t.description} for t in p.tasks],
+                "tasks": [
+                    {"id": t.id, "name": t.name, "description": t.description} for t in p.tasks
+                ],
             }
             for p in plan.phases
         ]
@@ -441,7 +453,9 @@ class Executor:
         plan = Plan.load(plan_path)
         if not plan:
             if plan_path.exists():
-                logger.error("PLAN.json exists but failed validation — check logs above for details")
+                logger.error(
+                    "PLAN.json exists but failed validation — check logs above for details"
+                )
             else:
                 logger.error("No PLAN.json found at %s", plan_path)
             return False
@@ -453,6 +467,7 @@ class Executor:
 
         # Interactive mode check
         from outbid_dirigent.dirigent import get_questioner, get_execution_mode
+
         questioner = get_questioner()
         execution_mode = get_execution_mode()
 
@@ -463,11 +478,17 @@ class Executor:
                 context=f"Geschätzte Zeit: {total_tasks * 5} Minuten.",
                 phase=0,
             )
-            if result.answered and result.answer and ("abbrechen" in result.answer.lower() or "nein" in result.answer.lower()):
+            if (
+                result.answered
+                and result.answer
+                and ("abbrechen" in result.answer.lower() or "nein" in result.answer.lower())
+            ):
                 logger.info("Execution cancelled by user")
                 return False
         else:
-            self._legacy_logger.info(f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks")
+            self._legacy_logger.info(
+                f"Starte Ausführung: {total_phases} Phasen, {total_tasks} Tasks"
+            )
 
         for phase in plan.phases:
             if phase.id in state.get("completed_phases", []):
@@ -492,7 +513,9 @@ class Executor:
                     phase_tasks_completed += 1
                     continue
 
-                self._legacy_logger.task_start(task.id, task.name, phase=int(phase.id) if phase.id.isdigit() else 0)
+                self._legacy_logger.task_start(
+                    task.id, task.name, phase=int(phase.id) if phase.id.isdigit() else 0
+                )
 
                 result = self.runner.run_task(task, plan, phase_num=phase.id)
 
@@ -504,35 +527,61 @@ class Executor:
                     if result.commit_hash:
                         phase_commit_count += 1
                     for dev in result.deviations:
-                        self._legacy_logger.deviation(dev["type"], dev["description"], task_id=task.id, phase=int(phase.id) if phase.id.isdigit() else 0)
-                    self._legacy_logger.task_done(task.id, result.commit_hash, task_name=task.name, phase=int(phase.id) if phase.id.isdigit() else 0)
+                        self._legacy_logger.deviation(
+                            dev["type"],
+                            dev["description"],
+                            task_id=task.id,
+                            phase=int(phase.id) if phase.id.isdigit() else 0,
+                        )
+                    self._legacy_logger.task_done(
+                        task.id,
+                        result.commit_hash,
+                        task_name=task.name,
+                        phase=int(phase.id) if phase.id.isdigit() else 0,
+                    )
                 else:
-                    state.setdefault("failed_tasks", []).append({
-                        "task_id": task.id,
-                        "error": result.summary,
-                        "attempts": result.attempts,
-                    })
+                    state.setdefault("failed_tasks", []).append(
+                        {
+                            "task_id": task.id,
+                            "error": result.summary,
+                            "attempts": result.attempts,
+                        }
+                    )
                     save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
                     logger.error(f"Task {task.id} failed after {result.attempts} attempts")
-                    self._legacy_logger.stop(f"Task {task.id} fehlgeschlagen nach {result.attempts} Versuchen")
+                    self._legacy_logger.stop(
+                        f"Task {task.id} fehlgeschlagen nach {result.attempts} Versuchen"
+                    )
                     self._legacy_logger.run_complete(success=False)
                     return False
 
             review_passed = self._review_phase(phase, plan)
             if not review_passed:
-                state.setdefault("failed_phases", []).append({"phase_id": phase.id, "reason": "review_failed"})
+                state.setdefault("failed_phases", []).append(
+                    {"phase_id": phase.id, "reason": "review_failed"}
+                )
                 save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
                 if self.force_continue:
-                    logger.warning(f"Phase {phase.id} review failed — continuing anyway (--force-continue)")
+                    logger.warning(
+                        f"Phase {phase.id} review failed — continuing anyway (--force-continue)"
+                    )
                 else:
-                    logger.error(f"Phase {phase.id} review failed — halting execution. Fix issues and --resume to retry.")
+                    logger.error(
+                        f"Phase {phase.id} review failed — halting execution. Fix issues and --resume to retry."
+                    )
                     self._legacy_logger.stop(f"Phase {phase.id} review failed")
                     self._legacy_logger.run_complete(success=False)
                     return False
 
             state.setdefault("completed_phases", []).append(phase.id)
             save_state(str(self.repo_path), state, dirigent_dir=self.dirigent_dir)
-            self._legacy_logger.phase_complete(phase.id, phase.name, phase_tasks_completed, phase_deviation_count, phase_commit_count)
+            self._legacy_logger.phase_complete(
+                phase.id,
+                phase.name,
+                phase_tasks_completed,
+                phase_deviation_count,
+                phase_commit_count,
+            )
 
         # NOTE: run_complete() is called by finalize() after shipping, not here
         return True
@@ -623,10 +672,13 @@ class Executor:
                 if not self._run_verification_cmd(cmd.command, key, timeout=timeout):
                     all_passed = False
 
-        logger.info("All verification commands passed") if all_passed else logger.error("Verification failed — blocking ship")
+        logger.info("All verification commands passed") if all_passed else logger.error(
+            "Verification failed — blocking ship"
+        )
 
         # Notify portal that testing is complete
         from outbid_dirigent.dirigent import get_portal_reporter
+
         reporter = get_portal_reporter()
         if reporter and hasattr(reporter, "testing_complete"):
             reporter.testing_complete(str(self.repo_path))
@@ -638,7 +690,10 @@ class Executor:
         try:
             result = subprocess.run(
                 ["bash", "-c", command],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=timeout,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
             )
             if result.returncode == 0:
                 logger.info(f"  PASS: {name}")
@@ -679,14 +734,20 @@ class Executor:
     # SUMMARY GENERATION
     # ══════════════════════════════════════════
 
-    def generate_summary(self, branch_name: Optional[str] = None, pr_url: Optional[str] = None) -> dict:
+    def generate_summary(
+        self, branch_name: Optional[str] = None, pr_url: Optional[str] = None
+    ) -> dict:
         """Generate the final execution report."""
         logger.info("Generating summary...")
 
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
         plan_title = plan.title if plan else "Feature"
 
-        summaries = [f.read_text(encoding="utf-8") for f in sorted(self.summaries_dir.glob("*-SUMMARY.md"))] if self.summaries_dir.exists() else []
+        summaries = (
+            [f.read_text(encoding="utf-8") for f in sorted(self.summaries_dir.glob("*-SUMMARY.md"))]
+            if self.summaries_dir.exists()
+            else []
+        )
         decisions = self.oracle.get_all_decisions()
         files_changed = self._get_files_changed()
         deviations = self._collect_all_deviations(summaries)
@@ -712,12 +773,25 @@ class Executor:
         # 3. The daemon would forward the legacy event first, causing the portal to reject our accurate one
 
         self._send_summary_to_portal(
-            markdown, files_changed, decisions, deviations, branch_name, pr_url,
-            test_instructions, manual_hints
+            markdown,
+            files_changed,
+            decisions,
+            deviations,
+            branch_name,
+            pr_url,
+            test_instructions,
+            manual_hints,
         )
 
-        return {"markdown": markdown, "files_changed": files_changed, "decisions": decisions,
-                "deviations": deviations, "cost_totals": cost_totals, "branch_name": branch_name, "pr_url": pr_url}
+        return {
+            "markdown": markdown,
+            "files_changed": files_changed,
+            "decisions": decisions,
+            "deviations": deviations,
+            "cost_totals": cost_totals,
+            "branch_name": branch_name,
+            "pr_url": pr_url,
+        }
 
     # ── Summary helpers ──
 
@@ -725,7 +799,10 @@ class Executor:
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                cwd=self.repo_path, capture_output=True, text=True, timeout=10,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             return result.stdout.strip() if result.returncode == 0 else None
         except Exception:
@@ -747,7 +824,10 @@ class Executor:
                 # Use --since to get only commits from this execution
                 result = subprocess.run(
                     ["git", "log", "--since", started_at, "--format=%H", "--reverse"],
-                    cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
                 commits = [c.strip() for c in result.stdout.strip().split("\n") if c.strip()]
 
@@ -767,17 +847,22 @@ class Executor:
 
             result = subprocess.run(
                 diff_cmd,
-                cwd=self.repo_path, capture_output=True, text=True, timeout=30,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             files = []
             for line in result.stdout.strip().split("\n"):
                 parts = line.split("\t") if line else []
                 if len(parts) == 3:
-                    files.append({
-                        "path": parts[2],
-                        "lines_added": int(parts[0]) if parts[0] != '-' else 0,
-                        "lines_removed": int(parts[1]) if parts[1] != '-' else 0,
-                    })
+                    files.append(
+                        {
+                            "path": parts[2],
+                            "lines_added": int(parts[0]) if parts[0] != "-" else 0,
+                            "lines_removed": int(parts[1]) if parts[1] != "-" else 0,
+                        }
+                    )
             return files
         except Exception as e:
             logger.debug(f"Error getting files changed: {e}")
@@ -790,8 +875,14 @@ class Executor:
         return all_devs
 
     def _generate_summary_markdown(
-        self, title: str, plan: Optional[Plan], summaries: list[str],
-        decisions: list[dict], files: list[dict], deviations: list[dict], cost_totals: dict,
+        self,
+        title: str,
+        plan: Optional[Plan],
+        summaries: list[str],
+        decisions: list[dict],
+        files: list[dict],
+        deviations: list[dict],
+        cost_totals: dict,
     ) -> str:
         phases_count = len(plan.phases) if plan else 0
         tasks_count = plan.total_tasks if plan else 0
@@ -806,7 +897,9 @@ class Executor:
         md.append(f"- **Deviations:** {len(deviations)}")
         md.append(f"- **Oracle-Entscheidungen:** {len(decisions)}")
         md.append(f"- **API-Kosten:** ${cost_usd:.2f}")
-        md.append(f"- **Tokens:** {cost_totals['total_input_tokens']:,} in / {cost_totals['total_output_tokens']:,} out\n")
+        md.append(
+            f"- **Tokens:** {cost_totals['total_input_tokens']:,} in / {cost_totals['total_output_tokens']:,} out\n"
+        )
 
         # Test instructions from spec acceptance criteria
         test_instructions = self._extract_test_instructions()
@@ -837,7 +930,7 @@ class Executor:
         if decisions:
             md.append("## Oracle-Entscheidungen\n")
             for d in decisions[:15]:
-                q = d['question'][:100] + "..." if len(d['question']) > 100 else d['question']
+                q = d["question"][:100] + "..." if len(d["question"]) > 100 else d["question"]
                 md.append(f"**Q:** {q}\n**A:** {d['decision']}\n*{d['reason']}*\n")
 
         if deviations:
@@ -871,7 +964,8 @@ class Executor:
             # Find acceptance criteria section
             ac_match = re.search(
                 r"##\s*(?:Acceptance Criteria|Akzeptanzkriterien|AC)\s*\n(.*?)(?=\n##|\Z)",
-                content, re.DOTALL | re.IGNORECASE
+                content,
+                re.DOTALL | re.IGNORECASE,
             )
             if not ac_match:
                 return []
@@ -896,22 +990,57 @@ class Executor:
         hints = []
 
         # Categorize files
-        ui_files = [f for f in files if any(x in f["path"].lower() for x in
-            ["component", "page", "view", ".tsx", ".jsx", ".vue", ".svelte", "template"])]
-        api_files = [f for f in files if any(x in f["path"].lower() for x in
-            ["api/", "route", "endpoint", "controller", "handler"])]
-        test_files = [f for f in files if any(x in f["path"].lower() for x in
-            ["test", "spec", ".test.", ".spec."])]
-        migration_files = [f for f in files if any(x in f["path"].lower() for x in
-            ["migration", "schema", ".sql"])]
-        config_files = [f for f in files if any(x in f["path"].lower() for x in
-            ["config", ".env", "settings", "package.json", "requirements"])]
+        ui_files = [
+            f
+            for f in files
+            if any(
+                x in f["path"].lower()
+                for x in [
+                    "component",
+                    "page",
+                    "view",
+                    ".tsx",
+                    ".jsx",
+                    ".vue",
+                    ".svelte",
+                    "template",
+                ]
+            )
+        ]
+        api_files = [
+            f
+            for f in files
+            if any(
+                x in f["path"].lower()
+                for x in ["api/", "route", "endpoint", "controller", "handler"]
+            )
+        ]
+        test_files = [
+            f
+            for f in files
+            if any(x in f["path"].lower() for x in ["test", "spec", ".test.", ".spec."])
+        ]
+        migration_files = [
+            f for f in files if any(x in f["path"].lower() for x in ["migration", "schema", ".sql"])
+        ]
+        config_files = [
+            f
+            for f in files
+            if any(
+                x in f["path"].lower()
+                for x in ["config", ".env", "settings", "package.json", "requirements"]
+            )
+        ]
 
         if ui_files:
-            hints.append(f"UI-Änderungen in {len(ui_files)} Dateien - Browser öffnen und visuell prüfen")
+            hints.append(
+                f"UI-Änderungen in {len(ui_files)} Dateien - Browser öffnen und visuell prüfen"
+            )
 
         if api_files:
-            hints.append(f"API-Änderungen in {len(api_files)} Dateien - API-Endpunkte mit Postman/curl testen")
+            hints.append(
+                f"API-Änderungen in {len(api_files)} Dateien - API-Endpunkte mit Postman/curl testen"
+            )
 
         if not test_files and (ui_files or api_files):
             hints.append("Keine Tests hinzugefügt - manuelle Tests empfohlen")
@@ -957,7 +1086,9 @@ class Executor:
         total_cost_cents = 0.0
         files_processed = 0
         files_skipped = 0
-        usage_by_model: dict[str, dict] = {}  # model -> {input, output, cache_read, cache_write, cost}
+        usage_by_model: dict[
+            str, dict
+        ] = {}  # model -> {input, output, cache_read, cache_write, cost}
 
         # Get execution start time from state
         state = load_state(str(self.repo_path), dirigent_dir=self.dirigent_dir)
@@ -973,7 +1104,14 @@ class Executor:
         claude_projects_dir = Path.home() / ".claude" / "projects"
         if not claude_projects_dir.exists():
             logger.warning(f"Claude projects directory not found: {claude_projects_dir}")
-            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0, "cost_cents": 0, "usage_by_model": {}}
+            return {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cache_read_tokens": 0,
+                "cost_cents": 0,
+                "usage_by_model": {},
+            }
 
         # Build project key pattern from repo path (Claude uses path with dashes)
         # e.g., /home/coder/outbit-portal -> -home-coder-outbit-portal
@@ -997,8 +1135,17 @@ class Executor:
 
         if not matching_dirs:
             logger.warning(f"No Claude project directory found matching: {project_key}")
-            logger.debug(f"Available directories: {[d.name for d in claude_projects_dir.iterdir() if d.is_dir()]}")
-            return {"input_tokens": 0, "output_tokens": 0, "cache_creation_tokens": 0, "cache_read_tokens": 0, "cost_cents": 0, "usage_by_model": {}}
+            logger.debug(
+                f"Available directories: {[d.name for d in claude_projects_dir.iterdir() if d.is_dir()]}"
+            )
+            return {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cache_read_tokens": 0,
+                "cost_cents": 0,
+                "usage_by_model": {},
+            }
 
         logger.info(f"Found {len(matching_dirs)} Claude project directories matching repo")
 
@@ -1063,11 +1210,20 @@ class Executor:
                                         # - Cache reads: 0.1x input price
                                         # - Output: full output price
                                         input_cost = (input_tokens / 1_000_000) * input_price
-                                        cache_write_cost = (cache_creation / 1_000_000) * input_price * 1.25
-                                        cache_read_cost = (cache_read / 1_000_000) * input_price * 0.1
+                                        cache_write_cost = (
+                                            (cache_creation / 1_000_000) * input_price * 1.25
+                                        )
+                                        cache_read_cost = (
+                                            (cache_read / 1_000_000) * input_price * 0.1
+                                        )
                                         output_cost = (output_tokens / 1_000_000) * output_price
 
-                                        message_cost = input_cost + cache_write_cost + cache_read_cost + output_cost
+                                        message_cost = (
+                                            input_cost
+                                            + cache_write_cost
+                                            + cache_read_cost
+                                            + output_cost
+                                        )
                                         total_cost_cents += message_cost * 100  # Convert to cents
 
                                         # Track by model
@@ -1082,7 +1238,9 @@ class Executor:
                                         usage_by_model[model]["input_tokens"] += input_tokens
                                         usage_by_model[model]["output_tokens"] += output_tokens
                                         usage_by_model[model]["cache_read_tokens"] += cache_read
-                                        usage_by_model[model]["cache_write_tokens"] += cache_creation
+                                        usage_by_model[model]["cache_write_tokens"] += (
+                                            cache_creation
+                                        )
                                         usage_by_model[model]["cost_cents"] += message_cost * 100
                             except json.JSONDecodeError:
                                 continue
@@ -1094,16 +1252,20 @@ class Executor:
         total_in = total_input + total_cache_creation + total_cache_read
         cost_usd = total_cost_cents / 100
 
-        logger.info(f"Collected token usage from {files_processed} transcript files "
-                   f"(skipped {files_skipped} older files): "
-                   f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
-                   f"{total_output:,} output, ${cost_usd:.4f} estimated cost")
+        logger.info(
+            f"Collected token usage from {files_processed} transcript files "
+            f"(skipped {files_skipped} older files): "
+            f"{total_in:,} input (raw: {total_input:,}, cache_create: {total_cache_creation:,}, cache_read: {total_cache_read:,}), "
+            f"{total_output:,} output, ${cost_usd:.4f} estimated cost"
+        )
 
         # Log breakdown by model if multiple models used
         if len(usage_by_model) > 1:
             for model, stats in sorted(usage_by_model.items(), key=lambda x: -x[1]["cost_cents"]):
-                logger.debug(f"  {model}: {stats['input_tokens']:,} in, {stats['output_tokens']:,} out, "
-                           f"${stats['cost_cents']/100:.4f}")
+                logger.debug(
+                    f"  {model}: {stats['input_tokens']:,} in, {stats['output_tokens']:,} out, "
+                    f"${stats['cost_cents'] / 100:.4f}"
+                )
 
         return {
             "input_tokens": total_input + total_cache_creation + total_cache_read,
@@ -1115,10 +1277,15 @@ class Executor:
         }
 
     def _send_summary_to_portal(
-        self, markdown: str, files_changed: list[dict],
-        decisions: list[dict], deviations: list[dict],
-        branch_name: Optional[str], pr_url: Optional[str],
-        test_instructions: Optional[list[str]] = None, manual_hints: Optional[list[str]] = None,
+        self,
+        markdown: str,
+        files_changed: list[dict],
+        decisions: list[dict],
+        deviations: list[dict],
+        branch_name: Optional[str],
+        pr_url: Optional[str],
+        test_instructions: Optional[list[str]] = None,
+        manual_hints: Optional[list[str]] = None,
     ):
         # Use direct credentials from Executor, fallback to questioner
         portal_url = self.portal_url
@@ -1128,8 +1295,9 @@ class Executor:
         if not portal_url or not execution_id:
             # Try questioner as fallback
             from outbid_dirigent.dirigent import get_questioner
+
             questioner = get_questioner()
-            if questioner and hasattr(questioner, 'portal_url'):
+            if questioner and hasattr(questioner, "portal_url"):
                 portal_url = questioner.portal_url
                 execution_id = questioner.execution_id
                 reporter_token = questioner.reporter_token
@@ -1141,8 +1309,10 @@ class Executor:
         # Collect token usage directly from Claude Code transcripts
         token_usage = self._collect_token_usage()
         cost_cents = token_usage.get("cost_cents", 0)
-        logger.info(f"Token usage collected: {token_usage['input_tokens']:,} input, "
-                   f"{token_usage['output_tokens']:,} output, ${cost_cents/100:.4f} cost")
+        logger.info(
+            f"Token usage collected: {token_usage['input_tokens']:,} input, "
+            f"{token_usage['output_tokens']:,} output, ${cost_cents / 100:.4f} cost"
+        )
 
         # Calculate duration
         elapsed_ms = 0
@@ -1157,7 +1327,9 @@ class Executor:
             "decisions": [
                 {"question": d["question"][:200], "decision": d["decision"], "reason": d["reason"]}
                 for d in decisions
-            ] if decisions else [],
+            ]
+            if decisions
+            else [],
             "deviations": deviations or [],
             "branchName": branch_name,
             "prUrl": pr_url,
@@ -1185,15 +1357,19 @@ class Executor:
                         "type": "summary",
                         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                         "data": summary_data,
-                    }
+                    },
                 },
                 timeout=30,
             )
             if response.ok:
-                logger.info(f"Summary sent successfully: {len(files_changed)} files, "
-                          f"{token_usage['input_tokens']:,} input tokens, ${cost_cents/100:.4f}")
+                logger.info(
+                    f"Summary sent successfully: {len(files_changed)} files, "
+                    f"{token_usage['input_tokens']:,} input tokens, ${cost_cents / 100:.4f}"
+                )
             else:
-                logger.warning(f"Summary upload failed: {response.status_code} - {response.text[:200]}")
+                logger.warning(
+                    f"Summary upload failed: {response.status_code} - {response.text[:200]}"
+                )
         except requests.RequestException as e:
             logger.error(f"Summary upload failed: {e}")
 
@@ -1240,7 +1416,9 @@ class Executor:
                 if docker_image:
                     container_name = name.lower().replace(" ", "_")
                     script_lines.append(f"# {name}")
-                    script_lines.append(f'if ! docker ps --format "{{{{.Names}}}}" | grep -q "^{container_name}$"; then')
+                    script_lines.append(
+                        f'if ! docker ps --format "{{{{.Names}}}}" | grep -q "^{container_name}$"; then'
+                    )
                     docker_cmd = f"  docker run -d --name {container_name}"
                     for env_var in env_vars:
                         docker_cmd += f' -e "{env_var}"'
@@ -1281,15 +1459,24 @@ class Executor:
             script_lines.append("fi")
 
         return self._write_preview_script(
-            script_lines, runtime.get("port", 3000), runtime.get("framework"),
-            start_command, [s.get("name") for s in services],
-            uses_doppler, runtime.get("health_check_path"),
+            script_lines,
+            runtime.get("port", 3000),
+            runtime.get("framework"),
+            start_command,
+            [s.get("name") for s in services],
+            uses_doppler,
+            runtime.get("health_check_path"),
         )
 
     def _write_preview_script(
-        self, script_lines: list[str], port: int, framework: str | None,
-        start_command: str, service_names: list[str],
-        uses_doppler: bool, health_check: str | None,
+        self,
+        script_lines: list[str],
+        port: int,
+        framework: str | None,
+        start_command: str,
+        service_names: list[str],
+        uses_doppler: bool,
+        health_check: str | None,
     ) -> bool:
         """Write the preview script and metadata."""
         script_content = "\n".join(script_lines) + "\n"
@@ -1326,13 +1513,25 @@ class Executor:
 
 
 def create_executor(
-    repo_path: str, spec_path: str,
-    dry_run: bool = False, use_proteus: bool = False,
-    model: str = "", effort: str = "",
-    portal_url: str = "", execution_id: str = "", reporter_token: str = "",
+    repo_path: str,
+    spec_path: str,
+    dry_run: bool = False,
+    use_proteus: bool = False,
+    model: str = "",
+    effort: str = "",
+    portal_url: str = "",
+    execution_id: str = "",
+    reporter_token: str = "",
 ) -> Executor:
     """Factory function for Executor."""
     return Executor(
-        repo_path, spec_path, dry_run, use_proteus, model, effort,
-        portal_url, execution_id, reporter_token,
+        repo_path,
+        spec_path,
+        dry_run,
+        use_proteus,
+        model,
+        effort,
+        portal_url,
+        execution_id,
+        reporter_token,
     )

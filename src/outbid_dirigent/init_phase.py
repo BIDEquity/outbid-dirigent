@@ -216,6 +216,7 @@ def generate_harness_from_architecture(
 
         try:
             from outbid_dirigent.logger import get_logger
+
             dlogger = get_logger()
             input_tokens = int(usage.get("input_tokens", 0) or 0)
             output_tokens = int(usage.get("output_tokens", 0) or 0)
@@ -242,9 +243,7 @@ def generate_harness_from_architecture(
         return None
 
 
-async def _aquery_harness(
-    user_prompt: str, model: str
-) -> tuple[Optional[dict], dict]:
+async def _aquery_harness(user_prompt: str, model: str) -> tuple[Optional[dict], dict]:
     """Run harness extraction via claude_agent_sdk. Returns (structured_output, usage).
 
     Drains the generator to completion before returning — see the matching
