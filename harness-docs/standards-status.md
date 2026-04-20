@@ -18,8 +18,8 @@
 | 07 · Observability, Monitoring & Tracking | 0 | 4 | 0 | 1 |
 | 08 · Security & Dependency Management | 1 | 6 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 2 |
-| 10 · Agentic Development | 3 | 13 | 0 | 8 |
-| **Total** | **13** | **58** | **1** | **27** |
+| 10 · Agentic Development | 7 | 9 | 0 | 8 |
+| **Total** | **17** | **54** | **1** | **27** |
 
 ---
 
@@ -191,16 +191,16 @@
 | Do not merge AI-generated code without human read | MUST | ⚠️ WARN | 2026-04-20 | — | CLAUDE.md rule #5 requires peer review; no explicit "human-read AI code" gate |
 | Treat AI as author under review when writing tests | MUST | ❌ FAIL | 2026-04-20 | — | No CLAUDE.md or agent-review guidance |
 | Flag AI-generated code in commits/PR descriptions | MUST | ⚠️ WARN | 2026-04-20 | — | CLAUDE.md rule #8 stated; recent commits show no AI flag |
-| Define autonomy levels in CLAUDE.md | MUST | ❌ FAIL | 2026-04-20 | — | No autonomy-tier definitions in CLAUDE.md |
-| Restrict autonomous agents to reversible actions | MUST | ⚠️ WARN | 2026-04-20 | — | CLAUDE.md rule #9 requires confirmation for irreversible actions; not framed as autonomy tiers |
+| Define autonomy levels in CLAUDE.md | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | CLAUDE.md §Agentic Development declares "Autonomy level: Semi-autonomous" |
+| Restrict autonomous agents to reversible actions | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | CLAUDE.md §Blast radius lists confirmation-required actions (force-push, deploys, migrations, external side-effect calls) |
 | Never grant production access/secrets/IAM to agents | MUST | ⚠️ WARN | 2026-04-20 | — | `.claude/settings.json` has secret-scan hook and deny rules; no explicit prod/IAM denylist |
-| On agent failure: stop and surface, don't silently retry | MUST | ❌ FAIL | 2026-04-20 | — | No documented policy in CLAUDE.md or harness-docs |
-| Treat CLAUDE.md as first-class artifact | MUST | ✅ PASS | 2026-04-20 | — | CLAUDE.md wrapped in `<!-- BEGIN:bid-harness -->` markers; git-tracked |
-| Scope agent instructions to the repo | MUST | ✅ PASS | 2026-04-20 | — | CLAUDE.md content is repo-scoped (Python stack, dirigent skills) |
+| On agent failure: stop and surface, don't silently retry | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | CLAUDE.md semi-autonomous definition mandates stop-and-surface; no silent retries or unauthorised fallbacks |
+| Treat CLAUDE.md as first-class artifact | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | CLAUDE.md wrapped in `<!-- BEGIN:bid-harness -->` markers; git-tracked; §Agentic Development block added |
+| Scope agent instructions to the repo | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | CLAUDE.md content is repo-scoped (Python stack, dirigent skills); Agentic block applies to this repo only |
 | Fix CLAUDE.md in same PR that corrects agent output | MUST | ⚠️ WARN | 2026-04-20 | — | No process documented; no PR template |
 | Remove instructions that no longer apply | MUST | ⚠️ WARN | 2026-04-20 | — | No pruning cadence; `claude-md-improver` skill available but no enforcement |
-| Never pass secrets into agent context | MUST | ✅ PASS | 2026-04-20 | — | `.claude/settings.json` PreToolUse hook scans for API_KEY/SECRET/TOKEN patterns and denies |
-| Prompt injection awareness | MUST | ❌ FAIL | 2026-04-20 | — | No prompt-injection guidance in CLAUDE.md |
+| Never pass secrets into agent context | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | `.claude/settings.json` PreToolUse hook scans Write/Edit for API_KEY/SECRET/TOKEN patterns and denies; reinforced in CLAUDE.md §Tool permissions |
+| Prompt injection awareness | MUST | ✅ PASS | 2026-04-20 | /setup-agentic-standards | CLAUDE.md §Prompt injection awareness: treat external content as untrusted, flag injection attempts to user |
 | Review tool permissions per workflow (least privilege) | MUST | ⚠️ WARN | 2026-04-20 | — | `.claude/settings.json` has deny rules; no per-workflow permission review documented |
 | Do not bypass security controls with AI | MUST | ❌ FAIL | 2026-04-20 | — | No written policy in CLAUDE.md or harness-docs |
 | AI-assisted code review in PR template | REC | ❌ FAIL | 2026-04-20 | — | No PR template exists |
