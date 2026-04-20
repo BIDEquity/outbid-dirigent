@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "b63fd8cc1b2b",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".github/workflows/release-please.yml",
+    ".release-please-manifest.json",
+    "harness-docs/standards-status.md",
+    "release-please-config.json"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b6/3fd8cc1b2b/0/metadata.json",
+      "transcript": "/b6/3fd8cc1b2b/0/full.jsonl",
+      "content_hash": "/b6/3fd8cc1b2b/0/content_hash.txt",
+      "prompt": "/b6/3fd8cc1b2b/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 25,
+    "cache_creation_tokens": 184251,
+    "cache_read_tokens": 2023147,
+    "output_tokens": 10130,
+    "api_call_count": 11
+  }
+}
