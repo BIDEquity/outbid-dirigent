@@ -11,15 +11,15 @@
 |---|---|---|---|---|
 | 01 · Culture & Working Agreements | 2 | 4 | 0 | 2 |
 | 02 · Architecture & Decision Records | 1 | 6 | 0 | 4 |
-| 03 · Code Quality, Reviews & Standards | 5 | 4 | 0 | 3 |
+| 03 · Code Quality, Reviews & Standards | 6 | 3 | 0 | 3 |
 | 04 · Test Strategy | 6 | 3 | 0 | 3 |
-| 05 · Continuous Delivery & CI/CD | 10 | 4 | 1 | 2 |
+| 05 · Continuous Delivery & CI/CD | 11 | 3 | 1 | 2 |
 | 06 · Feature Toggles | 0 | 0 | 0 | 0 |
 | 07 · Observability, Monitoring & Tracking | 2 | 2 | 0 | 0 |
 | 08 · Security & Dependency Management | 2 | 5 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 0 |
 | 10 · Agentic Development | 16 | 0 | 1 | 7 |
-| **Total** | **44** | **30** | **2** | **23** |
+| **Total** | **46** | **28** | **2** | **23** |
 
 ---
 
@@ -71,7 +71,7 @@
 | README with purpose/setup/tests/deploy/ADR links | MUST | ⚠️ WARN | 2026-04-20 | — | README has purpose + Quick Start + tests; no deploy section, no ADR link |
 | Consistent folder structure documented in ADR | MUST | ❌ FAIL | 2026-04-20 | — | Only ADR-0001 (LLM migration); no folder-structure ADR |
 | Never commit secrets/config to source control | MUST | ✅ PASS | 2026-04-20 | manual | `.gitignore` covers env files; CLAUDE.md rule 1 enforces; no secrets observed |
-| Enforce linting/formatting via pre-commit or CI | MUST | ❌ FAIL | 2026-04-20 | — | No `.pre-commit-config.yaml`; no lint step in any workflow; ruff only in local PostToolUse hook |
+| Enforce linting/formatting via pre-commit or CI | MUST | ✅ PASS | 2026-04-20 | /add-ci | `ci.yml` lint job runs `ruff check` + `ruff format --check` on every push + PR; local PostToolUse hook in `.claude/settings.json` also runs `ruff format`/`ruff check --fix` on every file write |
 | Monorepo vs polyrepo decision in ADR | REC | ❌ FAIL | 2026-04-20 | — | No such ADR |
 | Maintain CONTRIBUTING.md | REC | ❌ FAIL | 2026-04-20 | — | File does not exist at repo root |
 
@@ -108,14 +108,14 @@
 | Tag every release commit | REC | ✅ PASS | 2026-04-20 | /add-release | release-please creates tag on release-PR merge; release.yml triggers on tag push |
 | Publish release notes to team channel | REC | ❌ FAIL | 2026-04-20 | — | No Slack/Discord/webhook notification step |
 | CI runs on every commit | MUST | ✅ PASS | 2026-04-20 | manual | `ci.yml`, `tests.yml`, `integration-tests.yml`, `commitlint.yml` trigger on push + PR |
-| CI includes linting | MUST | ❌ FAIL | 2026-04-20 | — | No ruff/black/flake8/pylint step in any workflow; `[tool.ruff]` absent from pyproject.toml |
+| CI includes linting | MUST | ✅ PASS | 2026-04-20 | /add-ci | `.github/workflows/ci.yml` `lint` job runs `ruff check` + `ruff format --check` on push + PR; `[tool.ruff]` config added to pyproject.toml (target-version py310, conservative E4/E7/E9/F rule set) |
 | CI includes unit tests | MUST | ✅ PASS | 2026-04-20 | manual | `tests.yml` runs `pytest tests/` |
 | CI includes integration tests | MUST | ✅ PASS | 2026-04-20 | manual | `integration-tests.yml` runs portal contract + e2e suites |
 | CI includes build validation | MUST | ⚠️ WARN | 2026-04-20 | — | `release.yml` runs `uv build` only on tag push, not every PR |
 | Automate all production deployments | MUST | ✅ PASS | 2026-04-20 | manual | `release.yml` on tag push runs `uv build` + attaches wheel + sdist to GitHub Release |
 | Main branch always deployable | MUST | ⚠️ WARN | 2026-04-20 | — | CI runs on PRs; branch-protection rules not visible in repo |
 | Rollback possible within 15 min | MUST | ✅ PASS | 2026-04-20 | manual | Prior version wheels on GitHub Releases; `pip install pkg==<prev>` satisfies 15-min rollback |
-| CI config must include lint/test/build/deploy | MUST | ❌ FAIL | 2026-04-20 | — | Lint stage missing; build only on tag push, not every commit |
+| CI config must include lint/test/build/deploy | MUST | ⚠️ WARN | 2026-04-20 | /add-ci | Lint (ci.yml), tests (tests.yml + integration-tests.yml), commitlint (commitlint.yml), deploy (release.yml on tag push) all covered; build only fires on tag push, not every PR |
 | Measure DORA metrics | REC | ❌ FAIL | 2026-04-20 | — | No DORA tooling |
 | Blue/green or canary | REC | ➖ SKIP | 2026-04-20 | — | Python library/CLI package, not a deployed service |
 

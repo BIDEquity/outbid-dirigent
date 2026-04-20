@@ -28,6 +28,20 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+# Default rule set: E (pycodestyle errors), F (pyflakes). Kept conservative
+# so existing code passes without a large cleanup pass. Expand as needed.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.format]
+# Use ruff's builtin formatter (black-compatible) to match the PostToolUse
+# hook behavior in .claude/settings.json, which already runs `ruff format`
+# on every file write locally.
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/outbid_dirigent"]
 
