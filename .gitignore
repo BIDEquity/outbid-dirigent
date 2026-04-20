@@ -37,6 +37,10 @@ env/
 .DS_Store
 Thumbs.db
 
+# Claude Code scratch state
+.claude/scheduled_tasks.lock
+.claude/*.lock
+
 # Testing
 .pytest_cache/
 .coverage

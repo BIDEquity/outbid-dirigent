@@ -1,6 +1,6 @@
 [project]
 name = "outbid-dirigent"
-version = "2.0.0rc4"
+version = "2.0.0"
 description = "Headless autonomous coding agent controller"
 readme = "README.md"
 license = "MIT"
@@ -45,7 +45,7 @@ path = "hatch_build.py"
 artifacts = ["src/outbid_dirigent/_build_info.py"]
 
 [tool.bumpversion]
-current_version = "2.0.0rc4"
+current_version = "2.0.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"
