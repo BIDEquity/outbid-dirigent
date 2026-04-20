@@ -10,7 +10,7 @@
 | Category | MUST ✅ | MUST ❌ | REC ✅ | REC ❌ |
 |---|---|---|---|---|
 | 01 · Culture & Working Agreements | 0 | 6 | 0 | 2 |
-| 02 · Architecture & Decision Records | 0 | 6 | 0 | 3 |
+| 02 · Architecture & Decision Records | 2 | 5 | 0 | 3 |
 | 03 · Code Quality, Reviews & Standards | 1 | 8 | 0 | 4 |
 | 04 · Test Strategy | 2 | 4 | 0 | 3 |
 | 05 · Continuous Delivery & CI/CD | 4 | 10 | 1 | 2 |
@@ -19,7 +19,7 @@
 | 08 · Security & Dependency Management | 1 | 6 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 2 |
 | 10 · Agentic Development | 3 | 13 | 0 | 8 |
-| **Total** | **11** | **59** | **1** | **27** |
+| **Total** | **13** | **58** | **1** | **27** |
 
 ---
 
@@ -42,9 +42,9 @@
 
 | Requirement | Level | Status | Verified | Fixed By | Notes |
 |---|---|---|---|---|---|
-| Document significant architectural decisions as ADRs | MUST | ❌ FAIL | 2026-04-20 | — | No ADR files; no `/docs/adr/` or `/harness-docs/adr/` directory |
-| Use standard ADR template (Title/Status/Context/Decision/Consequences/Alternatives) | MUST | ➖ SKIP | 2026-04-20 | — | No ADRs to evaluate; template available at harness-docs/templates/ |
-| Store ADRs in /docs/adr/ and link from README | MUST | ❌ FAIL | 2026-04-20 | — | `/docs/adr/` absent; README has no ADR references |
+| Document significant architectural decisions as ADRs | MUST | ✅ PASS | 2026-04-20 | /adr | First ADR created: `harness-docs/adr/0001-migrate-llm-callers-to-claude-agent-sdk.md` |
+| Use standard ADR template (Title/Status/Context/Decision/Consequences/Alternatives) | MUST | ✅ PASS | 2026-04-20 | /adr | ADR-0001 uses the template at `harness-docs/templates/adr-template.md` |
+| Store ADRs in /docs/adr/ and link from README | MUST | ⚠️ WARN | 2026-04-20 | /adr | ADRs now stored in `harness-docs/adr/`; README link to ADRs still pending |
 | Never delete ADRs; mark as Deprecated/Superseded | MUST | ➖ SKIP | 2026-04-20 | — | No ADRs exist to deprecate |
 | Check for existing ADR before architectural decisions | MUST | ⚠️ WARN | 2026-04-20 | — | `/adr` skill installed but no ADRs despite significant decisions (SDK migration, observability) |
 | Clear service/module boundaries with explicit interfaces | MUST | ⚠️ WARN | 2026-04-20 | — | `src/outbid_dirigent/` has submodules but no explicit interface contracts documented |
