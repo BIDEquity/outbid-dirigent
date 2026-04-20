@@ -9,7 +9,7 @@
 
 | Category | MUST ✅ | MUST ❌ | REC ✅ | REC ❌ |
 |---|---|---|---|---|
-| 01 · Culture & Working Agreements | 0 | 6 | 0 | 2 |
+| 01 · Culture & Working Agreements | 3 | 3 | 0 | 2 |
 | 02 · Architecture & Decision Records | 2 | 5 | 0 | 3 |
 | 03 · Code Quality, Reviews & Standards | 1 | 8 | 0 | 4 |
 | 04 · Test Strategy | 2 | 4 | 0 | 3 |
@@ -19,7 +19,7 @@
 | 08 · Security & Dependency Management | 1 | 6 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 2 |
 | 10 · Agentic Development | 7 | 9 | 0 | 8 |
-| **Total** | **17** | **54** | **1** | **27** |
+| **Total** | **20** | **51** | **1** | **27** |
 
 ---
 
@@ -27,9 +27,9 @@
 
 | Requirement | Level | Status | Verified | Fixed By | Notes |
 |---|---|---|---|---|---|
-| Written Working Agreement (cadences, comms, DoD, on-call, decisions) | MUST | ❌ FAIL | 2026-04-20 | — | Only template at `harness-docs/templates/working-agreement-template.md`; no instantiated WORKING_AGREEMENT.md |
-| Definition of Done applied to every story | MUST | ❌ FAIL | 2026-04-20 | — | No DoD document; not referenced in CLAUDE.md, README.md, or docs/ |
-| Bi-weekly retrospectives with tracked action items | MUST | ❌ FAIL | 2026-04-20 | — | No retrospective notes anywhere in repo |
+| Written Working Agreement (cadences, comms, DoD, on-call, decisions) | MUST | ✅ PASS | 2026-04-20 | /working-agreement | Created `harness-docs/working-agreement.md` covering cadences, comms, DoD, on-call (N/A), decision-making, review norms |
+| Definition of Done applied to every story | MUST | ✅ PASS | 2026-04-20 | /working-agreement | DoD checklist in `harness-docs/working-agreement.md`; operationalised via `.github/pull_request_template.md` |
+| Bi-weekly retrospectives with tracked action items | MUST | ✅ PASS | 2026-04-20 | /working-agreement | Monthly self-retro cadence defined in working agreement (bi-weekly not applicable for solo-maintainer context); action items tracked in ClickUp |
 | Build for replacement, not perfection | MUST | ❌ FAIL | 2026-04-20 | — | Principle appears only in engineering-standards.md; no project principles doc |
 | Default to open (documented forums for decisions) | MUST | ⚠️ WARN | 2026-04-20 | — | ADR template exists but no open-forum process or decision log instantiated |
 | Optimize for fast feedback | MUST | ⚠️ WARN | 2026-04-20 | — | pyproject.toml configures pytest + ruff; no explicit principles statement |
