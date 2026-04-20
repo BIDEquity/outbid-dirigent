@@ -13,13 +13,13 @@
 | 02 · Architecture & Decision Records | 2 | 5 | 0 | 3 |
 | 03 · Code Quality, Reviews & Standards | 1 | 8 | 0 | 4 |
 | 04 · Test Strategy | 2 | 4 | 0 | 3 |
-| 05 · Continuous Delivery & CI/CD | 6 | 8 | 1 | 2 |
+| 05 · Continuous Delivery & CI/CD | 8 | 6 | 1 | 2 |
 | 06 · Feature Toggles | 0 | 0 | 0 | 0 |
 | 07 · Observability, Monitoring & Tracking | 0 | 4 | 0 | 1 |
 | 08 · Security & Dependency Management | 1 | 6 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 2 |
 | 10 · Agentic Development | 7 | 9 | 0 | 8 |
-| **Total** | **22** | **49** | **1** | **27** |
+| **Total** | **24** | **47** | **1** | **27** |
 
 ---
 
@@ -97,8 +97,8 @@
 
 | Requirement | Level | Status | Verified | Fixed By | Notes |
 |---|---|---|---|---|---|
-| Use Conventional Commits format | MUST | ⚠️ WARN | 2026-04-20 | — | Most recent commits conform; `bump:` and `refine:` types are non-standard |
-| Enforce Conventional Commits via commitlint in CI | MUST | ❌ FAIL | 2026-04-20 | — | No commitlint config; no commit-msg hook |
+| Use Conventional Commits format | MUST | ✅ PASS | 2026-04-20 | /add-release | `.commitlintrc.json` extends `@commitlint/config-conventional` — standard type list now enforced; `bump:` / `refine:` commits pre-date enforcement |
+| Enforce Conventional Commits via commitlint in CI | MUST | ✅ PASS | 2026-04-20 | /add-release | `.github/workflows/commitlint.yml` runs `wagoid/commitlint-github-action@v6` on `pull_request` and push-to-master; non-conforming commits block merge |
 | Follow SemVer | MUST | ✅ PASS | 2026-04-20 | /add-release | Tags v1.0.0–v2.0.0 follow SemVer; ci.yml enforces PEP 440 pattern; release-please-config.json declares `release-type: python` (SemVer) |
 | Automate version bumping via semantic-release/release-please | MUST | ✅ PASS | 2026-04-20 | /add-release | Added `.github/workflows/release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` seeded at 2.0.0; bump-my-version retained but will be superseded once release-please lands the first release PR |
 | Auto-generate CHANGELOG.md from commits | MUST | ✅ PASS | 2026-04-20 | /add-release | release-please generates/updates CHANGELOG.md on each release PR; existing release.yml still attaches built wheels on tag push |
