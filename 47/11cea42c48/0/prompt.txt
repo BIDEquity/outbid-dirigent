@@ -1,0 +1,21 @@
+/bid-harness:assess
+
+---
+
+/bid-harness:adr
+
+---
+
+antrhoopic sdk mig
+
+---
+
+/bid-harness:setup-agentic-standards
+
+---
+
+semi
+
+---
+
+/bid-harness:working-agreement pr template
