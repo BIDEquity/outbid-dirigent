@@ -1,0 +1,13 @@
+/bid-harness:add-structured-logging
+
+---
+
+top 3 harness items now
+
+---
+
+why not struct. logging?
+
+---
+
+/bid-harness:verify-assessment

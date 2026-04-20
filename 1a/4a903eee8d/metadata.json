@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "1a4a903eee8d",
+  "strategy": "manual-commit",
+  "branch": "feat/logging",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "harness-docs/remediation-plan.md",
+    "harness-docs/standards-status.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/1a/4a903eee8d/0/metadata.json",
+      "transcript": "/1a/4a903eee8d/0/full.jsonl",
+      "content_hash": "/1a/4a903eee8d/0/content_hash.txt",
+      "prompt": "/1a/4a903eee8d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 55,
+    "cache_creation_tokens": 542521,
+    "cache_read_tokens": 5845889,
+    "output_tokens": 57050,
+    "api_call_count": 23
+  }
+}
