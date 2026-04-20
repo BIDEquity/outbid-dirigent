@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "d3adef013f7e",
+  "session_id": "f96b8728-bb6c-4f4a-917e-5cf2021349f4",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-20T14:30:04.143354Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/pull_request_template.md",
+    "harness-docs/working-agreement.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "9ad414e87c42",
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 370598,
+    "cache_read_tokens": 5138677,
+    "output_tokens": 73730,
+    "api_call_count": 43
+  },
+  "session_metrics": {
+    "turn_count": 6
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-20T14:30:03.894983Z",
+    "agent_lines": 143,
+    "human_added": 5,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 148,
+    "agent_percentage": 96.62162162162163
+  }
+}

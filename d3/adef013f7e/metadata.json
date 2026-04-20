@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "d3adef013f7e",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/pull_request_template.md",
+    "harness-docs/working-agreement.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d3/adef013f7e/0/metadata.json",
+      "transcript": "/d3/adef013f7e/0/full.jsonl",
+      "content_hash": "/d3/adef013f7e/0/content_hash.txt",
+      "prompt": "/d3/adef013f7e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 370598,
+    "cache_read_tokens": 5138677,
+    "output_tokens": 73730,
+    "api_call_count": 43
+  }
+}
