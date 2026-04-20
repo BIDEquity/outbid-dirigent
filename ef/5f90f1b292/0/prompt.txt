@@ -35,3 +35,7 @@ fix all 6 remaining ruff check(s)
 ---
 
 was hat der hook damit zu tun?
+
+---
+
+ah verstanden, hab formatiert, commit all in one.
