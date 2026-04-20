@@ -4,7 +4,6 @@ Outbid Dirigent - Interactive Questioner
 Ermöglicht Fragen an User via Portal.
 """
 
-import os
 import time
 import requests
 from typing import Optional, List, Dict, Any
@@ -16,6 +15,7 @@ from outbid_dirigent.logger import get_logger
 @dataclass
 class QuestionResult:
     """Ergebnis einer Frage."""
+
     answered: bool
     answer: Optional[str]
     timeout: bool
@@ -34,7 +34,7 @@ class Questioner:
         execution_id: str,
         timeout_minutes: int = 30,
     ):
-        self.portal_url = portal_url.rstrip('/')
+        self.portal_url = portal_url.rstrip("/")
         self.reporter_token = reporter_token
         self.execution_id = execution_id
         self.timeout_minutes = timeout_minutes
@@ -106,8 +106,8 @@ class Questioner:
                             "phase": phase,
                             "questionType": question_type,
                             "timeoutMinutes": self.timeout_minutes,
-                        }
-                    }
+                        },
+                    },
                 },
                 timeout=30,
             )
@@ -160,7 +160,9 @@ class Questioner:
                         self.logger.info("Frage-Timeout erreicht")
                         if default_on_timeout:
                             self.logger.info(f"Nutze Default-Antwort: {default_on_timeout}")
-                            return QuestionResult(answered=True, answer=default_on_timeout, timeout=True)
+                            return QuestionResult(
+                                answered=True, answer=default_on_timeout, timeout=True
+                            )
                         return QuestionResult(answered=False, answer=None, timeout=True)
 
             except requests.RequestException as e:
@@ -324,8 +326,8 @@ class Questioner:
                         "data": {
                             "planContent": plan_content,
                             "timeoutMinutes": timeout,
-                        }
-                    }
+                        },
+                    },
                 },
                 timeout=30,
             )
@@ -365,7 +367,9 @@ class Questioner:
                     if status == "pending":
                         # Noch keine Entscheidung, weiter pollen
                         remaining = int((timeout_seconds - elapsed) / 60)
-                        self.logger.debug(f"Warte auf Plan-Approval... ({remaining}min verbleibend)")
+                        self.logger.debug(
+                            f"Warte auf Plan-Approval... ({remaining}min verbleibend)"
+                        )
                         time.sleep(self.POLL_INTERVAL)
                         continue
 
@@ -429,7 +433,9 @@ class DummyQuestioner:
         self.logger.debug(f"[NON-INTERACTIVE] Confirm übersprungen: {question[:50]}...")
         return default_on_timeout
 
-    def choose(self, question: str, options: List[str], default_on_timeout: Optional[str] = None, **kwargs) -> Optional[str]:
+    def choose(
+        self, question: str, options: List[str], default_on_timeout: Optional[str] = None, **kwargs
+    ) -> Optional[str]:
         self.logger.debug(f"[NON-INTERACTIVE] Choice übersprungen: {question[:50]}...")
         return default_on_timeout or (options[0] if options else None)
 

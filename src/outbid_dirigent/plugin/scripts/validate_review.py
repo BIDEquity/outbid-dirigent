@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate Review JSON against the Pydantic schema. Standalone — no imports beyond stdlib."""
+
 import json
-import re
 import sys
 
 VALID_VERDICTS = {"pass", "fail"}
@@ -62,7 +62,9 @@ def validate(path: str):
                 if "verdict" not in item:
                     errors.append(f"{prefix}: missing 'verdict'")
                 elif item["verdict"] not in VALID_CR_VERDICTS:
-                    errors.append(f"{prefix}.verdict: must be one of {sorted(VALID_CR_VERDICTS)}, got '{item['verdict']}'")
+                    errors.append(
+                        f"{prefix}.verdict: must be one of {sorted(VALID_CR_VERDICTS)}, got '{item['verdict']}'"
+                    )
 
                 # Optional: notes
                 if "notes" in item and not isinstance(item["notes"], str):
@@ -100,7 +102,9 @@ def validate(path: str):
                         ev = item.get("evidence")
                         if ev is None or (isinstance(ev, list) and len(ev) == 0):
                             ac_id = item.get("ac_id", f"[{i}]")
-                            warnings.append(f"verdict='pass' but criteria_results[{i}] ({ac_id}) has no evidence")
+                            warnings.append(
+                                f"verdict='pass' but criteria_results[{i}] ({ac_id}) has no evidence"
+                            )
 
     # Optional: findings
     if "findings" in data:
@@ -117,7 +121,9 @@ def validate(path: str):
                 if "severity" not in item:
                     errors.append(f"{prefix}: missing 'severity'")
                 elif item["severity"] not in VALID_SEVERITIES:
-                    errors.append(f"{prefix}.severity: must be one of {sorted(VALID_SEVERITIES)}, got '{item['severity']}'")
+                    errors.append(
+                        f"{prefix}.severity: must be one of {sorted(VALID_SEVERITIES)}, got '{item['severity']}'"
+                    )
 
                 if "file" not in item:
                     errors.append(f"{prefix}: missing 'file'")

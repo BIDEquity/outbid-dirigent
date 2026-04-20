@@ -1,4 +1,5 @@
 """Pydantic schemas for tiered infrastructure detection."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -6,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 import json
 from pydantic import BaseModel
+
 
 class InfraTier(str, Enum):
     DEVBOX = "1_devbox"
@@ -16,17 +18,22 @@ class InfraTier(str, Enum):
     GENERATED_COMPOSE = "6_generated_compose"
     NONE = "7_none"
 
+
 class ServiceGap(BaseModel):
     service: str
     port: Optional[int] = None
     reason: str
     suggested_fix: str
 
+
 class SeedInfo(BaseModel):
     command: str = ""
-    detection_confidence: str = "none"  # high | medium | none — how reliably the seed command was detected
+    detection_confidence: str = (
+        "none"  # high | medium | none — how reliably the seed command was detected
+    )
     ran: bool = False
     error: str = ""
+
 
 class InfraContext(BaseModel):
     tier: InfraTier = InfraTier.NONE

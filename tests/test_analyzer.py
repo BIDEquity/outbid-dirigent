@@ -2,7 +2,6 @@
 Unit tests for analyzer.py — pure logic, no filesystem or git calls.
 """
 
-import pytest
 from pathlib import Path
 from typing import List
 
@@ -67,14 +66,15 @@ def _make_analyzer() -> Analyzer:
 
 
 class TestDetermineRoute:
-
     def test_testability_route_two_keywords(self):
         analyzer = _make_analyzer()
         spec = _make_spec(
             has_testability_keywords=True,
             testability_keywords_found=["add tests", "test coverage"],
         )
-        route, reason, confidence, legacy, greenfield = analyzer._determine_route(_make_repo(), spec)
+        route, reason, confidence, legacy, greenfield = analyzer._determine_route(
+            _make_repo(), spec
+        )
         assert route == "testability"
         assert confidence == "high"
 
@@ -93,7 +93,9 @@ class TestDetermineRoute:
 
     def test_quick_route_not_when_legacy_keywords(self):
         analyzer = _make_analyzer()
-        spec = _make_spec(estimated_scope="small", has_legacy_keywords=True, legacy_keywords_found=["migrate"])
+        spec = _make_spec(
+            estimated_scope="small", has_legacy_keywords=True, legacy_keywords_found=["migrate"]
+        )
         route, _, _, _, _ = analyzer._determine_route(_make_repo(), spec)
         assert route != "quick"
 
@@ -113,7 +115,9 @@ class TestDetermineRoute:
             has_tracking_keywords=True,
             tracking_keywords_found=["posthog", "event tracking"],
         )
-        route, reason, confidence, legacy, greenfield = analyzer._determine_route(_make_repo(), spec)
+        route, reason, confidence, legacy, greenfield = analyzer._determine_route(
+            _make_repo(), spec
+        )
         assert route != "tracking"
         assert confidence == "high"
 
@@ -133,8 +137,8 @@ class TestDetermineRoute:
     def test_many_legacy_keywords_inactive_large_commits_gives_legacy_route(self):
         analyzer = _make_analyzer()
         repo = _make_repo(
-            last_commit_days_ago=400,   # +2 legacy
-            commit_count=2500,          # +1 legacy
+            last_commit_days_ago=400,  # +2 legacy
+            commit_count=2500,  # +1 legacy
         )
         spec = _make_spec(
             has_legacy_keywords=True,
@@ -159,7 +163,7 @@ class TestDetermineRoute:
         repo = _make_repo(
             primary_language="TypeScript",
             last_commit_days_ago=10,  # active → +1 greenfield
-            file_count=20,            # small → +1 greenfield
+            file_count=20,  # small → +1 greenfield
         )
         spec = _make_spec(
             has_greenfield_keywords=True,
@@ -180,10 +184,10 @@ class TestDetermineRoute:
         analyzer = _make_analyzer()
         # No strong signals in either direction
         repo = _make_repo(
-            primary_language="Java",   # not a modern lang
+            primary_language="Java",  # not a modern lang
             last_commit_days_ago=100,  # not active (<90), not inactive (>365)
             commit_count=50,
-            file_count=100,            # not small
+            file_count=100,  # not small
         )
         spec = _make_spec()  # no keywords at all
         route, _, confidence, legacy, greenfield = analyzer._determine_route(repo, spec)
@@ -195,13 +199,11 @@ class TestDetermineRoute:
 
 
 class TestDetectLanguages:
-
     def test_most_common_extension_wins(self):
         analyzer = _make_analyzer()
-        files: List[Path] = (
-            [Path(f"src/a{i}.ts") for i in range(5)]
-            + [Path(f"src/b{i}.py") for i in range(2)]
-        )
+        files: List[Path] = [Path(f"src/a{i}.ts") for i in range(5)] + [
+            Path(f"src/b{i}.py") for i in range(2)
+        ]
         primary, secondary = analyzer._detect_languages(files)
         assert primary == "TypeScript"
         assert "Python" in secondary
@@ -224,7 +226,6 @@ class TestDetectLanguages:
 
 
 class TestAnalyzeSpec:
-
     def _make_spec_file(self, tmp_path: Path, content: str) -> Analyzer:
         spec_file = tmp_path / "spec.md"
         spec_file.write_text(content, encoding="utf-8")
@@ -286,9 +287,7 @@ class TestAnalyzeSpec:
         assert result.estimated_scope == "large"
 
     def test_target_language_detected_via_fastapi(self, tmp_path):
-        analyzer = self._make_spec_file(
-            tmp_path, "# API\n\nBuild an endpoint using FastAPI."
-        )
+        analyzer = self._make_spec_file(tmp_path, "# API\n\nBuild an endpoint using FastAPI.")
         result = analyzer._analyze_spec()
         assert result.target_language == "Python"
 

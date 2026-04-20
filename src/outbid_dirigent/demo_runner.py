@@ -8,7 +8,6 @@ running any analysis, planning, or code generation. Useful for:
 - Development without API costs
 """
 
-import asyncio
 import random
 import time
 from typing import Optional
@@ -237,10 +236,18 @@ Successfully implemented the User Settings feature with the following changes:
 5. Check notification preferences save correctly
 """,
     "files_changed": [
-        {"path": "supabase/migrations/20240315_user_settings.sql", "lines_added": 25, "lines_removed": 0},
+        {
+            "path": "supabase/migrations/20240315_user_settings.sql",
+            "lines_added": 25,
+            "lines_removed": 0,
+        },
         {"path": "src/app/api/user/settings/route.ts", "lines_added": 67, "lines_removed": 0},
         {"path": "src/lib/validations/settings.ts", "lines_added": 45, "lines_removed": 0},
-        {"path": "src/components/settings/settings-form.tsx", "lines_added": 156, "lines_removed": 0},
+        {
+            "path": "src/components/settings/settings-form.tsx",
+            "lines_added": 156,
+            "lines_removed": 0,
+        },
         {"path": "src/app/(dashboard)/settings/page.tsx", "lines_added": 48, "lines_removed": 0},
         {"path": "src/app/(dashboard)/settings/layout.tsx", "lines_added": 22, "lines_removed": 0},
         {"path": "src/components/nav/user-menu.tsx", "lines_added": 8, "lines_removed": 1},
@@ -444,8 +451,9 @@ class DemoRunner:
             self._random_sleep(0.5, 1.0)
 
         # Complete the task
-        commit_msg = activities.get("commit", f"feat: complete {task_id}")
-        self.reporter.task_complete(task_id, task_name, commit_hash=f"abc{task_id.replace('.', '')}def")
+        self.reporter.task_complete(
+            task_id, task_name, commit_hash=f"abc{task_id.replace('.', '')}def"
+        )
         self._tasks_completed += 1
         self._random_sleep(0.3, 0.5)
 

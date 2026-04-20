@@ -4,8 +4,6 @@ ContractManager._GREP_PATTERNS from contract.py.
 """
 
 import json
-import re
-from pathlib import Path
 
 import pytest
 
@@ -29,7 +27,10 @@ from outbid_dirigent.contract import ContractManager
 # Helpers
 # ══════════════════════════════════════════
 
-def _make_criterion(id_: str = "AC-01-01", layer: CriterionLayer = CriterionLayer.USER_JOURNEY) -> AcceptanceCriterion:
+
+def _make_criterion(
+    id_: str = "AC-01-01", layer: CriterionLayer = CriterionLayer.USER_JOURNEY
+) -> AcceptanceCriterion:
     return AcceptanceCriterion(
         id=id_,
         description="Something works",
@@ -76,6 +77,7 @@ def _make_review(**kwargs) -> Review:
 # TestContractSaveLoad
 # ══════════════════════════════════════════
 
+
 class TestContractSaveLoad:
     def test_roundtrip(self, tmp_path):
         contract = _make_contract(
@@ -113,7 +115,7 @@ class TestContractSaveLoad:
                     "id": "AC-02-01",
                     "description": "Login works",
                     "verification": "Run: curl -X POST /login",
-                    "category": "functional",   # old field name
+                    "category": "functional",  # old field name
                 }
             ],
         }
@@ -134,7 +136,7 @@ class TestContractSaveLoad:
                     "id": "AC-02-01",
                     "description": "Compiles",
                     "verification": "Run: npm run build",
-                    "category": "quality",   # old field name
+                    "category": "quality",  # old field name
                 }
             ],
         }
@@ -195,6 +197,7 @@ class TestContractSaveLoad:
 # ══════════════════════════════════════════
 # TestReviewComputedProperties
 # ══════════════════════════════════════════
+
 
 class TestReviewComputedProperties:
     def test_critical_count(self):
@@ -296,6 +299,7 @@ class TestReviewComputedProperties:
 # TestReviewSaveLoad
 # ══════════════════════════════════════════
 
+
 class TestReviewSaveLoad:
     def test_roundtrip(self, tmp_path):
         evidence = VerificationEvidence(
@@ -349,7 +353,7 @@ class TestReviewSaveLoad:
     def test_backward_compat_uppercase_verdict(self, tmp_path):
         raw = {
             "phase_id": "01",
-            "verdict": "PASS",   # old format: uppercase
+            "verdict": "PASS",  # old format: uppercase
             "criteria_results": [],
         }
         path = tmp_path / "review_old_verdict.json"
@@ -455,6 +459,7 @@ class TestReviewSaveLoad:
 # TestGrepPatterns
 # ══════════════════════════════════════════
 
+
 class TestGrepPatterns:
     """Test ContractManager._GREP_PATTERNS detects structural-check anti-patterns."""
 
@@ -462,64 +467,82 @@ class TestGrepPatterns:
 
     # ── should detect ──────────────────────────────────────────
 
-    @pytest.mark.parametrize("cmd", [
-        "grep 'def login' src/auth.py",
-        "grep -r UserController app/",
-        "rg 'import React' src/",
-        "ag 'class Foo'",
-        "ack 'TODO'",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "grep 'def login' src/auth.py",
+            "grep -r UserController app/",
+            "rg 'import React' src/",
+            "ag 'class Foo'",
+            "ack 'TODO'",
+        ],
+    )
     def test_detects_grep_variants(self, cmd):
         assert self.PATTERN.search(cmd), f"Expected match for: {cmd!r}"
 
-    @pytest.mark.parametrize("cmd", [
-        "cat src/app.py",
-        "head src/index.ts",
-        "tail src/main.js",
-        "cat src/component.tsx",
-        "head src/lib.jsx",
-        "cat src/server.go",
-        "cat src/main.rs",
-        "cat src/Service.java",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cat src/app.py",
+            "head src/index.ts",
+            "tail src/main.js",
+            "cat src/component.tsx",
+            "head src/lib.jsx",
+            "cat src/server.go",
+            "cat src/main.rs",
+            "cat src/Service.java",
+        ],
+    )
     def test_detects_cat_head_tail_on_source_files(self, cmd):
         assert self.PATTERN.search(cmd), f"Expected match for: {cmd!r}"
 
-    @pytest.mark.parametrize("cmd", [
-        "test -f /tmp/output.log",
-        "test -e /var/run/app.pid",
-        "test -d /tmp/builds",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "test -f /tmp/output.log",
+            "test -e /var/run/app.pid",
+            "test -d /tmp/builds",
+        ],
+    )
     def test_detects_test_flag_checks(self, cmd):
         assert self.PATTERN.search(cmd), f"Expected match for: {cmd!r}"
 
-    @pytest.mark.parametrize("cmd", [
-        "[ -f /tmp/output.log ] && echo exists",
-        "[ -e /var/run/pid ]",
-        "[ -d /tmp/data ]",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "[ -f /tmp/output.log ] && echo exists",
+            "[ -e /var/run/pid ]",
+            "[ -d /tmp/data ]",
+        ],
+    )
     def test_detects_bracket_file_checks(self, cmd):
         assert self.PATTERN.search(cmd), f"Expected match for: {cmd!r}"
 
     # ── should NOT detect ──────────────────────────────────────
 
-    @pytest.mark.parametrize("cmd", [
-        "curl -sf http://localhost:3000/health",
-        "npm run test",
-        "pytest tests/ -v",
-        "python -m pytest",
-        "npx jest",
-        "go test ./...",
-        "cargo test",
-        "bundle exec rspec",
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "curl -sf http://localhost:3000/health",
+            "npm run test",
+            "pytest tests/ -v",
+            "python -m pytest",
+            "npx jest",
+            "go test ./...",
+            "cargo test",
+            "bundle exec rspec",
+        ],
+    )
     def test_allows_legitimate_test_commands(self, cmd):
         assert not self.PATTERN.search(cmd), f"Expected no match for: {cmd!r}"
 
-    @pytest.mark.parametrize("cmd", [
-        "cat /tmp/output.log",           # cat on non-source file (no extension match)
-        "head /var/log/app.log",          # head on .log file
-        "tail /tmp/results.txt",          # tail on .txt file
-    ])
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "cat /tmp/output.log",  # cat on non-source file (no extension match)
+            "head /var/log/app.log",  # head on .log file
+            "tail /tmp/results.txt",  # tail on .txt file
+        ],
+    )
     def test_allows_cat_on_non_source_files(self, cmd):
         assert not self.PATTERN.search(cmd), f"Expected no match for: {cmd!r}"

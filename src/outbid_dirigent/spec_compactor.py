@@ -87,6 +87,7 @@ class CompactMeta(BaseModel):
 
 class BusinessRule(BaseModel):
     """A business rule extracted from the existing codebase (Legacy route)."""
+
     id: str = Field(description="Stable ID like BR1, BR2, BR3")
     text: str = Field(description="The business rule as found in the codebase")
     source: str = Field("", description="File:line where this rule is implemented")
@@ -98,6 +99,7 @@ class BusinessRule(BaseModel):
 
 class TestingConsideration(BaseModel):
     """A testing consideration for the implementation."""
+
     aspect: str = Field(description="What needs testing (e.g. 'auth flow', 'data migration')")
     approach: str = Field(description="How to test it (e.g. 'integration test with real DB')")
     risk: str = Field("", description="What could go wrong if not tested")
@@ -148,9 +150,7 @@ class CompactSpec(BaseModel):
         if self.glossary:
             lines.append("  <glossary>")
             for term in self.glossary:
-                lines.append(
-                    f'    <term name="{_esc(term.name)}">{_esc(term.definition)}</term>'
-                )
+                lines.append(f'    <term name="{_esc(term.name)}">{_esc(term.definition)}</term>')
             lines.append("  </glossary>")
 
         # Requirements (filtered if only_req_ids given)
@@ -211,9 +211,7 @@ class CompactSpec(BaseModel):
 
         # Testing considerations
         if self.testing:
-            lines.append(
-                '  <testing hint="testing strategy for this implementation">'
-            )
+            lines.append('  <testing hint="testing strategy for this implementation">')
             for t in self.testing:
                 risk = f' risk="{_esc(t.risk)}"' if t.risk else ""
                 lines.append(
@@ -227,12 +225,7 @@ class CompactSpec(BaseModel):
 
 def _esc(s: str) -> str:
     """Minimal XML escaping for text content and attributes."""
-    return (
-        s.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 # ---------------------------------------------------------------------------
@@ -387,9 +380,7 @@ def compact_spec(
         return None
 
 
-async def _aquery_compact(
-    user_prompt: str, model: str
-) -> tuple[Optional[dict], dict]:
+async def _aquery_compact(user_prompt: str, model: str) -> tuple[Optional[dict], dict]:
     """Run compaction via claude_agent_sdk. Returns (structured_output, usage).
 
     Drains the generator to completion before returning — see the matching

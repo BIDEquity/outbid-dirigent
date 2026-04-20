@@ -8,7 +8,7 @@ Tests verify the actual events sent by Dirigent v1.1.0 (commit 44c6488):
 
 Run with: pytest tests/integration/test_portal_contract.py -v
 """
-import json
+
 import os
 import stat
 import subprocess
@@ -41,7 +41,9 @@ def contract_test_repo(tmp_path: Path) -> Path:
     repo_path.mkdir()
 
     subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo_path, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"], cwd=repo_path, capture_output=True
+    )
     subprocess.run(["git", "config", "user.name", "Test"], cwd=repo_path, capture_output=True)
 
     (repo_path / "package.json").write_text('{"name":"test","scripts":{"test":"echo ok"}}')
@@ -73,14 +75,23 @@ class TestPortalDirigentContract:
 
         subprocess.run(
             [
-                sys.executable, "-m", "outbid_dirigent.dirigent",
-                "--spec", str(spec_path),
-                "--repo", str(repo_path),
-                "--execution-mode", "autonomous",
-                "--portal-url", url,
-                "--execution-id", "test-001",
-                "--reporter-token", "token-001",
-                "--output", "json",
+                sys.executable,
+                "-m",
+                "outbid_dirigent.dirigent",
+                "--spec",
+                str(spec_path),
+                "--repo",
+                str(repo_path),
+                "--execution-mode",
+                "autonomous",
+                "--portal-url",
+                url,
+                "--execution-id",
+                "test-001",
+                "--reporter-token",
+                "token-001",
+                "--output",
+                "json",
             ],
             cwd=repo_path,
             env=env,
@@ -123,9 +134,13 @@ class TestPortalDirigentContract:
             print(f"✅ Summary event received at position {summary_idx}/{len(event_types)}")
         else:
             # With mocked Claude, summary may not be sent - this is acceptable
-            print(f"⚠️ No summary event (acceptable with mocked Claude). Got: {len(event_types)} events")
+            print(
+                f"⚠️ No summary event (acceptable with mocked Claude). Got: {len(event_types)} events"
+            )
 
-    def test_creates_commits_when_tasks_execute(self, mock_portal, mock_claude_bin, contract_test_repo):
+    def test_creates_commits_when_tasks_execute(
+        self, mock_portal, mock_claude_bin, contract_test_repo
+    ):
         """Dirigent creates git commits when tasks are executed."""
         initial = count_commits(contract_test_repo)
         self._run_dirigent(mock_portal, mock_claude_bin, contract_test_repo)

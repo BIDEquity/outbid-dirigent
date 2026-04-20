@@ -9,9 +9,9 @@ import re
 import json
 import subprocess
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from collections import Counter
 
 from outbid_dirigent.logger import get_logger
@@ -20,6 +20,7 @@ from outbid_dirigent.logger import get_logger
 @dataclass
 class RepoAnalysis:
     """Ergebnis der Repository-Analyse."""
+
     repo_path: str
     repo_name: str
     primary_language: str
@@ -40,6 +41,7 @@ class RepoAnalysis:
 @dataclass
 class SpecAnalysis:
     """Ergebnis der Spec-Analyse."""
+
     spec_path: str
     title: str
     has_legacy_keywords: bool
@@ -58,6 +60,7 @@ class SpecAnalysis:
 @dataclass
 class RuntimeRequirement:
     """Eine benötigte Runtime-Abhängigkeit (Service, Tool, etc.)."""
+
     name: str
     type: str  # database, cache, queue, storage, api
     docker_image: Optional[str] = None
@@ -68,6 +71,7 @@ class RuntimeRequirement:
 @dataclass
 class RuntimeAnalysis:
     """Analyse wie das Projekt lokal gestartet wird."""
+
     start_command: str  # z.B. "npm run dev"
     port: int  # z.B. 3000
     package_manager: str  # npm, yarn, pnpm, pip, go, etc.
@@ -83,6 +87,7 @@ class RuntimeAnalysis:
 @dataclass
 class AnalysisResult:
     """Kombiniertes Analyse-Ergebnis."""
+
     repo: RepoAnalysis
     spec: SpecAnalysis
     runtime: Optional[RuntimeAnalysis]  # NEU: Runtime-Analyse
@@ -183,34 +188,89 @@ BUILD_TOOLS = {
 
 # Keywords für Routing-Entscheidung
 LEGACY_KEYWORDS = [
-    "refactor", "migrate", "migration", "rewrite", "port", "legacy",
-    "convert", "modernize", "upgrade", "replace", "deprecated",
-    "technical debt", "tech debt", "overhaul", "replatform",
-    "umschreiben", "migrieren", "portieren", "ersetzen", "modernisieren",
+    "refactor",
+    "migrate",
+    "migration",
+    "rewrite",
+    "port",
+    "legacy",
+    "convert",
+    "modernize",
+    "upgrade",
+    "replace",
+    "deprecated",
+    "technical debt",
+    "tech debt",
+    "overhaul",
+    "replatform",
+    "umschreiben",
+    "migrieren",
+    "portieren",
+    "ersetzen",
+    "modernisieren",
 ]
 
 GREENFIELD_KEYWORDS = [
-    "add", "build", "create", "implement", "new feature", "neue",
-    "develop", "design", "introduce", "setup", "initialize",
-    "hinzufügen", "erstellen", "bauen", "implementieren", "entwickeln",
-    "feature", "neu", "anlegen",
+    "add",
+    "build",
+    "create",
+    "implement",
+    "new feature",
+    "neue",
+    "develop",
+    "design",
+    "introduce",
+    "setup",
+    "initialize",
+    "hinzufügen",
+    "erstellen",
+    "bauen",
+    "implementieren",
+    "entwickeln",
+    "feature",
+    "neu",
+    "anlegen",
 ]
 
 TESTABILITY_KEYWORDS = [
-    "testability", "testbarkeit", "test coverage", "testabdeckung",
-    "e2e test", "end-to-end test", "testing infrastructure",
-    "test setup", "test harness", "increase testability",
-    "improve testing", "add tests", "tests hinzufügen",
-    "test framework", "playwright setup", "cypress setup",
-    "seed data", "test fixtures", "test environment",
+    "testability",
+    "testbarkeit",
+    "test coverage",
+    "testabdeckung",
+    "e2e test",
+    "end-to-end test",
+    "testing infrastructure",
+    "test setup",
+    "test harness",
+    "increase testability",
+    "improve testing",
+    "add tests",
+    "tests hinzufügen",
+    "test framework",
+    "playwright setup",
+    "cypress setup",
+    "seed data",
+    "test fixtures",
+    "test environment",
 ]
 
 TRACKING_KEYWORDS = [
-    "tracking", "analytics", "posthog", "feature tracking",
-    "event tracking", "user tracking", "product analytics",
-    "telemetry", "instrumentation", "feature flags",
-    "ab test", "a/b test", "conversion tracking",
-    "nutzer tracking", "analyse", "feature usage",
+    "tracking",
+    "analytics",
+    "posthog",
+    "feature tracking",
+    "event tracking",
+    "user tracking",
+    "product analytics",
+    "telemetry",
+    "instrumentation",
+    "feature flags",
+    "ab test",
+    "a/b test",
+    "conversion tracking",
+    "nutzer tracking",
+    "analyse",
+    "feature usage",
 ]
 
 # Sprachen die auf Target-Language hinweisen können
@@ -270,7 +330,7 @@ class Analyzer:
         self.logger.stats(
             f"{repo_analysis.primary_language}/{repo_analysis.framework_detected or 'kein Framework'}",
             repo_analysis.commit_count,
-            age_info
+            age_info,
         )
 
         # Log Runtime-Info
@@ -281,8 +341,8 @@ class Analyzer:
             )
 
         # Route bestimmen — LLM first, heuristic fallback
-        route, reason, confidence, legacy_signals, greenfield_signals = self._determine_route_with_llm(
-            repo_analysis, spec_analysis
+        route, reason, confidence, legacy_signals, greenfield_signals = (
+            self._determine_route_with_llm(repo_analysis, spec_analysis)
         )
 
         self.logger.route(route, confidence)
@@ -357,9 +417,19 @@ class Analyzer:
     def _get_all_files(self) -> List[Path]:
         """Sammelt alle Dateien im Repo (ohne .git, node_modules, etc.)."""
         exclude_dirs = {
-            ".git", "node_modules", "vendor", "venv", ".venv",
-            "__pycache__", ".idea", ".vscode", "dist", "build",
-            "target", ".gradle", ".dirigent",
+            ".git",
+            "node_modules",
+            "vendor",
+            "venv",
+            ".venv",
+            "__pycache__",
+            ".idea",
+            ".vscode",
+            "dist",
+            "build",
+            "target",
+            ".gradle",
+            ".dirigent",
         }
 
         files = []
@@ -470,8 +540,20 @@ class Analyzer:
 
     def _get_top_directories(self) -> List[str]:
         """Gibt die wichtigsten Verzeichnisse zurück."""
-        important_dirs = ["src", "app", "lib", "api", "components", "pages",
-                         "ios", "android", "server", "client", "core", "modules"]
+        important_dirs = [
+            "src",
+            "app",
+            "lib",
+            "api",
+            "components",
+            "pages",
+            "ios",
+            "android",
+            "server",
+            "client",
+            "core",
+            "modules",
+        ]
 
         found = []
         for d in self.repo_path.iterdir():
@@ -484,10 +566,21 @@ class Analyzer:
     def _get_config_files(self) -> List[str]:
         """Gibt gefundene Konfigurationsdateien zurück."""
         config_patterns = [
-            "package.json", "pom.xml", "build.gradle", "Cargo.toml",
-            "go.mod", "requirements.txt", "Gemfile", "composer.json",
-            "tsconfig.json", "webpack.config.js", "vite.config.js",
-            ".env", ".env.example", "docker-compose.yml", "Dockerfile",
+            "package.json",
+            "pom.xml",
+            "build.gradle",
+            "Cargo.toml",
+            "go.mod",
+            "requirements.txt",
+            "Gemfile",
+            "composer.json",
+            "tsconfig.json",
+            "webpack.config.js",
+            "vite.config.js",
+            ".env",
+            ".env.example",
+            "docker-compose.yml",
+            "Dockerfile",
         ]
 
         found = []
@@ -500,8 +593,14 @@ class Analyzer:
     def _has_tests(self) -> bool:
         """Prüft ob Tests vorhanden sind."""
         test_indicators = [
-            "test", "tests", "spec", "specs", "__tests__",
-            "pytest.ini", "jest.config.js", "vitest.config.js",
+            "test",
+            "tests",
+            "spec",
+            "specs",
+            "__tests__",
+            "pytest.ini",
+            "jest.config.js",
+            "vitest.config.js",
         ]
 
         for d in self.repo_path.iterdir():
@@ -547,7 +646,10 @@ class Analyzer:
                 try:
                     package_data = json.loads(package_json_path.read_text(encoding="utf-8"))
                     scripts = package_data.get("scripts", {})
-                    deps = {**package_data.get("dependencies", {}), **package_data.get("devDependencies", {})}
+                    deps = {
+                        **package_data.get("dependencies", {}),
+                        **package_data.get("devDependencies", {}),
+                    }
 
                     # Package Manager erkennen
                     pkg_manager = package_data.get("packageManager", "")
@@ -562,15 +664,27 @@ class Analyzer:
 
                     # Start-Command erkennen
                     if "dev" in scripts:
-                        start_command = f"{package_manager} run dev" if package_manager != "npm" else "npm run dev"
+                        start_command = (
+                            f"{package_manager} run dev"
+                            if package_manager != "npm"
+                            else "npm run dev"
+                        )
                         # Port aus dev script extrahieren
                         port_match = re.search(r"--port[=\s]+(\d+)|-p[=\s]+(\d+)", scripts["dev"])
                         if port_match:
                             port = int(port_match.group(1) or port_match.group(2))
                     elif "start:dev" in scripts:
-                        start_command = f"{package_manager} run start:dev" if package_manager != "npm" else "npm run start:dev"
+                        start_command = (
+                            f"{package_manager} run start:dev"
+                            if package_manager != "npm"
+                            else "npm run start:dev"
+                        )
                     elif "serve" in scripts:
-                        start_command = f"{package_manager} run serve" if package_manager != "npm" else "npm run serve"
+                        start_command = (
+                            f"{package_manager} run serve"
+                            if package_manager != "npm"
+                            else "npm run serve"
+                        )
 
                     # Framework-spezifische Ports
                     if "next" in deps:
@@ -606,43 +720,57 @@ class Analyzer:
                     # -> Keine lokalen DB-Container starten!
                     if not uses_doppler:
                         if "pg" in deps or "postgres" in deps or "@prisma/client" in deps:
-                            services.append(RuntimeRequirement(
-                                name="PostgreSQL",
-                                type="database",
-                                docker_image="postgres:15",
-                                port=5432,
-                                env_vars=["POSTGRES_PASSWORD=dev", "POSTGRES_DB=app_dev"]
-                            ))
+                            services.append(
+                                RuntimeRequirement(
+                                    name="PostgreSQL",
+                                    type="database",
+                                    docker_image="postgres:15",
+                                    port=5432,
+                                    env_vars=["POSTGRES_PASSWORD=dev", "POSTGRES_DB=app_dev"],
+                                )
+                            )
                         if "mysql" in deps or "mysql2" in deps:
-                            services.append(RuntimeRequirement(
-                                name="MySQL",
-                                type="database",
-                                docker_image="mysql:8",
-                                port=3306,
-                                env_vars=["MYSQL_ROOT_PASSWORD=dev", "MYSQL_DATABASE=app_dev"]
-                            ))
+                            services.append(
+                                RuntimeRequirement(
+                                    name="MySQL",
+                                    type="database",
+                                    docker_image="mysql:8",
+                                    port=3306,
+                                    env_vars=["MYSQL_ROOT_PASSWORD=dev", "MYSQL_DATABASE=app_dev"],
+                                )
+                            )
                         if "mongodb" in deps or "mongoose" in deps:
-                            services.append(RuntimeRequirement(
-                                name="MongoDB",
-                                type="database",
-                                docker_image="mongo:7",
-                                port=27017
-                            ))
+                            services.append(
+                                RuntimeRequirement(
+                                    name="MongoDB",
+                                    type="database",
+                                    docker_image="mongo:7",
+                                    port=27017,
+                                )
+                            )
                         if "redis" in deps or "ioredis" in deps:
-                            services.append(RuntimeRequirement(
-                                name="Redis",
-                                type="cache",
-                                docker_image="redis:7-alpine",
-                                port=6379
-                            ))
+                            services.append(
+                                RuntimeRequirement(
+                                    name="Redis",
+                                    type="cache",
+                                    docker_image="redis:7-alpine",
+                                    port=6379,
+                                )
+                            )
 
                 except Exception as e:
                     self.logger.debug(f"Error parsing package.json: {e}")
 
             # 2. Python-Projekte
-            elif (self.repo_path / "pyproject.toml").exists() or (self.repo_path / "requirements.txt").exists():
+            elif (self.repo_path / "pyproject.toml").exists() or (
+                self.repo_path / "requirements.txt"
+            ).exists():
                 package_manager = "pip"
-                setup_steps.append("pip install -r requirements.txt" if (self.repo_path / "requirements.txt").exists() else "pip install -e .")
+                setup_steps.append(
+                    "pip install -r requirements.txt"
+                    if (self.repo_path / "requirements.txt").exists()
+                    else "pip install -e ."
+                )
 
                 # Framework erkennen
                 for req_file in ["requirements.txt", "pyproject.toml"]:
@@ -682,42 +810,50 @@ class Analyzer:
                     compose_content = compose_path.read_text(encoding="utf-8").lower()
 
                     # Services aus docker-compose extrahieren (vereinfacht)
-                    if "postgres" in compose_content and not any(s.name == "PostgreSQL" for s in services):
-                        services.append(RuntimeRequirement(
-                            name="PostgreSQL",
-                            type="database",
-                            docker_image="postgres:15",
-                            port=5432,
-                            env_vars=["POSTGRES_PASSWORD=dev"]
-                        ))
+                    if "postgres" in compose_content and not any(
+                        s.name == "PostgreSQL" for s in services
+                    ):
+                        services.append(
+                            RuntimeRequirement(
+                                name="PostgreSQL",
+                                type="database",
+                                docker_image="postgres:15",
+                                port=5432,
+                                env_vars=["POSTGRES_PASSWORD=dev"],
+                            )
+                        )
                     if "redis" in compose_content and not any(s.name == "Redis" for s in services):
-                        services.append(RuntimeRequirement(
-                            name="Redis",
-                            type="cache",
-                            docker_image="redis:7-alpine",
-                            port=6379
-                        ))
-                    if "mongo" in compose_content and not any(s.name == "MongoDB" for s in services):
-                        services.append(RuntimeRequirement(
-                            name="MongoDB",
-                            type="database",
-                            docker_image="mongo:7",
-                            port=27017
-                        ))
+                        services.append(
+                            RuntimeRequirement(
+                                name="Redis", type="cache", docker_image="redis:7-alpine", port=6379
+                            )
+                        )
+                    if "mongo" in compose_content and not any(
+                        s.name == "MongoDB" for s in services
+                    ):
+                        services.append(
+                            RuntimeRequirement(
+                                name="MongoDB", type="database", docker_image="mongo:7", port=27017
+                            )
+                        )
                     if "elasticsearch" in compose_content:
-                        services.append(RuntimeRequirement(
-                            name="Elasticsearch",
-                            type="search",
-                            docker_image="elasticsearch:8.11.0",
-                            port=9200
-                        ))
+                        services.append(
+                            RuntimeRequirement(
+                                name="Elasticsearch",
+                                type="search",
+                                docker_image="elasticsearch:8.11.0",
+                                port=9200,
+                            )
+                        )
                     if "rabbitmq" in compose_content:
-                        services.append(RuntimeRequirement(
-                            name="RabbitMQ",
-                            type="queue",
-                            docker_image="rabbitmq:3-management",
-                            port=5672
-                        ))
+                        services.append(
+                            RuntimeRequirement(
+                                name="RabbitMQ",
+                                type="queue",
+                                docker_image="rabbitmq:3-management",
+                                port=5672,
+                            )
+                        )
                 except Exception as e:
                     self.logger.debug(f"Error parsing docker-compose: {e}")
 
@@ -741,13 +877,17 @@ class Analyzer:
                         pass
 
             # 6. Env-File finden
-            for env_name in [".env.example", ".env.local.example", ".env.sample", ".env.development"]:
+            for env_name in [
+                ".env.example",
+                ".env.local.example",
+                ".env.sample",
+                ".env.development",
+            ]:
                 if (self.repo_path / env_name).exists():
                     env_file = env_name
                     break
 
             # 7. Health-Check-Path erkennen (häufige Patterns)
-            health_patterns = ["/api/health", "/health", "/healthz", "/_health"]
             for src_dir in ["src", "app", "api", "."]:
                 for pattern in ["health", "healthcheck"]:
                     for ext in [".ts", ".js", ".py", ".go"]:
@@ -847,7 +987,9 @@ class Analyzer:
             estimated_scope=scope,
         )
 
-    def _determine_route_with_llm(self, repo: RepoAnalysis, spec: SpecAnalysis) -> Tuple[str, str, str, int, int]:
+    def _determine_route_with_llm(
+        self, repo: RepoAnalysis, spec: SpecAnalysis
+    ) -> Tuple[str, str, str, int, int]:
         """Try LLM routing first, fall back to heuristics on failure."""
         from outbid_dirigent.llm_router import determine_route_llm
         from outbid_dirigent.test_harness_schema import TestHarness
@@ -873,15 +1015,19 @@ class Analyzer:
         self.logger.info("LLM router failed, falling back to heuristics")
         return self._determine_route(repo, spec)
 
-    def _determine_route(self, repo: RepoAnalysis, spec: SpecAnalysis) -> Tuple[str, str, str, int, int]:
+    def _determine_route(
+        self, repo: RepoAnalysis, spec: SpecAnalysis
+    ) -> Tuple[str, str, str, int, int]:
         """Bestimmt die optimale Route basierend auf der Analyse."""
 
         # ── Quick route (highest priority — small spec, one-shot doable) ──
 
-        if (spec.estimated_scope == "small"
+        if (
+            spec.estimated_scope == "small"
             and not spec.has_legacy_keywords
             and not spec.has_testability_keywords
-            and not spec.has_greenfield_keywords):
+            and not spec.has_greenfield_keywords
+        ):
             return "quick", "Kleine Spec, in einem Durchlauf machbar", "high", 0, 0
 
         # ── Specialized routes (take priority over general routes) ──
@@ -910,7 +1056,9 @@ class Analyzer:
         if repo.primary_language in ["Java", "Ruby", "PHP", "Swift", "Objective-C"]:
             if spec.target_language and spec.target_language != repo.primary_language:
                 legacy_signals += 3
-                reasons.append(f"Sprach-Migration von {repo.primary_language} zu {spec.target_language}")
+                reasons.append(
+                    f"Sprach-Migration von {repo.primary_language} zu {spec.target_language}"
+                )
 
         if spec.has_legacy_keywords:
             # Scale by keyword density: 1-2 keywords = partial refactor (+1), 3+ = real migration (+2)
@@ -927,7 +1075,9 @@ class Analyzer:
         # Greenfield Signale
         if spec.has_greenfield_keywords:
             greenfield_signals += 2
-            reasons.append(f"Greenfield-Keywords in Spec: {', '.join(spec.greenfield_keywords_found[:3])}")
+            reasons.append(
+                f"Greenfield-Keywords in Spec: {', '.join(spec.greenfield_keywords_found[:3])}"
+            )
 
         if repo.primary_language in ["TypeScript", "JavaScript", "Python", "Go", "Rust"]:
             greenfield_signals += 1
@@ -983,7 +1133,8 @@ class Analyzer:
             "file_count": result.repo.file_count,
             "total_lines": result.repo.total_lines,
             "spec_title": result.spec.title,
-            "spec_keywords": result.spec.legacy_keywords_found + result.spec.greenfield_keywords_found,
+            "spec_keywords": result.spec.legacy_keywords_found
+            + result.spec.greenfield_keywords_found,
             "route": result.route,
             "route_reason": result.route_reason,
             "confidence": result.confidence,

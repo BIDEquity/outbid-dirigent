@@ -21,13 +21,15 @@ class PhaseKind(str, Enum):
     Drives layer quotas in contracts and plan-level validation (max 1
     infrastructure, final phase ≠ infrastructure, etc).
     """
-    USER_FACING = "user-facing"        # Delivers UI surface or observable behavior change
-    INTEGRATION = "integration"        # Subsystem a later phase will expose to users
+
+    USER_FACING = "user-facing"  # Delivers UI surface or observable behavior change
+    INTEGRATION = "integration"  # Subsystem a later phase will expose to users
     INFRASTRUCTURE = "infrastructure"  # Scaffolding, migrations, tooling — no consumer in-run
 
 
 class Task(BaseModel):
     """A single executable task within a phase."""
+
     id: str
     name: str
     description: str = ""
@@ -37,12 +39,17 @@ class Task(BaseModel):
     model: str = ""
     effort: str = ""
     test_level: str = ""  # "", "L1", "L2"
-    convention_skills: list[str] = Field(default_factory=list)  # e.g. ["ruby-code-writing", "form-builder"]
-    relevant_req_ids: list[str] = Field(default_factory=list)  # e.g. ["R3", "R7"] from SPEC.compact.json
+    convention_skills: list[str] = Field(
+        default_factory=list
+    )  # e.g. ["ruby-code-writing", "form-builder"]
+    relevant_req_ids: list[str] = Field(
+        default_factory=list
+    )  # e.g. ["R3", "R7"] from SPEC.compact.json
 
 
 class Phase(BaseModel):
     """A group of related tasks executed sequentially."""
+
     id: str
     name: str
     kind: PhaseKind = Field(
@@ -64,6 +71,7 @@ class Phase(BaseModel):
 
 class Plan(BaseModel):
     """The full execution plan for a dirigent run."""
+
     title: str = "Untitled"
     summary: str = ""
     size: Literal["standard", "large"] = Field(

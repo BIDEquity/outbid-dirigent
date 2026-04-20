@@ -8,14 +8,13 @@ against the deterministic fake claude, validating the full flow end-to-end.
 import json
 from pathlib import Path
 
-import pytest
 
 from outbid_dirigent.task_runner import TaskRunner
 from outbid_dirigent.planner import Planner
 from outbid_dirigent.contract import ContractManager
 from outbid_dirigent.plan_schema import Plan
-from outbid_dirigent.router import mark_step_complete, get_next_step, load_state, save_state
-from outbid_dirigent.analyzer import Analyzer, RepoAnalysis, SpecAnalysis
+from outbid_dirigent.router import mark_step_complete, get_next_step, load_state
+from outbid_dirigent.analyzer import Analyzer, RepoAnalysis
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -204,7 +203,9 @@ class TestE2ERouteSelection:
         )
         spec_analysis = analyzer._analyze_spec()
 
-        route, reason, confidence, legacy_s, gf_s = analyzer._determine_route(repo_analysis, spec_analysis)
+        route, reason, confidence, legacy_s, gf_s = analyzer._determine_route(
+            repo_analysis, spec_analysis
+        )
         assert route == "legacy", f"Expected legacy, got {route} (reason: {reason})"
 
     def test_tracking_spec_routes_to_tracking(self, git_repo):
@@ -237,6 +238,8 @@ class TestE2ERouteSelection:
             config_files=[],
         )
 
-        route, reason, confidence, legacy_s, gf_s = analyzer._determine_route(repo_analysis, spec_analysis)
+        route, reason, confidence, legacy_s, gf_s = analyzer._determine_route(
+            repo_analysis, spec_analysis
+        )
         # Tracking route is disabled — should fall through to general routing
         assert route != "tracking", f"Tracking route should be disabled, got {route}"

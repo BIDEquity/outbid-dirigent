@@ -1,7 +1,5 @@
 """Unit tests for TaskRunner static helpers and TaskResult data class."""
 
-import pytest
-
 from outbid_dirigent.task_runner import TaskResult, TaskRunner
 
 

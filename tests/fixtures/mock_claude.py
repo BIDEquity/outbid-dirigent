@@ -13,9 +13,9 @@ Usage:
     Set PATH to include this script's directory before running tests.
     The Dirigent will call this instead of the real `claude` CLI.
 """
+
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -44,7 +44,7 @@ def create_plan(repo_path: Path, prompt: str) -> None:
     dirigent_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract spec content to understand what files to create
-    spec_match = re.search(r'<spec>(.*?)</spec>', prompt, re.DOTALL)
+    spec_match = re.search(r"<spec>(.*?)</spec>", prompt, re.DOTALL)
     spec_content = spec_match.group(1) if spec_match else ""
 
     # Detect files mentioned in spec
@@ -64,14 +64,8 @@ def create_plan(repo_path: Path, prompt: str) -> None:
     plan = {
         "title": "Test Feature Implementation",
         "summary": "Implementing the requested feature",
-        "assumptions": [
-            "Repository is a valid git repo",
-            "No external dependencies required"
-        ],
-        "out_of_scope": [
-            "Deployment",
-            "Documentation updates"
-        ],
+        "assumptions": ["Repository is a valid git repo", "No external dependencies required"],
+        "out_of_scope": ["Deployment", "Documentation updates"],
         "phases": [
             {
                 "id": "01",
@@ -87,28 +81,30 @@ def create_plan(repo_path: Path, prompt: str) -> None:
                         "depends_on": [],
                         "model": "haiku",
                         "effort": "low",
-                        "test_level": ""
+                        "test_level": "",
                     }
-                ]
+                ],
             }
         ],
         "estimated_complexity": "low",
-        "risks": []
+        "risks": [],
     }
 
     # Add additional tasks for more files
     for i, filename in enumerate(files_to_create[1:], start=2):
-        plan["phases"][0]["tasks"].append({
-            "id": f"01-{i:02d}",
-            "name": f"Create {filename}",
-            "description": f"Create the {filename} file",
-            "files_to_create": [filename],
-            "files_to_modify": [],
-            "depends_on": [],
-            "model": "haiku",
-            "effort": "low",
-            "test_level": ""
-        })
+        plan["phases"][0]["tasks"].append(
+            {
+                "id": f"01-{i:02d}",
+                "name": f"Create {filename}",
+                "description": f"Create the {filename} file",
+                "files_to_create": [filename],
+                "files_to_modify": [],
+                "depends_on": [],
+                "model": "haiku",
+                "effort": "low",
+                "test_level": "",
+            }
+        )
 
     plan_path = dirigent_dir / "PLAN.json"
     plan_path.write_text(json.dumps(plan, indent=2))
@@ -161,19 +157,19 @@ def parse_task_from_prompt(prompt: str) -> dict:
         task_info["name"] = name_match.group(1).strip()
 
     # Extract description
-    desc_match = re.search(r'<description>([^<]+)</description>', prompt, re.DOTALL)
+    desc_match = re.search(r"<description>([^<]+)</description>", prompt, re.DOTALL)
     if desc_match:
         task_info["description"] = desc_match.group(1).strip()
 
     # Extract files to create
-    create_match = re.search(r'<files-to-create>([^<]+)</files-to-create>', prompt)
+    create_match = re.search(r"<files-to-create>([^<]+)</files-to-create>", prompt)
     if create_match:
         files = create_match.group(1).strip()
         if files and files.lower() != "keine":
             task_info["files_to_create"] = [f.strip() for f in files.split(",") if f.strip()]
 
     # Extract files to modify
-    modify_match = re.search(r'<files-to-modify>([^<]+)</files-to-modify>', prompt)
+    modify_match = re.search(r"<files-to-modify>([^<]+)</files-to-modify>", prompt)
     if modify_match:
         files = modify_match.group(1).strip()
         if files and files.lower() != "keine":
@@ -198,7 +194,9 @@ def execute_task(repo_path: Path, task_info: dict) -> None:
         elif filename.endswith(".js"):
             content = f"// Created by task {task_id}\nconsole.log('Hello from {filename}');\n"
         elif filename.endswith(".ts"):
-            content = f"// Created by task {task_id}\nexport const greeting = 'Hello from {filename}';\n"
+            content = (
+                f"// Created by task {task_id}\nexport const greeting = 'Hello from {filename}';\n"
+            )
         elif filename.endswith(".py"):
             content = f"# Created by task {task_id}\nprint('Hello from {filename}')\n"
         elif filename.endswith(".json"):
@@ -311,7 +309,7 @@ def main():
     elif request_type == "business_rules":
         create_business_rules(repo_path)
     else:
-        print(f"[mock-claude] Unknown request type, doing nothing")
+        print("[mock-claude] Unknown request type, doing nothing")
 
     sys.exit(0)
 

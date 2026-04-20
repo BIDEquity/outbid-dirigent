@@ -15,6 +15,7 @@ To run:
     # Real E2E mode (costs ~$0.50, requires ANTHROPIC_API_KEY):
     pytest tests/integration/test_simple_feature.py -v --e2e
 """
+
 import os
 import subprocess
 import sys
@@ -24,10 +25,8 @@ import pytest
 
 from tests.conftest import (
     count_commits,
-    get_commit_messages,
     file_exists,
     get_file_content,
-    PortalEvent,
 )
 
 
@@ -44,31 +43,37 @@ class TestSimpleFeatureMocked:
         # Set up pending execution
         state.pending_execution = {
             "execution_id": "test-exec-123",
-            "reporter_token": "test-token-456"
+            "reporter_token": "test-token-456",
         }
 
         # Simulate events that would be sent by Dirigent
         import requests
 
         # Simulate plan event
-        requests.post(f"{url}/api/execution-event", json={
-            "execution_id": "test-exec-123",
-            "event": {
-                "type": "plan",
-                "ts": "2024-01-01T00:00:00Z",
-                "data": {"totalPhases": 1, "totalTasks": 1}
-            }
-        })
+        requests.post(
+            f"{url}/api/execution-event",
+            json={
+                "execution_id": "test-exec-123",
+                "event": {
+                    "type": "plan",
+                    "ts": "2024-01-01T00:00:00Z",
+                    "data": {"totalPhases": 1, "totalTasks": 1},
+                },
+            },
+        )
 
         # Simulate task_start event
-        requests.post(f"{url}/api/execution-event", json={
-            "execution_id": "test-exec-123",
-            "event": {
-                "type": "task_start",
-                "ts": "2024-01-01T00:00:01Z",
-                "data": {"taskId": "01-01", "name": "Test task"}
-            }
-        })
+        requests.post(
+            f"{url}/api/execution-event",
+            json={
+                "execution_id": "test-exec-123",
+                "event": {
+                    "type": "task_start",
+                    "ts": "2024-01-01T00:00:01Z",
+                    "data": {"taskId": "01-01", "name": "Test task"},
+                },
+            },
+        )
 
         # Verify events captured
         assert len(state.events) == 2
@@ -122,7 +127,7 @@ class TestSimpleFeatureE2E:
         # Set up pending execution (simulates portal trigger)
         state.pending_execution = {
             "execution_id": "e2e-test-001",
-            "reporter_token": "e2e-token-001"
+            "reporter_token": "e2e-token-001",
         }
 
         # Find dirigent entry point
@@ -134,14 +139,23 @@ class TestSimpleFeatureE2E:
 
         result = subprocess.run(
             [
-                sys.executable, "-m", "outbid_dirigent.dirigent",
-                "--spec", str(spec_file),
-                "--repo", str(test_repo),
-                "--execution-mode", "autonomous",
-                "--portal-url", url,
-                "--execution-id", "e2e-test-001",
-                "--reporter-token", "e2e-token-001",
-                "--output", "json",
+                sys.executable,
+                "-m",
+                "outbid_dirigent.dirigent",
+                "--spec",
+                str(spec_file),
+                "--repo",
+                str(test_repo),
+                "--execution-mode",
+                "autonomous",
+                "--portal-url",
+                url,
+                "--execution-id",
+                "e2e-test-001",
+                "--reporter-token",
+                "e2e-token-001",
+                "--output",
+                "json",
             ],
             cwd=test_repo,
             env=env,
@@ -178,7 +192,7 @@ class TestSimpleFeatureE2E:
         assert "task_start" in event_types, "No task_start event received"
 
         # Success!
-        print(f"\n✅ E2E Test passed!")
+        print("\n✅ E2E Test passed!")
         print(f"   - hello.txt created with content: {content[:50]}...")
         print(f"   - {final_commits - initial_commits} new commit(s)")
         print(f"   - {len(state.events)} event(s) sent to portal")
@@ -208,12 +222,14 @@ Erstelle zwei Dateien:
         subprocess.run(["git", "add", "."], cwd=test_repo, check=True, capture_output=True)
         subprocess.run(
             ["git", "commit", "-m", "Add multi-file spec"],
-            cwd=test_repo, check=True, capture_output=True
+            cwd=test_repo,
+            check=True,
+            capture_output=True,
         )
 
         state.pending_execution = {
             "execution_id": "e2e-test-002",
-            "reporter_token": "e2e-token-002"
+            "reporter_token": "e2e-token-002",
         }
 
         initial_commits = count_commits(test_repo)
@@ -224,14 +240,23 @@ Erstelle zwei Dateien:
 
         result = subprocess.run(
             [
-                sys.executable, "-m", "outbid_dirigent.dirigent",
-                "--spec", str(spec_path),
-                "--repo", str(test_repo),
-                "--execution-mode", "autonomous",
-                "--portal-url", url,
-                "--execution-id", "e2e-test-002",
-                "--reporter-token", "e2e-token-002",
-                "--output", "json",
+                sys.executable,
+                "-m",
+                "outbid_dirigent.dirigent",
+                "--spec",
+                str(spec_path),
+                "--repo",
+                str(test_repo),
+                "--execution-mode",
+                "autonomous",
+                "--portal-url",
+                url,
+                "--execution-id",
+                "e2e-test-002",
+                "--reporter-token",
+                "e2e-token-002",
+                "--output",
+                "json",
             ],
             cwd=test_repo,
             env=env,
@@ -247,5 +272,5 @@ Erstelle zwei Dateien:
         final_commits = count_commits(test_repo)
         assert final_commits > initial_commits, "No new commits"
 
-        print(f"\n✅ Multi-task E2E Test passed!")
+        print("\n✅ Multi-task E2E Test passed!")
         print(f"   - {final_commits - initial_commits} new commit(s)")

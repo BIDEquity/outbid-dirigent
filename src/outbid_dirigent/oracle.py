@@ -31,6 +31,7 @@ def _get_questioner():
     """Lazy import um circular imports zu vermeiden."""
     try:
         from outbid_dirigent.dirigent import get_questioner
+
         return get_questioner()
     except ImportError:
         return None
@@ -42,7 +43,9 @@ class Oracle:
     Nutzt Claude API direkt (nicht Claude Code) für schnelle Antworten.
     """
 
-    def __init__(self, repo_path: str, model: str = "claude-sonnet-4-6", dirigent_dir: Optional[Path] = None):
+    def __init__(
+        self, repo_path: str, model: str = "claude-sonnet-4-6", dirigent_dir: Optional[Path] = None
+    ):
         self.repo_path = Path(repo_path)
         self.model = model
         self.logger = get_logger()
@@ -86,10 +89,12 @@ class Oracle:
         if not all_decisions:
             return []
         q_words = set(question.lower().split())
+
         def score(d: dict) -> float:
             d_words = set(d.get("question", "").lower().split())
             union = len(q_words | d_words)
             return len(q_words & d_words) / union if union else 0.0
+
         ranked = sorted(all_decisions, key=score, reverse=True)
         # Always include the most recent decision even if score is low
         top = ranked[:top_n]
@@ -136,10 +141,12 @@ class Oracle:
         # Bisherige Entscheidungen — ranked by relevance to current question
         if self.decisions.get("decisions"):
             relevant = self._relevant_decisions(question)
-            decisions_text = "\n".join([
-                f"<decision question=\"{d['question'][:100]}\" confidence=\"{d.get('confidence', '?')}\">{d['decision']}</decision>"
-                for d in relevant
-            ])
+            decisions_text = "\n".join(
+                [
+                    f'<decision question="{d["question"][:100]}" confidence="{d.get("confidence", "?")}">{d["decision"]}</decision>'
+                    for d in relevant
+                ]
+            )
             context_parts.append(f"<previous-decisions>\n{decisions_text}\n</previous-decisions>")
 
         return "\n\n".join(context_parts)
@@ -151,7 +158,10 @@ class Oracle:
             cwd=str(self.repo_path),
             allowed_tools=[],
             permission_mode="bypassPermissions",
-            output_format={"type": "json_schema", "schema": strict_json_schema(OracleDecision.model_json_schema())},
+            output_format={
+                "type": "json_schema",
+                "schema": strict_json_schema(OracleDecision.model_json_schema()),
+            },
         )
         async for message in sdk_query(prompt=prompt, options=options):
             if isinstance(message, ResultMessage) and not message.is_error:
@@ -192,7 +202,7 @@ class Oracle:
         # Prompt bauen
         options_text = ""
         if options:
-            options_text = f"\nOptionen:\n" + "\n".join([f"- {opt}" for opt in options])
+            options_text = "\nOptionen:\n" + "\n".join([f"- {opt}" for opt in options])
 
         prompt = f"""<role>Du bist ein Software-Architektur-Oracle. Triff architekturelle Entscheidungen basierend auf dem Kontext.</role>
 
@@ -224,16 +234,18 @@ class Oracle:
             confidence = result.confidence
 
             # In Cache speichern
-            self.decisions["decisions"].append({
-                "cache_key": cache_key,
-                "question": question,
-                "options": options_list,
-                "decision": decision,
-                "reason": reason,
-                "confidence": confidence,
-                "duration_ms": duration_ms,
-                "timestamp": datetime.now().isoformat(),
-            })
+            self.decisions["decisions"].append(
+                {
+                    "cache_key": cache_key,
+                    "question": question,
+                    "options": options_list,
+                    "decision": decision,
+                    "reason": reason,
+                    "confidence": confidence,
+                    "duration_ms": duration_ms,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             self._save_decisions()
 
             self.logger.oracle_decision(decision, reason)
@@ -288,16 +300,18 @@ class Oracle:
 
                 # Cache auch User-Entscheidungen
                 cache_key = self._get_cache_key(question, options)
-                self.decisions["decisions"].append({
-                    "cache_key": cache_key,
-                    "question": question,
-                    "options": options,
-                    "decision": result.answer,
-                    "reason": "Vom User entschieden",
-                    "confidence": "high",
-                    "source": "user",
-                    "timestamp": datetime.now().isoformat(),
-                })
+                self.decisions["decisions"].append(
+                    {
+                        "cache_key": cache_key,
+                        "question": question,
+                        "options": options,
+                        "decision": result.answer,
+                        "reason": "Vom User entschieden",
+                        "confidence": "high",
+                        "source": "user",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
                 self._save_decisions()
 
                 return {
@@ -362,7 +376,9 @@ class Oracle:
 <question>Soll der Ansatz so beibehalten werden, oder gibt es ein besseres Vorgehen?</question>
 </validation>"""
 
-        result = self.query(question, ["Ansatz beibehalten", "Ansatz modifizieren", "Anderen Ansatz wählen"])
+        result = self.query(
+            question, ["Ansatz beibehalten", "Ansatz modifizieren", "Anderen Ansatz wählen"]
+        )
 
         return {
             "valid": "beibehalten" in result["decision"].lower(),
@@ -407,6 +423,8 @@ class Oracle:
         self.logger.info("Oracle Cache gelöscht")
 
 
-def create_oracle(repo_path: str, model: str = "claude-sonnet-4-6", dirigent_dir: Optional[Path] = None) -> Oracle:
+def create_oracle(
+    repo_path: str, model: str = "claude-sonnet-4-6", dirigent_dir: Optional[Path] = None
+) -> Oracle:
     """Factory-Funktion für Oracle-Instanz."""
     return Oracle(repo_path, model, dirigent_dir=dirigent_dir)

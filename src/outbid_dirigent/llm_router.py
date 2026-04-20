@@ -31,8 +31,11 @@ class RouteChoice(str, Enum):
 
 class RouteDecision(BaseModel):
     """Structured output schema for the LLM route decision."""
+
     route: RouteChoice = Field(description="The execution route to take")
-    justification: str = Field(description="2-3 sentences explaining why this route was chosen over the alternatives")
+    justification: str = Field(
+        description="2-3 sentences explaining why this route was chosen over the alternatives"
+    )
     confidence: str = Field(description="high, medium, or low")
 
 
@@ -121,7 +124,9 @@ def determine_route_llm(
             duration_ms=duration_ms,
         )
 
-        logger.info(f"LLM route: {decision.route.value} ({decision.confidence}) — {decision.justification[:80]}")
+        logger.info(
+            f"LLM route: {decision.route.value} ({decision.confidence}) — {decision.justification[:80]}"
+        )
 
         # Save decision for traceability
         if dirigent_dir:
@@ -134,9 +139,7 @@ def determine_route_llm(
         return None
 
 
-async def _aquery_route(
-    user_prompt: str, model: str
-) -> tuple[Optional[dict], dict]:
+async def _aquery_route(user_prompt: str, model: str) -> tuple[Optional[dict], dict]:
     """Run the route decision via claude_agent_sdk. Returns (structured_output, usage).
 
     Drains the generator to completion before returning so the underlying

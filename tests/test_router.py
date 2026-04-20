@@ -21,10 +21,13 @@ from outbid_dirigent.router import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def make_router(tmp_path: Path) -> Router:
     router = Router.__new__(Router)
     router.repo_path = tmp_path
-    router.logger = type("L", (), {k: (lambda *a, **kw: None) for k in ["debug", "info", "warning", "error"]})()
+    router.logger = type(
+        "L", (), {k: (lambda *a, **kw: None) for k in ["debug", "info", "warning", "error"]}
+    )()
     return router
 
 
@@ -34,8 +37,7 @@ def _minimal_route_json(steps: list[str]) -> dict:
         "reason": "test",
         "steps": steps,
         "step_details": [
-            {"type": s, "name": s, "description": "", "required": True}
-            for s in steps
+            {"type": s, "name": s, "description": "", "required": True} for s in steps
         ],
         "estimated_tasks": 4,
         "oracle_needed": False,
@@ -47,6 +49,7 @@ def _minimal_route_json(steps: list[str]) -> dict:
 # ---------------------------------------------------------------------------
 # TestEstimateTasks
 # ---------------------------------------------------------------------------
+
 
 class TestEstimateTasks:
     def test_small(self, tmp_path):
@@ -68,6 +71,7 @@ class TestEstimateTasks:
 # ---------------------------------------------------------------------------
 # TestBuildRoute
 # ---------------------------------------------------------------------------
+
 
 class TestBuildRoute:
     def test_greenfield_dict_route_type(self, tmp_path):
@@ -158,12 +162,15 @@ class TestBuildRoute:
         route = router.determine_route(analysis)
         assert route.oracle_needed is True
 
-    @pytest.mark.parametrize("route_str,route_type", [
-        ("legacy", RouteType.LEGACY),
-        ("hybrid", RouteType.HYBRID),
-        ("testability", RouteType.TESTABILITY),
-        ("tracking", RouteType.TRACKING),
-    ])
+    @pytest.mark.parametrize(
+        "route_str,route_type",
+        [
+            ("legacy", RouteType.LEGACY),
+            ("hybrid", RouteType.HYBRID),
+            ("testability", RouteType.TESTABILITY),
+            ("tracking", RouteType.TRACKING),
+        ],
+    )
     def test_non_greenfield_routes_start_with_init(self, tmp_path, route_str, route_type):
         router = make_router(tmp_path)
         analysis = {
@@ -188,9 +195,16 @@ class TestBuildRoute:
         route = router.determine_route(analysis)
         assert route.steps[0].step_type == StepType.GREENFIELD_SCAFFOLD
 
-    @pytest.mark.parametrize("route_str", [
-        "greenfield", "legacy", "hybrid", "testability", "tracking",
-    ])
+    @pytest.mark.parametrize(
+        "route_str",
+        [
+            "greenfield",
+            "legacy",
+            "hybrid",
+            "testability",
+            "tracking",
+        ],
+    )
     def test_all_routes_end_with_ship(self, tmp_path, route_str):
         router = make_router(tmp_path)
         analysis = {
@@ -207,6 +221,7 @@ class TestBuildRoute:
 # ---------------------------------------------------------------------------
 # TestStateCRUD
 # ---------------------------------------------------------------------------
+
 
 class TestStateCRUD:
     def test_load_state_returns_none_when_missing(self, tmp_path):
@@ -260,12 +275,11 @@ class TestStateCRUD:
 # TestGetNextStep
 # ---------------------------------------------------------------------------
 
+
 class TestGetNextStep:
     def _write_route(self, tmp_path: Path, steps: list[str]):
         d = tmp_path / ".dirigent"
-        (d / "ROUTE.json").write_text(
-            json.dumps(_minimal_route_json(steps)), encoding="utf-8"
-        )
+        (d / "ROUTE.json").write_text(json.dumps(_minimal_route_json(steps)), encoding="utf-8")
 
     def test_returns_first_step_when_no_state(self, tmp_path):
         self._write_route(tmp_path, ["init", "planning", "ship"])
@@ -289,6 +303,7 @@ class TestGetNextStep:
 # ---------------------------------------------------------------------------
 # TestRouteLoadSave
 # ---------------------------------------------------------------------------
+
 
 class TestRouteLoadSave:
     def test_load_route_returns_none_when_missing(self, tmp_path):

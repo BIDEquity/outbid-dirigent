@@ -182,8 +182,12 @@ class TestGreenfieldFullFlow:
         # Step 2: plan
         plan = _make_plan(repo)
         assert plan.total_tasks >= 1
-        assert len(plan.phases) <= 2, f"Greenfield smoke test must not exceed 2 phases, got {len(plan.phases)}"
-        assert plan.total_tasks <= 7, f"Greenfield smoke test must not exceed 7 tasks, got {plan.total_tasks}"
+        assert len(plan.phases) <= 2, (
+            f"Greenfield smoke test must not exceed 2 phases, got {len(plan.phases)}"
+        )
+        assert plan.total_tasks <= 7, (
+            f"Greenfield smoke test must not exceed 7 tasks, got {plan.total_tasks}"
+        )
 
     def test_scaffold_plan_execute(self, fake_claude_env):
         """Full flow: scaffold → plan → execute all tasks → review."""

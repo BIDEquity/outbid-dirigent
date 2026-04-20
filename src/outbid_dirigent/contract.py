@@ -19,7 +19,7 @@ from loguru import logger
 
 import re
 
-from outbid_dirigent.contract_schema import Contract, Review, Verdict, FindingSeverity, CriterionVerdict, CriterionLayer
+from outbid_dirigent.contract_schema import Contract, Review, Verdict, CriterionLayer
 from outbid_dirigent.plan_schema import Plan, Phase
 from outbid_dirigent.utils import strict_json_schema
 
@@ -69,8 +69,10 @@ class ContractManager:
         if contract_path.exists():
             contract = Contract.load(contract_path)
             if contract:
-                logger.info(f"Contract for phase {phase.id} already exists "
-                           f"({len(contract.acceptance_criteria)} criteria)")
+                logger.info(
+                    f"Contract for phase {phase.id} already exists "
+                    f"({len(contract.acceptance_criteria)} criteria)"
+                )
                 return True
 
         prompt = (
@@ -81,7 +83,10 @@ class ContractManager:
         )
         success, structured = self.runner._run_claude_structured(
             prompt,
-            output_format={"type": "json_schema", "schema": strict_json_schema(Contract.model_json_schema())},
+            output_format={
+                "type": "json_schema",
+                "schema": strict_json_schema(Contract.model_json_schema()),
+            },
             timeout=600,
             component=f"contract-negotiator:phase-{phase.id}",
         )
@@ -106,6 +111,7 @@ class ContractManager:
 
         # Send portal event (import here to avoid circular dependency)
         from outbid_dirigent.dirigent import get_portal_reporter
+
         reporter = get_portal_reporter()
         if reporter:
             reporter.contract_created(
@@ -122,10 +128,10 @@ class ContractManager:
 
     # Patterns that indicate structural checks masquerading as runtime criteria
     _GREP_PATTERNS = re.compile(
-        r"\b(grep|rg|ag|ack)\b|"          # source code search
+        r"\b(grep|rg|ag|ack)\b|"  # source code search
         r"\b(cat|head|tail)\s+\S+\.(py|ts|js|tsx|jsx|go|rs|java)\b|"  # reading source files
-        r"\btest\s+-[fed]\b|"              # file existence checks
-        r"\[\s*-[fed]\s+",                 # [ -f file ] checks
+        r"\btest\s+-[fed]\b|"  # file existence checks
+        r"\[\s*-[fed]\s+",  # [ -f file ] checks
     )
 
     def _validate_contract_quality(self, contract: Contract):
@@ -194,7 +200,10 @@ class ContractManager:
         )
         success, structured = self.runner._run_claude_structured(
             prompt,
-            output_format={"type": "json_schema", "schema": strict_json_schema(Review.model_json_schema())},
+            output_format={
+                "type": "json_schema",
+                "schema": strict_json_schema(Review.model_json_schema()),
+            },
             timeout=1200,
             component=f"reviewer:phase-{phase.id}-i{iteration}",
         )
@@ -245,6 +254,7 @@ class ContractManager:
 
         # Send portal event (import here to avoid circular dependency)
         from outbid_dirigent.dirigent import get_portal_reporter
+
         reporter = get_portal_reporter()
         if reporter:
             reporter.review_result(
@@ -313,6 +323,7 @@ class ContractManager:
 
         # Send portal event (import here to avoid circular dependency)
         from outbid_dirigent.dirigent import get_portal_reporter
+
         reporter = get_portal_reporter()
         if reporter:
             reporter.review_fix(
@@ -354,7 +365,9 @@ class ContractManager:
         consecutive_errors = 0
 
         for iteration in range(1, self.MAX_REVIEW_ITERATIONS + 1):
-            logger.info(f"Phase {phase.id} review iteration {iteration}/{self.MAX_REVIEW_ITERATIONS}")
+            logger.info(
+                f"Phase {phase.id} review iteration {iteration}/{self.MAX_REVIEW_ITERATIONS}"
+            )
 
             verdict = self.review_phase(phase, plan, iteration)
 

@@ -22,6 +22,7 @@ from loguru import logger
 def _get_runs_root() -> Path:
     return Path.home() / ".dirigent" / "runs"
 
+
 # Subdirectories created inside each run dir
 _SUBDIRS = ["summaries", "reviews", "contracts", "logs", "hooks"]
 
@@ -38,7 +39,10 @@ def _get_commit_sha(repo_path: Path) -> str:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=repo_path, capture_output=True, text=True, timeout=5,
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         return result.stdout.strip() if result.returncode == 0 else "unknown"
     except Exception:

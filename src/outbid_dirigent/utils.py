@@ -53,12 +53,12 @@ def extract_phase_number(phase_id: Union[str, int]) -> int:
                 return int(part)
 
     # Versuche Zahlen am Ende zu finden (z.B. "phase01", "step2")
-    match = re.search(r'(\d+)$', phase_id)
+    match = re.search(r"(\d+)$", phase_id)
     if match:
         return int(match.group(1))
 
     # Versuche Zahlen irgendwo zu finden
-    match = re.search(r'(\d+)', phase_id)
+    match = re.search(r"(\d+)", phase_id)
     if match:
         return int(match.group(1))
 

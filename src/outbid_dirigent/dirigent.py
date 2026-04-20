@@ -17,17 +17,24 @@ import sys
 import os
 import tempfile
 from pathlib import Path
-from datetime import datetime
 from typing import Optional
 
 # Eigene Module
 from outbid_dirigent.logger import init_logger, get_logger
 from outbid_dirigent.analyzer import Analyzer, load_analysis
-from outbid_dirigent.router import Router, Route, RouteType, StepType, load_route, load_state, mark_step_complete
-from outbid_dirigent.executor import Executor, create_executor
+from outbid_dirigent.router import (
+    Router,
+    Route,
+    RouteType,
+    StepType,
+    load_route,
+    load_state,
+    mark_step_complete,
+)
+from outbid_dirigent.executor import create_executor
 from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.questioner import create_questioner, create_dummy_questioner
-from outbid_dirigent.portal_reporter import PortalReporter, create_portal_reporter
+from outbid_dirigent.portal_reporter import create_portal_reporter
 
 # Global questioner instance (set in main)
 _questioner = None
@@ -36,30 +43,36 @@ _execution_mode = "autonomous"
 # Global portal reporter instance
 _portal_reporter = None
 
+
 def get_questioner():
     """Gibt die globale Questioner-Instanz zurück."""
     global _questioner
     return _questioner
+
 
 def set_questioner(questioner):
     """Setzt die globale Questioner-Instanz."""
     global _questioner
     _questioner = questioner
 
+
 def get_execution_mode():
     """Gibt den aktuellen Execution Mode zurück."""
     global _execution_mode
     return _execution_mode
+
 
 def set_execution_mode(mode: str):
     """Setzt den Execution Mode."""
     global _execution_mode
     _execution_mode = mode
 
+
 def get_portal_reporter():
     """Gibt die globale PortalReporter-Instanz zurück."""
     global _portal_reporter
     return _portal_reporter
+
 
 def set_portal_reporter(reporter):
     """Setzt die globale PortalReporter-Instanz."""
@@ -81,14 +94,18 @@ def _install_info() -> str:
     """
     import subprocess
     from outbid_dirigent import __version__
+
     try:
         import outbid_dirigent as _pkg
+
         pkg_dir = Path(_pkg.__file__).parent
         for parent in [pkg_dir, *pkg_dir.parents]:
             if (parent / ".git").exists():
                 result = subprocess.run(
                     ["git", "-C", str(parent), "rev-parse", "--short", "HEAD"],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     return f"v{__version__} ({result.stdout.strip()})"
@@ -98,6 +115,7 @@ def _install_info() -> str:
 
     try:
         from outbid_dirigent import _build_info
+
         commit = getattr(_build_info, "COMMIT", None)
         if commit and commit != "unknown":
             return f"v{__version__} ({commit})"
@@ -134,6 +152,7 @@ def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
 # ══════════════════════════════════════════════════════════════════════════════
 # SPEC RESOLUTION — Priority: file > inline description > interactive > yolo
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _gather_repo_context(repo_path: Path) -> str:
     """Collect well-known context files from the repo for spec generation."""
@@ -234,8 +253,12 @@ def resolve_spec(args, repo_path: Path) -> Path:
         dirigent_dir = repo_path / ".dirigent"
         dirigent_dir.mkdir(parents=True, exist_ok=True)
         spec_tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".md", prefix="spec-", dir=dirigent_dir,
-            delete=False, encoding="utf-8",
+            mode="w",
+            suffix=".md",
+            prefix="spec-",
+            dir=dirigent_dir,
+            delete=False,
+            encoding="utf-8",
         )
         spec_tmp.write(stdin_content)
         spec_tmp.close()
@@ -256,8 +279,8 @@ def resolve_spec(args, repo_path: Path) -> Path:
     if not description:
         print("❌ Kein Spec gefunden. Entweder:", file=sys.stderr)
         print("   dirigent --repo . --spec path/to/SPEC.md", file=sys.stderr)
-        print("   dirigent --repo . \"Add a dark mode toggle\"", file=sys.stderr)
-        print("   dirigent --repo . --yolo \"Add a dark mode toggle\"", file=sys.stderr)
+        print('   dirigent --repo . "Add a dark mode toggle"', file=sys.stderr)
+        print('   dirigent --repo . --yolo "Add a dark mode toggle"', file=sys.stderr)
         sys.exit(1)
 
     # 6. Have a description — generate spec
@@ -269,7 +292,9 @@ def resolve_spec(args, repo_path: Path) -> Path:
         return _generate_spec_interactive(repo_path, description)
 
 
-def run_analysis(repo_path: Path, spec_path: Path, force: bool = False, dirigent_dir: Optional[Path] = None):
+def run_analysis(
+    repo_path: Path, spec_path: Path, force: bool = False, dirigent_dir: Optional[Path] = None
+):
     """Führt die Analyse durch."""
     logger = get_logger()
     reporter = get_portal_reporter()
@@ -370,11 +395,19 @@ def run_execution(
 ) -> bool:
     """Führt alle Schritte basierend auf der Route aus."""
     import json
+
     logger = get_logger()
     reporter = get_portal_reporter()
     executor = create_executor(
-        str(repo_path), str(spec_path), dry_run, use_proteus, model, effort,
-        portal_url=portal_url, execution_id=execution_id, reporter_token=reporter_token,
+        str(repo_path),
+        str(spec_path),
+        dry_run,
+        use_proteus,
+        model,
+        effort,
+        portal_url=portal_url,
+        execution_id=execution_id,
+        reporter_token=reporter_token,
     )
     executor.force_continue = force_continue
     questioner = get_questioner()
@@ -394,7 +427,9 @@ def run_execution(
             if step.step_type == StepType.PLANNING:
                 plan_file = dirigent_dir / "PLAN.json"
                 if not plan_file.exists():
-                    logger.info("Planung als abgeschlossen markiert aber PLAN.json fehlt — führe Planung erneut durch")
+                    logger.info(
+                        "Planung als abgeschlossen markiert aber PLAN.json fehlt — führe Planung erneut durch"
+                    )
                 else:
                     logger.skip(step_name, "bereits abgeschlossen")
                     continue
@@ -406,45 +441,66 @@ def run_execution(
 
         if step.step_type == StepType.INIT:
             if reporter:
-                reporter.stage_start("init", "Bootstrap dev environment and configure e2e credentials")
+                reporter.stage_start(
+                    "init", "Bootstrap dev environment and configure e2e credentials"
+                )
             success = executor.run_init()
             if reporter:
-                reporter.stage_complete("init", "Init phase complete" if success else "Init phase failed")
+                reporter.stage_complete(
+                    "init", "Init phase complete" if success else "Init phase failed"
+                )
 
         elif step.step_type == StepType.GREENFIELD_SCAFFOLD:
             if reporter:
-                reporter.stage_start("greenfield_scaffold", "Propose test setup and architecture best practices")
+                reporter.stage_start(
+                    "greenfield_scaffold", "Propose test setup and architecture best practices"
+                )
             success = executor.greenfield_scaffold()
             if reporter:
-                reporter.stage_complete("greenfield_scaffold", "Scaffold complete" if success else "Scaffold failed")
+                reporter.stage_complete(
+                    "greenfield_scaffold", "Scaffold complete" if success else "Scaffold failed"
+                )
 
         elif step.step_type == StepType.BUSINESS_RULE_EXTRACTION:
             if reporter:
                 reporter.stage_start("business_rules", "Extrahiere Business Rules aus der Codebase")
             success = executor.extract_business_rules()
             if reporter:
-                reporter.stage_complete("business_rules", "Business Rules extrahiert" if success else "Fehler bei Extraktion")
+                reporter.stage_complete(
+                    "business_rules",
+                    "Business Rules extrahiert" if success else "Fehler bei Extraktion",
+                )
 
         elif step.step_type == StepType.QUICK_SCAN:
             if reporter:
                 reporter.stage_start("quick_scan", "Scanne relevante Dateien für das Feature")
             success = executor.quick_scan()
             if reporter:
-                reporter.stage_complete("quick_scan", "Quick Scan abgeschlossen" if success else "Fehler bei Quick Scan")
+                reporter.stage_complete(
+                    "quick_scan", "Quick Scan abgeschlossen" if success else "Fehler bei Quick Scan"
+                )
 
         elif step.step_type == StepType.INCREASE_TESTABILITY:
             if reporter:
                 reporter.stage_start("testability", "Analyse und Verbesserung der Testbarkeit")
             success = executor.increase_testability()
             if reporter:
-                reporter.stage_complete("testability", "Testability-Analyse abgeschlossen" if success else "Testability-Analyse fehlgeschlagen")
+                reporter.stage_complete(
+                    "testability",
+                    "Testability-Analyse abgeschlossen"
+                    if success
+                    else "Testability-Analyse fehlgeschlagen",
+                )
 
         elif step.step_type == StepType.ADD_TRACKING:
             if reporter:
                 reporter.stage_start("tracking", "PostHog Setup und Event-Identifikation")
             success = executor.add_tracking()
             if reporter:
-                reporter.stage_complete("tracking", "Tracking Setup abgeschlossen" if success else "Tracking Setup fehlgeschlagen")
+                reporter.stage_complete(
+                    "tracking",
+                    "Tracking Setup abgeschlossen" if success else "Tracking Setup fehlgeschlagen",
+                )
 
         elif step.step_type == StepType.PLANNING:
             # Skip planning if PLAN.json already exists (e.g. from --plan-only)
@@ -458,7 +514,12 @@ def run_execution(
                 success = executor.create_plan()
 
             # plan_first: Nach Plan-Erstellung auf Genehmigung warten
-            if success and execution_mode == "plan_first" and questioner and questioner.is_enabled():
+            if (
+                success
+                and execution_mode == "plan_first"
+                and questioner
+                and questioner.is_enabled()
+            ):
                 plan_file = dirigent_dir / "PLAN.json"
                 if plan_file.exists():
                     try:
@@ -469,7 +530,9 @@ def run_execution(
                         result = questioner.submit_plan_for_approval(plan_content)
 
                         if result["status"] == "rejected":
-                            logger.stop(f"Plan abgelehnt: {result.get('message', 'Keine Begründung')}")
+                            logger.stop(
+                                f"Plan abgelehnt: {result.get('message', 'Keine Begründung')}"
+                            )
                             return False
 
                         elif result["status"] == "timeout":
@@ -498,28 +561,42 @@ def run_execution(
                 reporter.stage_start("execution", "Führe Tasks mit Claude Code aus")
             success = executor.execute_plan()
             if reporter:
-                reporter.stage_complete("execution", "Ausführung abgeschlossen" if success else "Ausführung fehlgeschlagen")
+                reporter.stage_complete(
+                    "execution",
+                    "Ausführung abgeschlossen" if success else "Ausführung fehlgeschlagen",
+                )
 
         elif step.step_type == StepType.ENTROPY_MINIMIZATION:
             if reporter:
-                reporter.stage_start("entropy_minimization", "Align docs, remove dead code, resolve contradictions")
+                reporter.stage_start(
+                    "entropy_minimization", "Align docs, remove dead code, resolve contradictions"
+                )
             success = executor.entropy_minimization()
             if reporter:
-                reporter.stage_complete("entropy_minimization", "Entropy minimization abgeschlossen" if success else "Entropy minimization fehlgeschlagen")
+                reporter.stage_complete(
+                    "entropy_minimization",
+                    "Entropy minimization abgeschlossen"
+                    if success
+                    else "Entropy minimization fehlgeschlagen",
+                )
 
         elif step.step_type == StepType.TEST:
             if reporter:
                 reporter.stage_start("testing", "Führe Test-Suite aus")
             success = executor.run_tests()
             if reporter:
-                reporter.stage_complete("testing", "Tests bestanden" if success else "Tests fehlgeschlagen")
+                reporter.stage_complete(
+                    "testing", "Tests bestanden" if success else "Tests fehlgeschlagen"
+                )
 
         elif step.step_type == StepType.SHIP:
             if reporter:
                 reporter.stage_start("shipping", "Erstelle Branch und PR")
             success = executor.ship()
             if reporter:
-                reporter.stage_complete("shipping", "PR erstellt" if success else "Shipping fehlgeschlagen")
+                reporter.stage_complete(
+                    "shipping", "PR erstellt" if success else "Shipping fehlgeschlagen"
+                )
             # Send 'complete' event AFTER shipping (not after execute_plan)
             executor.finalize(success=success)
 
@@ -535,7 +612,14 @@ def run_execution(
     return True
 
 
-def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, use_proteus: bool = False, model: str = "", effort: str = "") -> bool:
+def resume_execution(
+    repo_path: Path,
+    spec_path: Path,
+    dry_run: bool = False,
+    use_proteus: bool = False,
+    model: str = "",
+    effort: str = "",
+) -> bool:
     """Setzt eine unterbrochene Ausführung fort."""
     logger = get_logger()
 
@@ -554,7 +638,6 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
     router = Router(str(repo_path))
 
     # Dummy-Analyse für Route-Bestimmung (wir haben ja schon die Route)
-    from outbid_dirigent.analyzer import AnalysisResult, RepoAnalysis, SpecAnalysis
     analysis = load_analysis(str(repo_path), dirigent_dir=dirigent_dir)
 
     if not analysis:
@@ -583,7 +666,9 @@ def resume_execution(repo_path: Path, spec_path: Path, dry_run: bool = False, us
         last_task = state["completed_tasks"][-1]
         logger.resume(last_task)
 
-    return run_execution(repo_path, spec_path, route, dry_run, use_proteus, model=model, effort=effort)
+    return run_execution(
+        repo_path, spec_path, route, dry_run, use_proteus, model=model, effort=effort
+    )
 
 
 def main():
@@ -612,7 +697,8 @@ Beispiele:
     )
 
     parser.add_argument(
-        "-V", "--version",
+        "-V",
+        "--version",
         action="version",
         version=f"outbid-dirigent {__version__}",
     )
@@ -833,11 +919,14 @@ Beispiele:
     # Demo-Modus: Simulierte Events senden und beenden
     if args.demo:
         if not has_credentials:
-            logger.error("Demo-Modus benötigt Portal-Credentials (--portal-url, --execution-id, --reporter-token)")
+            logger.error(
+                "Demo-Modus benötigt Portal-Credentials (--portal-url, --execution-id, --reporter-token)"
+            )
             sys.exit(1)
 
         logger.info("🎭 Demo-Modus aktiviert - sende simulierte Events")
         from outbid_dirigent.demo_runner import run_demo
+
         try:
             run_demo(
                 portal_url=args.portal_url,
@@ -867,7 +956,9 @@ Beispiele:
     else:
         set_questioner(create_dummy_questioner())
         if needs_questioner:
-            logger.warn(f"Execution Mode '{args.execution_mode}' benötigt Portal-Credentials (fehlen)")
+            logger.warn(
+                f"Execution Mode '{args.execution_mode}' benötigt Portal-Credentials (fehlen)"
+            )
 
     try:
         # Polish-Modus: standalone spec→code gap audit. Skip analyze/route/plan/execute.
@@ -875,22 +966,31 @@ Beispiele:
             logger.info("🔎 Polish-Modus — Spec→Code Gap-Audit")
             # Check for uncommitted changes before starting (skill also checks, but fail loud here)
             import subprocess as _sp
+
             dirty = _sp.run(
                 ["git", "-C", str(repo_path), "status", "--porcelain"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             if dirty.stdout.strip():
                 logger.error("Working tree has uncommitted changes. Commit or stash first.")
                 sys.exit(1)
 
             executor = create_executor(
-                str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model, args.effort,
+                str(repo_path),
+                str(spec_path),
+                args.dry_run,
+                args.use_proteus,
+                args.model,
+                args.effort,
                 portal_url=args.portal_url or "",
                 execution_id=args.execution_id or "",
                 reporter_token=args.reporter_token or "",
             )
             prompt = f"Run /dirigent:polish --max-fixes {args.polish_max_fixes}"
-            success, _, stderr = executor.runner._run_claude(prompt, timeout=2400, component="polish")
+            success, _, stderr = executor.runner._run_claude(
+                prompt, timeout=2400, component="polish"
+            )
             if not success:
                 logger.error(f"Polish failed: {stderr[:300]}")
                 sys.exit(1)
@@ -902,7 +1002,9 @@ Beispiele:
                     applied = report.get("fixes_applied", 0)
                     deferred = report.get("fixes_deferred", 0)
                     abandoned = report.get("fixes_abandoned", 0)
-                    logger.info(f"Polish: {applied} fixes applied, {deferred} deferred, {abandoned} abandoned")
+                    logger.info(
+                        f"Polish: {applied} fixes applied, {deferred} deferred, {abandoned} abandoned"
+                    )
                 except Exception:
                     pass
             logger.info("Polish abgeschlossen.")
@@ -910,7 +1012,9 @@ Beispiele:
 
         # Resume-Modus
         if args.resume:
-            success = resume_execution(repo_path, spec_path, args.dry_run, args.use_proteus, args.model, args.effort)
+            success = resume_execution(
+                repo_path, spec_path, args.dry_run, args.use_proteus, args.model, args.effort
+            )
             sys.exit(0 if success else 1)
 
         # Normale Ausführung
@@ -930,6 +1034,7 @@ Beispiele:
         analysis = run_analysis(repo_path, spec_path, force=False, dirigent_dir=run_dir.path)
         if args.route:
             from outbid_dirigent.router import Router, RouteType
+
             router = Router(str(repo_path))
             route_type = RouteType(args.route)
             steps_map = {
@@ -941,6 +1046,7 @@ Beispiele:
                 RouteType.TRACKING: router.TRACKING_STEPS,
             }
             from outbid_dirigent.router import Route
+
             route = Route(
                 route_type=route_type,
                 reason=f"Manuell festgelegt via --route {args.route}",
@@ -965,7 +1071,14 @@ Beispiele:
 
         # Plan-Only: Nur bis Plan erstellen, dann stoppen
         if args.plan_only:
-            executor = create_executor(str(repo_path), str(spec_path), dry_run=False, use_proteus=args.use_proteus, model=args.model, effort=args.effort)
+            executor = create_executor(
+                str(repo_path),
+                str(spec_path),
+                dry_run=False,
+                use_proteus=args.use_proteus,
+                model=args.model,
+                effort=args.effort,
+            )
             success = executor.create_plan()
             if success:
                 plan_file = executor.dirigent_dir / "PLAN.json"
@@ -984,7 +1097,14 @@ Beispiele:
                 logger.info(f"Geschätzte Tasks: {route.estimated_tasks}")
             else:
                 success = run_execution(
-                    repo_path, spec_path, route, args.dry_run, args.use_proteus, execution_mode, args.model, args.effort,
+                    repo_path,
+                    spec_path,
+                    route,
+                    args.dry_run,
+                    args.use_proteus,
+                    execution_mode,
+                    args.model,
+                    args.effort,
                     portal_url=args.portal_url or "",
                     execution_id=args.execution_id or "",
                     reporter_token=args.reporter_token or "",
@@ -995,11 +1115,17 @@ Beispiele:
 
                 # Log final progress
                 from outbid_dirigent.progress import print_progress
+
                 logger.info("\n" + print_progress(str(repo_path), "console"))
 
                 # Summary generieren nach erfolgreicher Execution
                 executor = create_executor(
-                    str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model, args.effort,
+                    str(repo_path),
+                    str(spec_path),
+                    args.dry_run,
+                    args.use_proteus,
+                    args.model,
+                    args.effort,
                     portal_url=args.portal_url or "",
                     execution_id=args.execution_id or "",
                     reporter_token=args.reporter_token or "",
@@ -1011,7 +1137,9 @@ Beispiele:
 
         # Ship only
         if args.phase == "ship":
-            executor = create_executor(str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model)
+            executor = create_executor(
+                str(repo_path), str(spec_path), args.dry_run, args.use_proteus, args.model
+            )
             success = executor.ship()
             sys.exit(0 if success else 1)
 
@@ -1030,6 +1158,7 @@ Beispiele:
         logger.run_complete(success=False)
         if verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 
