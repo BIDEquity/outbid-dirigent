@@ -29,7 +29,7 @@ from outbid_dirigent.contract import ContractManager
 # Helpers
 # ══════════════════════════════════════════
 
-def _make_criterion(id_: str = "AC-01-01", layer: CriterionLayer = CriterionLayer.BEHAVIORAL) -> AcceptanceCriterion:
+def _make_criterion(id_: str = "AC-01-01", layer: CriterionLayer = CriterionLayer.USER_JOURNEY) -> AcceptanceCriterion:
     return AcceptanceCriterion(
         id=id_,
         description="Something works",
