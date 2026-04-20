@@ -182,7 +182,7 @@ class TestContractSaveLoad:
         assert "AC-01-01" in summary
         assert "Health endpoint responds 200" in summary
         assert "Run: curl -sf http://localhost:3000/health" in summary
-        assert "behavioral" in summary
+        assert "user-journey" in summary
 
     def test_summary_for_prompt_includes_phase_id_and_objective(self):
         contract = _make_contract(objective="Set up the database schema")

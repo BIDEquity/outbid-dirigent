@@ -183,7 +183,7 @@ def handle_create_contract(prompt: str):
                 "id": f"AC-{phase_id}-02",
                 "description": "Core function returns expected value",
                 "verification": f"Run: python -c \"from src.task_{phase_id.replace('-','_')}_01 import *; print('ok')\"",
-                "layer": "behavioral",
+                "layer": "user-journey",
             },
         ],
         "quality_gates": [
