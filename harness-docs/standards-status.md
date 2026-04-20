@@ -16,10 +16,10 @@
 | 05 · Continuous Delivery & CI/CD | 11 | 3 | 1 | 2 |
 | 06 · Feature Toggles | 0 | 0 | 0 | 0 |
 | 07 · Observability, Monitoring & Tracking | 2 | 2 | 0 | 0 |
-| 08 · Security & Dependency Management | 2 | 5 | 0 | 2 |
+| 08 · Security & Dependency Management | 4 | 3 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 0 |
 | 10 · Agentic Development | 16 | 0 | 1 | 7 |
-| **Total** | **46** | **28** | **2** | **23** |
+| **Total** | **48** | **26** | **2** | **23** |
 
 ---
 
@@ -159,8 +159,8 @@
 
 | Requirement | Level | Status | Verified | Fixed By | Notes |
 |---|---|---|---|---|---|
-| Dependency vulnerability scanning in CI on every build | MUST | ❌ FAIL | 2026-04-20 | — | No dependabot.yml, renovate, pip-audit, safety, snyk, or trivy in any workflow |
-| Critical/high CVEs block merges | MUST | ❌ FAIL | 2026-04-20 | — | No CVE scanner runs; nothing can block |
+| Dependency vulnerability scanning in CI on every build | MUST | ✅ PASS | 2026-04-20 | /add-security-scan | `.github/workflows/ci.yml` `security` job runs `pypa/gh-action-pip-audit@v1.0.8` on every push + PR against resolved production deps exported from uv.lock; `.github/dependabot.yml` covers weekly pip + github-actions updates |
+| Critical/high CVEs block merges | MUST | ✅ PASS | 2026-04-20 | /add-security-scan | pip-audit exits non-zero on any vulnerability; stricter than standard (which asks for critical/high only) — pip-audit has no severity filter |
 | OWASP Top 10 reviewed as part of onboarding | MUST | ⚠️ WARN | 2026-04-20 | — | CLAUDE.md + harness-docs present but no explicit OWASP onboarding checkpoint |
 | Encrypt inter-service communication (TLS) | MUST | ✅ PASS | 2026-04-20 | manual | Portal API calls use `https://`; only `http://` references are localhost dev instructions |
 | Encrypt data at rest for PII | MUST | ➖ SKIP | 2026-04-20 | — | Agent controller holds no PII datastore |

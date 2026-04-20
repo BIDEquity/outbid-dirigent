@@ -23,6 +23,28 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
+  security:
+    name: Security Scan (pip-audit)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Export resolved production dependencies from uv.lock
+        # pip-audit scans a requirements file; uv export produces a resolved
+        # transitive-closure requirements file from uv.lock so the audit
+        # covers every package that actually ships, not just direct deps.
+        run: uv export --format requirements-txt --no-hashes --no-dev --output-file /tmp/requirements.txt
+      - name: Dependency vulnerability scan
+        # Blocks the build on any CVE against production deps. Stricter
+        # than the harness standard (which asks for critical/high only) —
+        # pip-audit has no severity filter, so we block on all. Revisit if
+        # low-severity noise appears.
+        uses: pypa/gh-action-pip-audit@v1.0.8
+        with:
+          inputs: /tmp/requirements.txt
+
   validate-version:
     name: Validate version
     runs-on: ubuntu-latest
