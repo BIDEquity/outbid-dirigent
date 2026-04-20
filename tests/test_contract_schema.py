@@ -80,8 +80,8 @@ class TestContractSaveLoad:
     def test_roundtrip(self, tmp_path):
         contract = _make_contract(
             acceptance_criteria=[
-                _make_criterion("AC-01-01", CriterionLayer.BEHAVIORAL),
-                _make_criterion("AC-01-02", CriterionLayer.BOUNDARY),
+                _make_criterion("AC-01-01", CriterionLayer.USER_JOURNEY),
+                _make_criterion("AC-01-02", CriterionLayer.EDGE_CASE),
             ],
             out_of_scope=["Deployment"],
             expected_files=[ExpectedFileChange(path="src/foo.py", change="Add class")],
@@ -94,8 +94,8 @@ class TestContractSaveLoad:
         assert loaded.phase_id == "01"
         assert loaded.phase_name == "Bootstrap"
         assert len(loaded.acceptance_criteria) == 2
-        assert loaded.acceptance_criteria[0].layer == CriterionLayer.BEHAVIORAL
-        assert loaded.acceptance_criteria[1].layer == CriterionLayer.BOUNDARY
+        assert loaded.acceptance_criteria[0].layer == CriterionLayer.USER_JOURNEY
+        assert loaded.acceptance_criteria[1].layer == CriterionLayer.EDGE_CASE
         assert loaded.out_of_scope == ["Deployment"]
         assert loaded.expected_files[0].path == "src/foo.py"
 
@@ -103,7 +103,7 @@ class TestContractSaveLoad:
         result = Contract.load(tmp_path / "nonexistent.json")
         assert result is None
 
-    def test_backward_compat_category_functional_maps_to_behavioral(self, tmp_path):
+    def test_backward_compat_category_functional_maps_to_user_journey(self, tmp_path):
         raw = {
             "phase_id": "02",
             "phase_name": "Auth",
@@ -122,7 +122,7 @@ class TestContractSaveLoad:
         loaded = Contract.load(path)
 
         assert loaded is not None
-        assert loaded.acceptance_criteria[0].layer == CriterionLayer.BEHAVIORAL
+        assert loaded.acceptance_criteria[0].layer == CriterionLayer.USER_JOURNEY
 
     def test_backward_compat_category_quality_maps_to_structural(self, tmp_path):
         raw = {
@@ -145,7 +145,7 @@ class TestContractSaveLoad:
         assert loaded is not None
         assert loaded.acceptance_criteria[0].layer == CriterionLayer.STRUCTURAL
 
-    def test_backward_compat_unknown_category_defaults_to_behavioral(self, tmp_path):
+    def test_backward_compat_unknown_category_defaults_to_user_journey(self, tmp_path):
         raw = {
             "phase_id": "02",
             "phase_name": "Auth",
@@ -164,7 +164,7 @@ class TestContractSaveLoad:
         loaded = Contract.load(path)
 
         assert loaded is not None
-        assert loaded.acceptance_criteria[0].layer == CriterionLayer.BEHAVIORAL
+        assert loaded.acceptance_criteria[0].layer == CriterionLayer.USER_JOURNEY
 
     def test_summary_for_prompt_includes_verification(self):
         contract = _make_contract(
@@ -173,7 +173,7 @@ class TestContractSaveLoad:
                     id="AC-01-01",
                     description="Health endpoint responds 200",
                     verification="Run: curl -sf http://localhost:3000/health",
-                    layer=CriterionLayer.BEHAVIORAL,
+                    layer=CriterionLayer.USER_JOURNEY,
                 )
             ]
         )
