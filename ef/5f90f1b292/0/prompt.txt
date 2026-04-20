@@ -1,0 +1,37 @@
+/bid-harness:add-structured-logging
+
+---
+
+top 3 harness items now
+
+---
+
+why not struct. logging?
+
+---
+
+/bid-harness:verify-assessment
+
+---
+
+/add-structured-logging
+
+---
+
+/bid-harness:add-ci lint step
+
+---
+
+/bid-harness:add-security-scan
+
+---
+
+push branch
+
+---
+
+fix all 6 remaining ruff check(s)
+
+---
+
+was hat der hook damit zu tun?

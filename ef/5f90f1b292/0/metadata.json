@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "ef5f90f1b292",
+  "session_id": "f96b8728-bb6c-4f4a-917e-5cf2021349f4",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-20T20:21:00.557133Z",
+  "branch": "feat/logging",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/outbid_dirigent/analyzer.py",
+    "src/outbid_dirigent/contract.py",
+    "src/outbid_dirigent/demo_runner.py",
+    "src/outbid_dirigent/dirigent.py",
+    "src/outbid_dirigent/executor.py",
+    "src/outbid_dirigent/oracle.py",
+    "src/outbid_dirigent/plugin/scripts/validate_review.py",
+    "src/outbid_dirigent/portal_reporter.py",
+    "src/outbid_dirigent/proteus_integration.py",
+    "src/outbid_dirigent/questioner.py",
+    "src/outbid_dirigent/router.py",
+    "src/outbid_dirigent/task_runner.py",
+    "tests/conftest.py",
+    "tests/fixtures/mock_claude.py",
+    "tests/integration/test_e2e_portal.py",
+    "tests/integration/test_portal_contract.py",
+    "tests/integration/test_simple_feature.py",
+    "tests/test_analyzer.py",
+    "tests/test_contract_schema.py",
+    "tests/test_e2e.py",
+    "tests/test_executor_integration.py",
+    "tests/test_oracle.py",
+    "tests/test_plan_schema.py",
+    "tests/test_smoke.py",
+    "tests/test_task_runner.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "3670a8f936c3",
+  "token_usage": {
+    "input_tokens": 320,
+    "cache_creation_tokens": 1645488,
+    "cache_read_tokens": 28637654,
+    "output_tokens": 187856,
+    "api_call_count": 134
+  },
+  "session_metrics": {
+    "turn_count": 22
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-20T20:20:59.818707Z",
+    "agent_lines": 0,
+    "human_added": 1397,
+    "human_modified": 750,
+    "human_removed": 0,
+    "total_committed": 1404,
+    "agent_percentage": 0
+  }
+}
