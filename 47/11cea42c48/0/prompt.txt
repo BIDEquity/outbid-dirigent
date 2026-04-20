@@ -19,3 +19,7 @@ semi
 ---
 
 /bid-harness:working-agreement pr template
+
+---
+
+commit all steps we did so far individually. the rest of changes is cleanup, commit this dirst
