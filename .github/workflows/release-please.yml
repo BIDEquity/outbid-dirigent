@@ -1,0 +1,17 @@
+name: Release Please
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  release-please:
+    name: Open / merge release PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

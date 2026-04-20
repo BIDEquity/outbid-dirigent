@@ -13,13 +13,13 @@
 | 02 · Architecture & Decision Records | 2 | 5 | 0 | 3 |
 | 03 · Code Quality, Reviews & Standards | 1 | 8 | 0 | 4 |
 | 04 · Test Strategy | 2 | 4 | 0 | 3 |
-| 05 · Continuous Delivery & CI/CD | 4 | 10 | 1 | 2 |
+| 05 · Continuous Delivery & CI/CD | 6 | 8 | 1 | 2 |
 | 06 · Feature Toggles | 0 | 0 | 0 | 0 |
 | 07 · Observability, Monitoring & Tracking | 0 | 4 | 0 | 1 |
 | 08 · Security & Dependency Management | 1 | 6 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 2 |
 | 10 · Agentic Development | 7 | 9 | 0 | 8 |
-| **Total** | **20** | **51** | **1** | **27** |
+| **Total** | **22** | **49** | **1** | **27** |
 
 ---
 
@@ -99,9 +99,9 @@
 |---|---|---|---|---|---|
 | Use Conventional Commits format | MUST | ⚠️ WARN | 2026-04-20 | — | Most recent commits conform; `bump:` and `refine:` types are non-standard |
 | Enforce Conventional Commits via commitlint in CI | MUST | ❌ FAIL | 2026-04-20 | — | No commitlint config; no commit-msg hook |
-| Follow SemVer | MUST | ✅ PASS | 2026-04-20 | — | Tags v1.0.0–v2.0.0 follow SemVer; ci.yml enforces PEP 440 pattern |
-| Automate version bumping via semantic-release/release-please | MUST | ❌ FAIL | 2026-04-20 | — | Uses manual `bump-my-version`; commit `bump: version 2.0.0rc4 -> 2.0.0` confirms manual bump |
-| Auto-generate CHANGELOG.md from commits | MUST | ⚠️ WARN | 2026-04-20 | — | No CHANGELOG.md; release.yml uses `generate_release_notes: true` (GitHub notes, not committed file) |
+| Follow SemVer | MUST | ✅ PASS | 2026-04-20 | /add-release | Tags v1.0.0–v2.0.0 follow SemVer; ci.yml enforces PEP 440 pattern; release-please-config.json declares `release-type: python` (SemVer) |
+| Automate version bumping via semantic-release/release-please | MUST | ✅ PASS | 2026-04-20 | /add-release | Added `.github/workflows/release-please.yml` + `release-please-config.json` + `.release-please-manifest.json` seeded at 2.0.0; bump-my-version retained but will be superseded once release-please lands the first release PR |
+| Auto-generate CHANGELOG.md from commits | MUST | ✅ PASS | 2026-04-20 | /add-release | release-please generates/updates CHANGELOG.md on each release PR; existing release.yml still attaches built wheels on tag push |
 | CI runs on every commit | MUST | ✅ PASS | 2026-04-20 | — | `ci.yml`, `tests.yml`, `integration-tests.yml` trigger on push + PR |
 | CI includes linting | MUST | ❌ FAIL | 2026-04-20 | — | No ruff/black/flake8/pylint step in any workflow |
 | CI includes unit tests | MUST | ✅ PASS | 2026-04-20 | — | `tests.yml` runs `pytest tests/` |
