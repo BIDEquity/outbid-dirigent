@@ -1,0 +1,9 @@
+{
+  "name": "bid-harness",
+  "version": "1.0.0",
+  "description": "Engineering standards and improvement workflows for portfolio company repositories",
+  "author": {
+    "name": "Bid/PMI Engineering"
+  },
+  "keywords": ["engineering-standards", "portfolio", "documentation", "ci-cd", "adr", "pir"]
+}

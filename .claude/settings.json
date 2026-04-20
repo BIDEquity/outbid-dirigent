@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "deny": [
+      "Read(./.entire/metadata/**)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -101,9 +106,50 @@
       }
     ]
   },
-  "permissions": {
-    "deny": [
-      "Read(./.entire/metadata/**)"
-    ]
-  }
+  "enabledPlugins": {
+    "bid-harness@bid-harness": true,
+    "superpowers@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "PreToolUse": [
+    {
+      "matcher": "Write|Edit",
+      "hooks": [
+        {
+          "type": "prompt",
+          "prompt": "Check if the file being written or edited contains hardcoded secrets, API keys, tokens, passwords, private keys, or credentials. Look for patterns like: API_KEY=, SECRET=, TOKEN=, PASSWORD=, PRIVATE_KEY, -----BEGIN.*KEY-----, and similar. If secrets are found, deny the write and instruct the agent to use environment variables or a secrets manager instead. If no secrets are found, allow the write.",
+          "timeout": 30
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "prompt",
+          "prompt": "Before the agent stops: (1) If new functionality was written without corresponding tests in this session, suggest running /test-bootstrap. (2) If a commit was made, verify the message follows Conventional Commits format.",
+          "timeout": 30
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "Write|Edit",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "file=\"$CLAUDE_FILE\"; if [[ \"$file\" == *.py ]]; then command -v ruff &>/dev/null && ruff format --quiet \"$file\" && ruff check --fix --quiet \"$file\" 2>/dev/null; fi; exit 0",
+          "timeout": 30
+        }
+      ]
+    }
+  ]
 }
