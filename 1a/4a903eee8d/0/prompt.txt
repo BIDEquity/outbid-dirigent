@@ -11,3 +11,7 @@ why not struct. logging?
 ---
 
 /bid-harness:verify-assessment
+
+---
+
+/add-structured-logging
