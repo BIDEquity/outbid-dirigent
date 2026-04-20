@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from enum import Enum
+from uuid import uuid4
 
 
 class LogLevel(Enum):
@@ -22,6 +23,8 @@ class LogLevel(Enum):
 
 class DirigentLogger:
     """Strukturierter Logger für den Outbid Dirigenten."""
+
+    SERVICE_NAME = "outbid-dirigent"
 
     ICONS = {
         "start": "🎼",
@@ -63,6 +66,12 @@ class DirigentLogger:
         self.log_dir = (dirigent_dir or self.repo_path / ".dirigent") / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
+        # Correlation ID for this run. When dirigent is spawned by the portal
+        # it receives EXECUTION_ID so all emitted events correlate against the
+        # same Outbid execution. For local runs without a portal, fall back to
+        # a UUID so the run is still internally consistent.
+        self._trace_id = os.getenv("EXECUTION_ID") or uuid4().hex
+
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.log_file = self.log_dir / f"run-{timestamp}.log"
         self.json_log_file = self.log_dir / f"run-{timestamp}.jsonl"
@@ -98,6 +107,8 @@ class DirigentLogger:
         event = {
             "type": event_type,
             "ts": self._iso_timestamp(),
+            "service": self.SERVICE_NAME,
+            "trace_id": self._trace_id,
             "data": data,
         }
         try:
@@ -114,7 +125,9 @@ class DirigentLogger:
 
     def _write_json_log(self, entry: dict):
         """Schreibt strukturierten Log-Eintrag als JSON."""
-        entry["timestamp"] = datetime.now().isoformat()
+        entry["timestamp"] = self._iso_timestamp()
+        entry["service"] = self.SERVICE_NAME
+        entry["trace_id"] = self._trace_id
         with open(self.json_log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 

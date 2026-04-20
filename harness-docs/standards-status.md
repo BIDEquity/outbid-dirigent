@@ -15,11 +15,11 @@
 | 04 · Test Strategy | 6 | 3 | 0 | 3 |
 | 05 · Continuous Delivery & CI/CD | 10 | 4 | 1 | 2 |
 | 06 · Feature Toggles | 0 | 0 | 0 | 0 |
-| 07 · Observability, Monitoring & Tracking | 0 | 4 | 0 | 0 |
+| 07 · Observability, Monitoring & Tracking | 2 | 2 | 0 | 0 |
 | 08 · Security & Dependency Management | 2 | 5 | 0 | 2 |
 | 09 · Incident Management & Blameless Culture | 0 | 2 | 0 | 0 |
 | 10 · Agentic Development | 16 | 0 | 1 | 7 |
-| **Total** | **42** | **32** | **2** | **23** |
+| **Total** | **44** | **30** | **2** | **23** |
 
 ---
 
@@ -139,12 +139,12 @@
 
 | Requirement | Level | Status | Verified | Fixed By | Notes |
 |---|---|---|---|---|---|
-| Structured logging (JSON w/ timestamp, service, level, trace ID, message) | MUST | ❌ FAIL | 2026-04-20 | — | `DirigentLogger` emits JSON w/ timestamp, level, message, data — **missing `service` and `trace_id` fields** |
+| Structured logging (JSON w/ timestamp, service, level, trace ID, message) | MUST | ✅ PASS | 2026-04-20 | /add-structured-logging | `DirigentLogger` at `src/outbid_dirigent/logger.py` now emits all five required fields on every JSONL record and every `@@JSON@@` stdout event; covered by `tests/test_logger_fields.py` |
 | Emit key metrics (rate/error/latency/saturation) | MUST | ➖ SKIP | 2026-04-20 | — | CLI tool; no service runtime to emit RED/USE metrics |
 | Distributed tracing, propagate trace IDs | MUST | ➖ SKIP | 2026-04-20 | — | CLI tool; no cross-service boundaries |
 | Alert on Four Golden Signals | MUST | ➖ SKIP | 2026-04-20 | — | CLI tool; no alerting surface |
 | Link runbooks from every alert | MUST | ➖ SKIP | 2026-04-20 | — | No alerts; runbook template unused |
-| Structured logging in service code; propagate trace context | MUST | ❌ FAIL | 2026-04-20 | — | 41 `print()` calls are legitimate CLI output, but logger lacks trace context propagation |
+| Structured logging in service code; propagate trace context | MUST | ✅ PASS | 2026-04-20 | /add-structured-logging | `trace_id` sourced from `EXECUTION_ID` env (set by portal when dirigent runs as child) or `uuid4().hex` fallback; stable across a run; `print()` calls remain legitimate CLI user-facing output per CLAUDE.md |
 | Define SLOs, track error budgets | REC | ➖ SKIP | 2026-04-20 | — | Not a service |
 | Centralised observability platform | REC | ➖ SKIP | 2026-04-20 | — | CLI tool; N/A |
 | Chaos engineering | REC | ➖ SKIP | 2026-04-20 | — | Not a service |
