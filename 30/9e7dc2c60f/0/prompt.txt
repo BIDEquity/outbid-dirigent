@@ -1,0 +1,5 @@
+what is commitlint? can we add it next?
+
+---
+
+/bid-harness:add-release add commitlint
