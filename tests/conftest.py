@@ -126,10 +126,10 @@ def fake_claude_env(tmp_path, git_repo, monkeypatch):
         )
         return result.returncode == 0, result.stdout, result.stderr
 
-    def fake_run_claude(self, prompt, timeout=0, model="", effort="", system_prompt=""):
+    def fake_run_claude(self, prompt, timeout=0, model="", effort="", system_prompt="", component="", **_kwargs):
         return _invoke_fake(self.repo_path, prompt)
 
-    def fake_run_claude_structured(self, prompt, output_format, timeout=0, model="", effort="", system_prompt="", agents=None):
+    def fake_run_claude_structured(self, prompt, output_format, timeout=0, model="", effort="", system_prompt="", agents=None, component="", **_kwargs):
         _invoke_fake(self.repo_path, prompt)
 
         # Detect which file was written and return it as structured dict
