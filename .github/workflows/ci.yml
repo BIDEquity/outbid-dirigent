@@ -41,7 +41,7 @@ jobs:
         # than the harness standard (which asks for critical/high only) —
         # pip-audit has no severity filter, so we block on all. Revisit if
         # low-severity noise appears.
-        uses: pypa/gh-action-pip-audit@v1.0.8
+        uses: pypa/gh-action-pip-audit@v1.1.0
         with:
           inputs: /tmp/requirements.txt
 
