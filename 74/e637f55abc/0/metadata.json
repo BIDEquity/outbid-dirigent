@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "74e637f55abc",
+  "session_id": "67db5bd5-d4e2-4159-8b1c-896f4e64a77d",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-21T14:55:41.083844Z",
+  "branch": "feat/harness-install-and-phase-adrs",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "src/outbid_dirigent/dirigent.py",
+    "src/outbid_dirigent/executor.py",
+    "src/outbid_dirigent/router.py",
+    "tests/test_harness_install.py",
+    "tests/test_router.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "ae4801de39c8",
+  "token_usage": {
+    "input_tokens": 128,
+    "cache_creation_tokens": 197159,
+    "cache_read_tokens": 12539028,
+    "output_tokens": 48271,
+    "api_call_count": 96
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-21T14:55:40.796632Z",
+    "agent_lines": 238,
+    "human_added": 0,
+    "human_modified": 1,
+    "human_removed": 76,
+    "total_committed": 239,
+    "agent_percentage": 99.581589958159
+  }
+}

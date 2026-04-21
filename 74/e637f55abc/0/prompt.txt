@@ -1,0 +1,21 @@
+Add a step that install the outbid-harness in a repo - especially for greenfield repos, this is important. In other routes, if this step should run at the beginning and check, if harness-docs fiolder is available. If not, it should install the harness.
+
+In greenfield route, harness should be installed after greenfield scaffold.
+
+Installation must be programmatic.
+
+---
+
+is there a smoke-test for this?
+
+---
+
+yes. set OUTBID_HARNESS_PATH correctly
+
+---
+
+next: we would like to add adr s after each phase in greenfield and hybrid route. This is tricky, as we cannot do it purely programmatic
+
+---
+
+Running the "/adr" skill with input and saying, "do it autonomously or pricifing a good prompt is sufficient.
