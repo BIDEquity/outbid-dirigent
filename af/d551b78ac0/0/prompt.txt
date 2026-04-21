@@ -1,0 +1,12 @@
+we had a schema error for "effort" in the plan. is that a string field?
+
+---
+
+error: option '--effort <level>' argument 'L' is invalid. It must be one of: low, medium, high, xhigh, max
+
+
+Is the plan generated with stuructured output?
+
+---
+
+yes. and also do the same for model. please also add xhigh to model constraints
