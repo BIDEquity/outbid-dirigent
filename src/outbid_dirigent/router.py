@@ -28,6 +28,7 @@ class RouteType(Enum):
 class StepType(Enum):
     INIT = "init"
     GREENFIELD_SCAFFOLD = "greenfield_scaffold"
+    HARNESS_INSTALL = "harness_install"
     BUSINESS_RULE_EXTRACTION = "business_rule_extraction"
     QUICK_SCAN = "quick_scan"
     INCREASE_TESTABILITY = "increase_testability"
@@ -81,8 +82,20 @@ class StateRecord(BaseModel):
 class Router:
     """Bestimmt den Ausführungspfad basierend auf der Analyse."""
 
+    # Shared across routes: installs the outbid-harness (CLAUDE.md, skills,
+    # agents, engineering standards) if `harness-docs/` is not present.
+    # Idempotent — greenfield always installs (no harness-docs yet); others
+    # skip if a prior install already produced the directory.
+    HARNESS_INSTALL_STEP = RouteStep(
+        step_type=StepType.HARNESS_INSTALL,
+        name="Harness Install",
+        description="Install outbid-harness if harness-docs/ is missing",
+        required=True,
+    )
+
     # Definitionen der Pfade
     QUICK_STEPS = [
+        HARNESS_INSTALL_STEP,
         RouteStep(
             step_type=StepType.PLANNING,
             name="Planung",
@@ -107,6 +120,7 @@ class Router:
             description="Pick stack, scaffold project, create ARCHITECTURE.md and start.sh",
             required=True,
         ),
+        HARNESS_INSTALL_STEP,
         RouteStep(
             step_type=StepType.PLANNING,
             name="Planung",
@@ -137,6 +151,7 @@ class Router:
     ]
 
     LEGACY_STEPS = [
+        HARNESS_INSTALL_STEP,
         RouteStep(
             step_type=StepType.INIT,
             name="Init Phase",
@@ -178,6 +193,7 @@ class Router:
     ]
 
     HYBRID_STEPS = [
+        HARNESS_INSTALL_STEP,
         RouteStep(
             step_type=StepType.INIT,
             name="Init Phase",
@@ -219,6 +235,7 @@ class Router:
     ]
 
     TESTABILITY_STEPS = [
+        HARNESS_INSTALL_STEP,
         RouteStep(
             step_type=StepType.INIT,
             name="Init Phase",
@@ -260,6 +277,7 @@ class Router:
     ]
 
     TRACKING_STEPS = [
+        HARNESS_INSTALL_STEP,
         RouteStep(
             step_type=StepType.INIT,
             name="Init Phase",
