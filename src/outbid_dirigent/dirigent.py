@@ -461,6 +461,18 @@ def run_execution(
                     "greenfield_scaffold", "Scaffold complete" if success else "Scaffold failed"
                 )
 
+        elif step.step_type == StepType.HARNESS_INSTALL:
+            if reporter:
+                reporter.stage_start(
+                    "harness_install", "Install outbid-harness if harness-docs/ missing"
+                )
+            success = executor.harness_install()
+            if reporter:
+                reporter.stage_complete(
+                    "harness_install",
+                    "Harness installed or already present" if success else "Harness install failed",
+                )
+
         elif step.step_type == StepType.BUSINESS_RULE_EXTRACTION:
             if reporter:
                 reporter.stage_start("business_rules", "Extrahiere Business Rules aus der Codebase")

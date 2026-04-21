@@ -6,6 +6,7 @@ Previously a 1300-line god class — now delegates to focused modules.
 """
 
 import json
+import os
 import re
 import requests
 import subprocess
@@ -221,6 +222,75 @@ class Executor:
         """Run init phase: discover and execute init scripts, detect e2e framework."""
         self._legacy_logger.info("Init Phase: Bootstrapping development environment")
         return self.init_phase.run()
+
+    # ══════════════════════════════════════════
+    # HARNESS INSTALL (All Routes)
+    # ══════════════════════════════════════════
+
+    def harness_install(self) -> bool:
+        """Install outbid-harness if harness-docs/ is missing.
+
+        Idempotent: skips when harness-docs/ already exists. Greenfield repos
+        always hit the install path; others skip on re-run.
+
+        Uses OUTBID_HARNESS_PATH as a local checkout when set, otherwise
+        fetches bootstrap.sh from the published URL.
+        """
+        harness_docs = self.repo_path / "harness-docs"
+        if harness_docs.is_dir():
+            logger.info(f"harness-docs/ already present at {harness_docs} — skipping install")
+            return True
+
+        local_harness = os.environ.get("OUTBID_HARNESS_PATH", "").strip()
+        if local_harness:
+            installer = Path(local_harness) / "install.sh"
+            if not installer.is_file():
+                logger.error(
+                    f"OUTBID_HARNESS_PATH={local_harness} set but install.sh not found"
+                )
+                return False
+            cmd = ["bash", str(installer), "--target", str(self.repo_path), "--yes"]
+            logger.info(f"Installing outbid-harness from local checkout: {local_harness}")
+        else:
+            bootstrap_url = (
+                "https://raw.githubusercontent.com/BIDEquity/outbid-harness/main/bootstrap.sh"
+            )
+            cmd = [
+                "bash",
+                "-c",
+                f'curl -fsSL {bootstrap_url} | bash -s -- --target "{self.repo_path}" --yes',
+            ]
+            logger.info(f"Installing outbid-harness via bootstrap: {bootstrap_url}")
+
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("Harness install timed out after 300s")
+            return False
+        except Exception as e:
+            logger.error(f"Harness install failed to launch: {e}")
+            return False
+
+        if result.returncode != 0:
+            logger.error(
+                f"Harness install exited with {result.returncode}: {result.stderr[:400]}"
+            )
+            return False
+
+        if not harness_docs.is_dir():
+            logger.error(
+                "Harness installer ran but harness-docs/ was not created — check stderr"
+            )
+            return False
+
+        logger.info("outbid-harness installed")
+        return True
 
     # ══════════════════════════════════════════
     # PROGRESS OUTPUT

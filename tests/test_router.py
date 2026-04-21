@@ -165,13 +165,16 @@ class TestBuildRoute:
     @pytest.mark.parametrize(
         "route_str,route_type",
         [
+            ("quick", RouteType.QUICK),
             ("legacy", RouteType.LEGACY),
             ("hybrid", RouteType.HYBRID),
             ("testability", RouteType.TESTABILITY),
             ("tracking", RouteType.TRACKING),
         ],
     )
-    def test_non_greenfield_routes_start_with_init(self, tmp_path, route_str, route_type):
+    def test_non_greenfield_routes_start_with_harness_install(
+        self, tmp_path, route_str, route_type
+    ):
         router = make_router(tmp_path)
         analysis = {
             "route": route_str,
@@ -181,7 +184,23 @@ class TestBuildRoute:
             "commit_count": 10,
         }
         route = router.determine_route(analysis)
-        assert route.steps[0].step_type == StepType.INIT
+        assert route.steps[0].step_type == StepType.HARNESS_INSTALL
+
+    @pytest.mark.parametrize(
+        "route_str",
+        ["legacy", "hybrid", "testability", "tracking"],
+    )
+    def test_non_greenfield_routes_run_init_after_harness(self, tmp_path, route_str):
+        router = make_router(tmp_path)
+        analysis = {
+            "route": route_str,
+            "route_reason": "",
+            "estimated_scope": "medium",
+            "file_count": 5,
+            "commit_count": 10,
+        }
+        route = router.determine_route(analysis)
+        assert route.steps[1].step_type == StepType.INIT
 
     def test_greenfield_starts_with_scaffold(self, tmp_path):
         router = make_router(tmp_path)
@@ -194,6 +213,18 @@ class TestBuildRoute:
         }
         route = router.determine_route(analysis)
         assert route.steps[0].step_type == StepType.GREENFIELD_SCAFFOLD
+
+    def test_greenfield_runs_harness_install_after_scaffold(self, tmp_path):
+        router = make_router(tmp_path)
+        analysis = {
+            "route": "greenfield",
+            "route_reason": "",
+            "estimated_scope": "medium",
+            "file_count": 5,
+            "commit_count": 10,
+        }
+        route = router.determine_route(analysis)
+        assert route.steps[1].step_type == StepType.HARNESS_INSTALL
 
     @pytest.mark.parametrize(
         "route_str",
