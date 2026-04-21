@@ -1,4 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "python"
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "package-name": "outbid-dirigent",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "src/outbid_dirigent/plugin/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
 }
