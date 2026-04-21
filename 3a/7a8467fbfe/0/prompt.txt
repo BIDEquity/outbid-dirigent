@@ -1,0 +1,1 @@
+is it possible to change the version for both the py package and the dirigent plugin? You are actually allowed to fix this on the same PR
