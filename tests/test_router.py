@@ -2,9 +2,11 @@
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 
+from outbid_dirigent.logger import DirigentLogger
 from outbid_dirigent.router import (
     Router,
     RouteType,
@@ -23,11 +25,17 @@ from outbid_dirigent.router import (
 
 
 def make_router(tmp_path: Path) -> Router:
+    # Silent no-op logger. Cast to DirigentLogger so Pyright is satisfied
+    # without needing to instantiate the full logger (which writes to disk).
+    silent_logger = cast(
+        DirigentLogger,
+        type(
+            "L", (), {k: (lambda *a, **kw: None) for k in ["debug", "info", "warning", "error"]}
+        )(),
+    )
     router = Router.__new__(Router)
     router.repo_path = tmp_path
-    router.logger = type(
-        "L", (), {k: (lambda *a, **kw: None) for k in ["debug", "info", "warning", "error"]}
-    )()
+    router.logger = silent_logger
     return router
 
 
@@ -270,6 +278,7 @@ class TestStateCRUD:
         state = {"completed_steps": [], "started_at": "2024-01-01T00:00:00"}
         save_state(str(tmp_path), state)
         loaded = load_state(str(tmp_path))
+        assert loaded is not None
         assert loaded["updated_at"] != ""
 
     def test_mark_step_complete_creates_state_if_missing(self, tmp_path):
@@ -282,12 +291,14 @@ class TestStateCRUD:
         mark_step_complete(str(tmp_path), "init")
         mark_step_complete(str(tmp_path), "init")
         loaded = load_state(str(tmp_path))
+        assert loaded is not None
         assert loaded["completed_steps"].count("init") == 1
 
     def test_mark_step_complete_appends_multiple(self, tmp_path):
         mark_step_complete(str(tmp_path), "init")
         mark_step_complete(str(tmp_path), "planning")
         loaded = load_state(str(tmp_path))
+        assert loaded is not None
         assert loaded["completed_steps"] == ["init", "planning"]
 
     def test_load_state_rejects_invalid_schema(self, tmp_path):
@@ -373,4 +384,5 @@ class TestRouteLoadSave:
         route = router.determine_route(analysis)
         router.save_route(route)
         loaded = load_route(str(tmp_path))
+        assert loaded is not None
         assert loaded["created_at"] != ""

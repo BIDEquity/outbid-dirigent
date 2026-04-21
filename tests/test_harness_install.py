@@ -14,15 +14,22 @@ from __future__ import annotations
 
 import stat
 from pathlib import Path
+from types import MethodType, SimpleNamespace
+from typing import cast
 
 from outbid_dirigent.executor import Executor
 
 
-def _make_stub(repo: Path):
-    """Minimal object with only what harness_install needs."""
-    stub = type("ExecStub", (), {})()
-    stub.repo_path = repo
-    return stub
+def _make_stub(repo: Path) -> Executor:
+    """Minimal object with only what harness_install needs.
+
+    Uses SimpleNamespace + MethodType so the method can be invoked as a
+    bound call while avoiding the full Executor dependency graph. Cast to
+    Executor so callers are typed cleanly.
+    """
+    stub = SimpleNamespace(repo_path=repo)
+    stub.harness_install = MethodType(Executor.harness_install, stub)
+    return cast(Executor, stub)
 
 
 def _write_installer(path: Path, body: str) -> None:
@@ -52,7 +59,7 @@ class TestHarnessInstallIdempotency:
         # and we'd see False. Idempotency must short-circuit before that.
         monkeypatch.setenv("OUTBID_HARNESS_PATH", "/definitely/not/a/real/path")
 
-        assert Executor.harness_install(_make_stub(tmp_path)) is True
+        assert _make_stub(tmp_path).harness_install() is True
 
 
 class TestHarnessInstallViaLocalPath:
@@ -66,7 +73,7 @@ class TestHarnessInstallViaLocalPath:
         repo.mkdir()
         monkeypatch.setenv("OUTBID_HARNESS_PATH", str(harness_dir))
 
-        assert Executor.harness_install(_make_stub(repo)) is True
+        assert _make_stub(repo).harness_install() is True
         assert (repo / "harness-docs").is_dir()
 
 
@@ -79,7 +86,7 @@ class TestHarnessInstallFailureModes:
         repo.mkdir()
         monkeypatch.setenv("OUTBID_HARNESS_PATH", str(harness_dir))
 
-        assert Executor.harness_install(_make_stub(repo)) is False
+        assert _make_stub(repo).harness_install() is False
 
     def test_returns_false_when_installer_exits_nonzero(self, tmp_path, monkeypatch):
         harness_dir = tmp_path / "harness"
@@ -89,7 +96,7 @@ class TestHarnessInstallFailureModes:
         repo.mkdir()
         monkeypatch.setenv("OUTBID_HARNESS_PATH", str(harness_dir))
 
-        assert Executor.harness_install(_make_stub(repo)) is False
+        assert _make_stub(repo).harness_install() is False
 
     def test_returns_false_when_installer_succeeds_but_docs_not_created(
         self, tmp_path, monkeypatch
@@ -102,4 +109,4 @@ class TestHarnessInstallFailureModes:
         repo.mkdir()
         monkeypatch.setenv("OUTBID_HARNESS_PATH", str(harness_dir))
 
-        assert Executor.harness_install(_make_stub(repo)) is False
+        assert _make_stub(repo).harness_install() is False

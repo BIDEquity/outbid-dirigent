@@ -13,7 +13,10 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from outbid_dirigent.brv_bridge import BrvBridge
 
 from loguru import logger
 
@@ -113,7 +116,7 @@ class TaskRunner:
         self.opencode_skill_catalog: list[dict] = []
         self.opencode_plugin_name: str = ""
         # BRV context-tree bridge — set by Executor if .brv/context-tree/ exists
-        self.brv_bridge = None
+        self.brv_bridge: Optional["BrvBridge"] = None
         # Discover spec images in .planning/assets/
         self.spec_images = self._discover_spec_images()
 

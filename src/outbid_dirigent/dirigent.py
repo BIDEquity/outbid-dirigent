@@ -203,7 +203,7 @@ def _generate_spec_interactive(repo_path: Path, description: str) -> Path:
     seed_path = dirigent_dir / "spec-seed.json"
     seed_path.write_text(json.dumps(seed, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    runner = TaskRunner(str(repo_path), str(dirigent_dir / "SPEC.md"))
+    runner = TaskRunner(repo_path, str(dirigent_dir / "SPEC.md"))
     success, _, stderr = runner._run_claude(
         "Run /dirigent:generate-spec",
         timeout=300,
