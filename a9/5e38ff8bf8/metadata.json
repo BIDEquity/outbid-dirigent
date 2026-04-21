@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "a95e38ff8bf8",
+  "strategy": "manual-commit",
+  "branch": "feat/harness-install-and-phase-adrs",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/dirigent.py",
+    "src/outbid_dirigent/task_runner.py",
+    "tests/test_harness_install.py",
+    "tests/test_router.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a9/5e38ff8bf8/0/metadata.json",
+      "transcript": "/a9/5e38ff8bf8/0/full.jsonl",
+      "content_hash": "/a9/5e38ff8bf8/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 26,
+    "cache_creation_tokens": 22374,
+    "cache_read_tokens": 5618126,
+    "output_tokens": 12843,
+    "api_call_count": 26
+  }
+}
