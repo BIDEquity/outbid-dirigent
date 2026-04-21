@@ -29,7 +29,7 @@ from outbid_dirigent.progress import ProgressRenderer
 from outbid_dirigent.proteus_integration import create_proteus_integration
 from outbid_dirigent.contract_schema import Review
 
-from outbid_dirigent.router import load_state, save_state
+from outbid_dirigent.router import load_state, load_route, save_state
 from outbid_dirigent.run_dir import RunDir
 from outbid_dirigent.shipper import Shipper
 from outbid_dirigent.task_runner import TaskRunner
@@ -530,6 +530,11 @@ class Executor:
                 logger.error("No PLAN.json found at %s", plan_path)
             return False
 
+        # Route-aware post-phase hooks (currently just ADR generation for
+        # greenfield/hybrid).
+        route_data = load_route(str(self.repo_path), dirigent_dir=self.dirigent_dir)
+        self._current_route = (route_data or {}).get("route", "")
+
         state = self._load_or_init_state()
 
         total_phases = len(plan.phases)
@@ -564,6 +569,8 @@ class Executor:
             if phase.id in state.get("completed_phases", []):
                 logger.info(f"Phase {phase.id} already completed, skipping")
                 continue
+
+            phase_start_sha = self._git_head_sha()
 
             contract_ok = self._create_phase_contract(phase, plan)
             if contract_ok:
@@ -652,6 +659,9 @@ class Executor:
                 phase_deviation_count,
                 phase_commit_count,
             )
+
+            if self._current_route in ("greenfield", "hybrid") and phase_start_sha:
+                self._capture_phase_adr(phase, phase_start_sha)
 
         # NOTE: run_complete() is called by finalize() after shipping, not here
         return True
@@ -754,6 +764,72 @@ class Executor:
             reporter.testing_complete(str(self.repo_path))
 
         return all_passed
+
+    # ══════════════════════════════════════════
+    # POST-PHASE ADR HOOK (Greenfield + Hybrid)
+    # ══════════════════════════════════════════
+
+    def _git_head_sha(self) -> str:
+        """Current HEAD SHA, or empty string if git call fails."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except Exception as e:
+            logger.warning(f"Could not read HEAD sha: {e}")
+        return ""
+
+    def _capture_phase_adr(self, phase, start_sha: str) -> None:
+        """Ask Claude to review the phase diff and write ADR(s) if warranted.
+
+        Non-blocking: failures are logged as warnings, never halt the run.
+        The prompt tells the agent to run autonomously and to skip /adr's
+        `/assess` prerequisite so we don't trigger a full standards audit
+        per phase.
+        """
+        if not (self.repo_path / "harness-docs").is_dir():
+            logger.info(f"Phase {phase.id}: harness-docs/ missing, skipping ADR capture")
+            return
+
+        prompt = (
+            f"Please analyze the changes made in phase {phase.id} "
+            f'("{phase.name}") of this dirigent run and capture any '
+            "architectural decisions as ADRs.\n\n"
+            f"Phase description: {phase.description or '(none provided)'}\n"
+            f"Diff range: git diff {start_sha}..HEAD\n"
+            f"SPEC context: {self.dirigent_dir}/SPEC.md (read for motivation)\n\n"
+            "Instructions:\n"
+            "- Work autonomously. DO NOT ask questions — infer context from the "
+            "diff, phase description, and SPEC.\n"
+            "- Use the template at harness-docs/templates/adr-template.md.\n"
+            "- Write ADR files directly to harness-docs/adr/NNNN-<slug>.md, "
+            "using the next available 4-digit number.\n"
+            "- Only create an ADR for meaningful architectural decisions: stack "
+            "or library choice, data model shape, topology, boundary, pattern. "
+            "Routine CRUD, wiring, or styling changes do NOT warrant an ADR.\n"
+            "- If nothing in this phase deserves an ADR, print 'NO_ADR' and "
+            "exit without writing or committing anything.\n"
+            "- Skip the /adr skill's `/assess` prerequisite — go straight to "
+            "writing the file.\n"
+            "- Commit any ADR(s) you create as their own commit: "
+            "'docs(adr): <short-title>'. Do not touch other files.\n"
+        )
+
+        success, _stdout, stderr = self.runner._run_claude(
+            prompt, timeout=600, component="phase-adr"
+        )
+        if not success:
+            logger.warning(
+                f"Phase {phase.id}: ADR capture failed (non-blocking): {stderr[:200]}"
+            )
+            return
+        logger.info(f"Phase {phase.id}: ADR capture complete")
 
     def _run_verification_cmd(self, command: str, name: str, timeout: int = 120) -> bool:
         """Run a single bash verification command. Returns True on success."""
