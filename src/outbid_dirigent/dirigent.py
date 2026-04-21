@@ -839,9 +839,9 @@ Beispiele:
 
     parser.add_argument(
         "--effort",
-        choices=["low", "medium", "high", "max"],
+        choices=["low", "medium", "high", "xhigh", "max"],
         default="",
-        help="Thinking Effort Level (low, medium, high, max). Leer = Default.",
+        help="Thinking Effort Level (low, medium, high, xhigh, max). Leer = Default.",
     )
 
     parser.add_argument(

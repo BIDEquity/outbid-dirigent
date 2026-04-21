@@ -36,9 +36,9 @@ class Task(BaseModel):
     files_to_create: list[str] = Field(default_factory=list)
     files_to_modify: list[str] = Field(default_factory=list)
     depends_on: list[str] = Field(default_factory=list)
-    model: str = ""
-    effort: str = ""
-    test_level: str = ""  # "", "L1", "L2"
+    model: Literal["", "haiku", "sonnet", "opus"] = ""
+    effort: Literal["", "low", "medium", "high", "xhigh", "max"] = ""
+    test_level: Literal["", "L1", "L2"] = ""
     convention_skills: list[str] = Field(
         default_factory=list
     )  # e.g. ["ruby-code-writing", "form-builder"]
