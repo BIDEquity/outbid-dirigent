@@ -144,11 +144,31 @@ First smoke spec (`tests/e2e/smoke.spec.ts`):
 ```typescript
 import { test, expect } from '@playwright/test'
 
-test('home page renders', async ({ page }) => {
+test('home page renders without console errors', async ({ page }) => {
+  const consoleErrors: string[] = []
+  const pageErrors: string[] = []
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text())
+  })
+  page.on('pageerror', (err) => {
+    pageErrors.push(`${err.name}: ${err.message}`)
+  })
+
   await page.goto('/')
   await expect(page.locator('body')).toBeVisible()
+
+  // Hydration mismatches, missing imports, and runtime React errors
+  // all surface here — not catching them means "body visible" passes
+  // against an app that is visibly broken in the console.
+  expect(
+    { consoleErrors, pageErrors },
+    `home page should not emit console or runtime errors`
+  ).toEqual({ consoleErrors: [], pageErrors: [] })
 })
 ```
+
+Why both listeners: `console` catches explicit `console.error(...)` calls and React's dev-mode hydration warnings; `pageerror` catches uncaught exceptions that don't go through `console`. A hydration mismatch (the failure mode in little-erp) produces a `console` error; an undefined-variable ReferenceError produces a `pageerror`.
 
 Run:
 
