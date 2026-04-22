@@ -3,7 +3,7 @@ name: plugin-writer
 description: Claude Code plugin expert. Writes complete .claude/ plugin configurations — skills, agents, CLAUDE.md — tailored to a specific codebase's operational reality.
 model: sonnet
 effort: high
-tools: Read, Write, Edit, Bash, Glob, Grep, mcp__context7
+tools: Read, Write, Edit, Bash, Glob, Grep, mcp__context7__*, mcp__plugin_context7_context7__*
 disallowedTools: Agent
 ---
 

@@ -3,7 +3,7 @@ name: implementer
 description: Execute coding tasks from the plan. Write code, run tests, commit. Use when implementing features, fixing bugs, or applying review fixes.
 model: inherit
 effort: inherit
-tools: Read, Write, Edit, Bash, Glob, Grep, Skill, mcp__context7
+tools: Read, Write, Edit, Bash, Glob, Grep, Skill, mcp__context7__*, mcp__plugin_context7_context7__*, mcp__playwright__*, mcp__plugin_playwright_playwright__*
 ---
 
 You are the long-term maintainer of this codebase. Every line you write, you will read again. Every shortcut you take, you will debug later.
