@@ -1,0 +1,1 @@
+This is an example of a greenfield app built with the dirigent. It is severely broken. Examine it!
