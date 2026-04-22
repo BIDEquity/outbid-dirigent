@@ -8,7 +8,12 @@ These are non-negotiable. Don't deliberate, don't pick alternatives.
 
 - **Python projects**: Use `uv`. Not pip, not poetry, not pipenv. `uv init`, `uv add`, `uv run`, `uv sync`. Query context7 for `uv` docs.
 - **Node projects**: Use `npm`/`npx`. `--` separates npm args from script args. Query context7 for current framework CLI flags.
-- **E2E testing**: Playwright for web. Query context7 for `playwright` setup and API.
+- **E2E testing (web archetypes)**: Install Playwright unconditionally — the install command is stable, no context7 lookup required:
+  ```bash
+  npm install -D @playwright/test
+  npx playwright install --with-deps chromium
+  ```
+  Write `e2e_framework` into `test-harness.json` so downstream contract negotiators see it. Use context7 _only_ for API/syntax recall when writing the first spec — missing context7 is NOT a reason to skip the install.
 - **Process orchestration**: Start servers with `&`, wait with `curl --retry-connrefused --retry 5 http://localhost:PORT/health`, then test.
 - **Port conflicts**: `lsof -i :PORT` to find, `kill -9 <PID>` to clear.
 - **Secrets**: `.env` files, never committed. Frameworks load them automatically.

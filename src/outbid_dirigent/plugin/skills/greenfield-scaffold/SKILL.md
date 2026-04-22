@@ -38,11 +38,12 @@ Use this table to navigate the skill. **Read only what you need for the current 
 | 2 | Verify stack availability | Pass/fail |
 | 3 | Assess existing repo structure | Skip-scaffold flag |
 | 4 | Run scaffold commands | Project skeleton on disk |
+| 4.5 | **Install E2E framework (mandatory for web archetypes)** | `@playwright/test` in devDependencies + `playwright.config.ts` + first smoke spec |
 | 5 | Write ARCHITECTURE.md | `<testing-verification>`, `<architecture-decisions>`, `<key-patterns>` |
-| 6 | Write test-harness.json | `${DIRIGENT_RUN_DIR}/test-harness.json` |
+| 6 | Write test-harness.json | `${DIRIGENT_RUN_DIR}/test-harness.json` (MUST include `e2e_framework` for web archetypes) |
 | 7 | Write start.sh | `start.sh` at repo root, executable, binds 0.0.0.0 |
 | 8 | Validate | All outputs verified |
-| 9 | Commit | `ARCHITECTURE.md` + `start.sh` committed |
+| 9 | Commit | `ARCHITECTURE.md` + `start.sh` + `playwright.config.ts` + smoke spec committed |
 
 ## When This Runs
 
@@ -62,7 +63,9 @@ Before writing scaffold commands, config syntax, or framework-specific code, alw
 2. mcp__context7__query-docs           →  libraryId=<result>, topic="<specific question>"
 ```
 
-This is mandatory — your training data may be stale. Scaffold commands, config formats, and API surfaces change between versions.
+This is strongly recommended — your training data may be stale. Scaffold commands, config formats, and API surfaces change between versions.
+
+**Missing context7 is not a reason to skip install steps.** Stable install/scaffold commands (e.g. `npm install -D @playwright/test`, `npx create-next-app`) do not require a docs lookup. Skipping them because context7 is unavailable caused the failure this skill is being hardened against. Use context7 for API/syntax recall _while writing code_; do not use its absence to opt out of mandatory install steps.
 
 ## Step 1: Classify the SPEC (TWO dimensions)
 
@@ -183,6 +186,27 @@ Read the "Scaffold" section of each stack file in your combo. Run the commands.
 The scaffold commands are documented in each stack file under `stacks/`. Do NOT invent scaffold commands — use exactly what the stack file specifies.
 
 **CRITICAL:** Never write framework config files manually (next.config.*, vite.config.*, etc.) — the scaffold generates version-correct configs.
+
+## Step 4.5: Install E2E framework (MANDATORY for web archetypes)
+
+If the chosen archetype has a browser-observable surface (any combo in the "Web Apps" table of `stacks/README.md`, plus all archetypes that include Next.js, Vite+React, Streamlit, or Gradio), install Playwright **unconditionally**.
+
+**This step is non-skippable.** "context7 not available" is NOT a valid reason to skip — the install command is stable and does not require docs lookup:
+
+```bash
+npm install -D @playwright/test
+npx playwright install --with-deps chromium
+# If --with-deps fails (no sudo), fall back to:
+npx playwright install chromium
+```
+
+Then commit a minimal `playwright.config.ts` and a first smoke spec at `tests/e2e/smoke.spec.ts`. The exact config/spec templates live in the stack file (`stacks/nextjs.md` → "E2E (Playwright)" section, `stacks/vite-react.md` → "E2E (Playwright)" section). Copy them verbatim and adjust only the `baseURL` / `webServer.command` to match the chosen port.
+
+**Rule:** if you do not finish Step 4.5, you do not proceed to Step 5. The contract negotiator downstream uses the presence of `e2e_framework` in `test-harness.json` (Step 6) to decide whether to write user-journey criteria backed by real browser tests or to fall back to weaker curl-based probes. Skipping this step silently degrades every downstream phase.
+
+**Mobile archetypes (Expo):** Playwright is not the right tool — defer to `stacks/expo.md` for the Expo-specific e2e approach (Detox / Maestro).
+
+**Non-web archetypes (pure ETL, batch jobs):** No e2e framework needed — record `"e2e_framework": null` in `test-harness.json` and move on.
 
 ## Step 5: Write ARCHITECTURE.md
 
@@ -358,6 +382,10 @@ Create `${DIRIGENT_RUN_DIR}/test-harness.json` with commands from the chosen sta
       "explanation": "{starts the dev server}"
     }
   },
+  "e2e_framework": {
+    "name": "playwright",
+    "run_command": "npx playwright test"
+  },
   "env_vars": {},
   "portal": {
     "start_command": "{run command from stack file}",
@@ -367,10 +395,13 @@ Create `${DIRIGENT_RUN_DIR}/test-harness.json` with commands from the chosen sta
   "_sources": {
     "commands.test": "stacks/{stack-file}.md",
     "commands.dev": "stacks/{stack-file}.md",
+    "e2e_framework": "stacks/{stack-file}.md (E2E section)",
     "portal.port": "stacks/{stack-file}.md"
   }
 }
 ```
+
+**`e2e_framework` is MANDATORY for every web archetype.** Set to `null` only for non-web archetypes (pure ETL / batch / CLI). The contract negotiator reads this key to decide whether user-journey criteria run through the browser or fall back to weaker curl probes.
 
 Only include command keys that apply. For example, a Streamlit app has no build step — omit `commands.build`. A Gradio app might not have a separate test command initially — omit `commands.test`.
 
@@ -414,6 +445,18 @@ Before committing:
 5. **test-harness.json is valid** — parseable JSON with the correct schema
 6. **`<key-patterns>` includes opinionated defaults** — not just naming conventions
 7. **Keep it proportional** — a small feature needs 1 page of architecture, not 10
+8. **E2E framework installed for web archetypes (Step 4.5)** — run these checks:
+   ```bash
+   # package.json contains @playwright/test
+   grep -q '"@playwright/test"' package.json || echo "MISSING — re-run Step 4.5"
+   # config file exists
+   ls playwright.config.ts playwright.config.js 2>/dev/null || echo "MISSING playwright.config"
+   # smoke spec exists
+   ls tests/e2e/*.spec.ts tests/e2e/*.spec.js 2>/dev/null || echo "MISSING smoke spec"
+   # test-harness.json has e2e_framework
+   python3 -c "import json; d=json.load(open('${DIRIGENT_RUN_DIR}/test-harness.json')); assert d.get('e2e_framework'), 'e2e_framework missing'" || echo "MISSING e2e_framework in harness"
+   ```
+   Any MISSING message means Step 4.5 was skipped — go back and complete it before proceeding.
 
 ## Step 9: Commit
 
@@ -437,6 +480,7 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 <rule>Create test-harness.json in ${DIRIGENT_RUN_DIR} — the test step and planner depend on it</rule>
 <rule>Every greenfield project MUST produce a start.sh that starts the full app</rule>
 <rule>start.sh MUST bind to 0.0.0.0 for port-forwarding access</rule>
+<rule>For any web archetype (browser-observable UI), Playwright install is mandatory in Step 4.5. The install commands are stable and do NOT require context7. Missing context7 / MCP is NOT a valid reason to skip this step. Downstream contract negotiators rely on the resulting `e2e_framework` entry in test-harness.json.</rule>
 <rule>Match recommendations to project scale — a weekend project doesn't need the same architecture as a SaaS platform</rule>
 <rule>Every recommendation must have a concrete reason tied to the spec</rule>
 <rule>If the repo already has a framework config, skip scaffolding and work with what exists</rule>
