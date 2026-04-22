@@ -158,9 +158,27 @@ First smoke spec (`tests/e2e/smoke.spec.ts`):
 ```typescript
 import { test, expect } from '@playwright/test'
 
-test('app renders', async ({ page }) => {
+test('app renders without console errors', async ({ page }) => {
+  const consoleErrors: string[] = []
+  const pageErrors: string[] = []
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text())
+  })
+  page.on('pageerror', (err) => {
+    pageErrors.push(`${err.name}: ${err.message}`)
+  })
+
   await page.goto('/')
   await expect(page.locator('#root')).toBeVisible()
+
+  // React runtime errors, missing imports, and bundler warnings
+  // surface here — not catching them means "#root visible" passes
+  // against an app that is visibly broken in the console.
+  expect(
+    { consoleErrors, pageErrors },
+    `app should not emit console or runtime errors`
+  ).toEqual({ consoleErrors: [], pageErrors: [] })
 })
 ```
 

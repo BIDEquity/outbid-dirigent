@@ -221,6 +221,8 @@ npx playwright install chromium
 
 Then commit a minimal `playwright.config.ts` and a first smoke spec at `tests/e2e/smoke.spec.ts`. The exact config/spec templates live in the stack file (`stacks/nextjs.md` → "E2E (Playwright)" section, `stacks/vite-react.md` → "E2E (Playwright)" section). Copy them verbatim and adjust only the `baseURL` / `webServer.command` to match the chosen port.
 
+**The smoke spec MUST assert zero console errors and zero page errors** (see the stack templates — both listeners plus a final `.toEqual({ consoleErrors: [], pageErrors: [] })`). A `expect(body).toBeVisible()` alone passes against hydration mismatches, React runtime errors, and missing-import failures — exactly the failure modes that look "fine" to a human eye but break interactivity. The observed failure in little-erp was a NavShell hydration mismatch that shipped despite every unit test passing; a console-error assertion would have caught it on the first run.
+
 ### 4.5a — Seed deterministic test credentials
 
 Playwright specs cannot log in if nobody exists. Every web archetype with auth MUST seed at least one test user at scaffold time. Default credentials (use these exact values — downstream tests reference them):
@@ -574,6 +576,7 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 <rule>start.sh MUST honour a `PORT` env var for the frontend (and a matching env var per backend, e.g. `POCKETBASE_PORT`). Defaults come from the stack file. This is the lightweight port-conflict escape hatch — a dev on a machine with port 3000 taken should not have to edit start.sh.</rule>
 <rule>start.sh MUST print the seeded test credentials (admin@test.local / testpass123) in its startup banner. A dev reading the terminal output must know how to log in without grepping files.</rule>
 <rule>For any web archetype, Step 4a MUST replace the stock create-next-app / Vite landing with a minimal app-branded home that links to the first real route. Leaving the Vercel tutorial / Vite logo in place means a user opening the finished app sees a framework starter instead of the application.</rule>
+<rule>The Step 4.5 smoke spec MUST collect `console` errors and `pageerror` events and assert both are empty. `expect(body).toBeVisible()` on its own is insufficient — it passes against hydration mismatches, React runtime errors, and missing imports that break interactivity while leaving the DOM rendered.</rule>
 <rule>For any web archetype (browser-observable UI), Playwright install is mandatory in Step 4.5. The install commands are stable and do NOT require context7. Missing context7 / MCP is NOT a valid reason to skip this step. Downstream contract negotiators rely on the resulting `e2e_framework` entry in test-harness.json.</rule>
 <rule>For any web archetype with auth, seed at least one deterministic test user (`admin@test.local` / `testpass123`) at scaffold time (Step 4.5a). The seed MUST be idempotent. Downstream Playwright specs cannot log in without it.</rule>
 <rule>Document the seeded test credentials in README.md `## Local Development` AND in a dev-mode banner on the home page (Step 4.5b). Production builds MUST NOT render the banner.</rule>
