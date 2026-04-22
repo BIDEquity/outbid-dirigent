@@ -1,6 +1,6 @@
 [project]
 name = "outbid-dirigent"
-version = "2.2.1"
+version = "2.2.2"
 description = "Headless autonomous coding agent controller"
 readme = "README.md"
 license = "MIT"

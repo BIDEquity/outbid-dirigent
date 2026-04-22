@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.2](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.2.1...outbid-dirigent-v2.2.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* **agents:** wildcard MCP tools in implementer + plugin-writer frontmatter ([2843cfe](https://github.com/BIDEquity/outbid-dirigent/commit/2843cfe66c5ed491bc4e50833df4f936756535a2))
+
 ## [2.2.1](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.2.0...outbid-dirigent-v2.2.1) (2026-04-22)
 
 
