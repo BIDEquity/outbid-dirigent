@@ -26,6 +26,53 @@ npm install
 
 Flags: fully non-interactive, zero prompts, produces clean `src/main.tsx`.
 
+## Stock Landing Replacement
+
+Immediately after `npm create vite`, overwrite `src/App.tsx` (and drop the Vite/React logo assets). The stock file has "Vite + React", a counter, and links to the framework docs — it MUST go before the first real phase starts.
+
+Minimal template (adjust the heading to the SPEC's working title; `router` choice is out of scope — use whatever routing lib the SPEC implies, or a plain anchor for now):
+
+```tsx
+// src/App.tsx
+export default function App() {
+  return (
+    <main
+      style={{
+        maxWidth: 560,
+        margin: '0 auto',
+        padding: '64px 24px',
+        textAlign: 'center',
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
+      <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.01em' }}>
+        {APP_TITLE}
+      </h1>
+      <p style={{ color: '#52525b', fontSize: 14, marginTop: 8 }}>
+        {ONE_LINE_DESCRIPTION_FROM_SPEC}
+      </p>
+      <a
+        href="/login"
+        style={{
+          display: 'inline-block',
+          marginTop: 24,
+          padding: '10px 16px',
+          borderRadius: 6,
+          background: '#18181b',
+          color: '#fff',
+          fontSize: 14,
+          textDecoration: 'none',
+        }}
+      >
+        Sign in
+      </a>
+    </main>
+  )
+}
+```
+
+Also delete `src/App.css`, `src/assets/react.svg`, and `public/vite.svg` if they exist — the template above uses inline styles only.
+
 ## Run
 
 ```bash

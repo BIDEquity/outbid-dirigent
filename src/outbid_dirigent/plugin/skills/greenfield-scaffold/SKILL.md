@@ -187,6 +187,25 @@ The scaffold commands are documented in each stack file under `stacks/`. Do NOT 
 
 **CRITICAL:** Never write framework config files manually (next.config.*, vite.config.*, etc.) — the scaffold generates version-correct configs.
 
+### Step 4a — Replace the stock landing page (MANDATORY for web archetypes)
+
+`create-next-app` / `npm create vite` ship a Vercel tutorial / Vite logo page. **Leaving it in place is the failure mode this step prevents.** A user who opens the finished app sees "To get started, edit app/page.tsx" with a Next.js logo — no navigation, no branding, no path forward — even after every downstream phase "succeeded."
+
+Immediately after running the scaffold, overwrite the stock landing with a minimal, app-branded home that:
+
+1. Uses a heading derived from the SPEC's working title (not "Create Next App").
+2. Links to the first real route the app will have (typically `/login` for auth-bearing archetypes, or the first nav target for auth-less apps).
+3. Does **not** reference the framework tutorial, Vercel templates, or starter docs.
+
+Concrete per-stack templates:
+
+- Next.js App Router → `stacks/nextjs.md` → "Stock Landing Replacement" section
+- Vite + React → `stacks/vite-react.md` → "Stock Landing Replacement" section
+
+The landing stays deliberately minimal — it's a placeholder that proves navigation works end-to-end, not a marketing page. The first real user-facing phase will flesh it out.
+
+**Why this is a scaffold-phase concern, not a task-01 concern:** every downstream phase assumes the app has a reachable home. A nav component that `Link`s to `/` should land on *something*, not on a Vercel tutorial. Leaving it until later means every e2e smoke spec passes against garbage, and the "app works" signal becomes a lie.
+
 ## Step 4.5: Install E2E framework (MANDATORY for web archetypes)
 
 If the chosen archetype has a browser-observable surface (any combo in the "Web Apps" table of `stacks/README.md`, plus all archetypes that include Next.js, Vite+React, Streamlit, or Gradio), install Playwright **unconditionally**.
@@ -513,7 +532,15 @@ Before committing:
    (grep -rlE 'admin@test\.local|testpass123' pb_migrations supabase src 2>/dev/null | head -1) || echo "MISSING seed for test user"
    ```
    Any MISSING message means the developer opening the app will not know how to log in — go back and complete Steps 4.5a/4.5b.
-10. **start.sh honours PORT and prints credentials (Step 7)** — run these checks:
+10. **Stock landing replaced (Step 4a)** — run these checks for web archetypes:
+    ```bash
+    # Next.js: stock scaffold content gone
+    ! grep -qE 'Get started by editing|app/page\.tsx|Vercel logomark|Deploy Now' src/app/page.tsx 2>/dev/null || echo "MISSING — Next.js stock landing not replaced"
+    # Vite: stock scaffold content gone
+    ! grep -qE 'Vite \+ React|count is \{|Edit <code>src/App\.tsx' src/App.tsx 2>/dev/null || echo "MISSING — Vite stock landing not replaced"
+    ```
+    Any MISSING message means a user opening the app will see a framework tutorial instead of the application — go back and complete Step 4a.
+11. **start.sh honours PORT and prints credentials (Step 7)** — run these checks:
     ```bash
     # PORT env var is read with a default
     grep -qE 'PORT="?\$\{PORT:-' start.sh || echo "MISSING — start.sh does not honour PORT env var"
@@ -546,6 +573,7 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 <rule>start.sh MUST bind to 0.0.0.0 for port-forwarding access</rule>
 <rule>start.sh MUST honour a `PORT` env var for the frontend (and a matching env var per backend, e.g. `POCKETBASE_PORT`). Defaults come from the stack file. This is the lightweight port-conflict escape hatch — a dev on a machine with port 3000 taken should not have to edit start.sh.</rule>
 <rule>start.sh MUST print the seeded test credentials (admin@test.local / testpass123) in its startup banner. A dev reading the terminal output must know how to log in without grepping files.</rule>
+<rule>For any web archetype, Step 4a MUST replace the stock create-next-app / Vite landing with a minimal app-branded home that links to the first real route. Leaving the Vercel tutorial / Vite logo in place means a user opening the finished app sees a framework starter instead of the application.</rule>
 <rule>For any web archetype (browser-observable UI), Playwright install is mandatory in Step 4.5. The install commands are stable and do NOT require context7. Missing context7 / MCP is NOT a valid reason to skip this step. Downstream contract negotiators rely on the resulting `e2e_framework` entry in test-harness.json.</rule>
 <rule>For any web archetype with auth, seed at least one deterministic test user (`admin@test.local` / `testpass123`) at scaffold time (Step 4.5a). The seed MUST be idempotent. Downstream Playwright specs cannot log in without it.</rule>
 <rule>Document the seeded test credentials in README.md `## Local Development` AND in a dev-mode banner on the home page (Step 4.5b). Production builds MUST NOT render the banner.</rule>
