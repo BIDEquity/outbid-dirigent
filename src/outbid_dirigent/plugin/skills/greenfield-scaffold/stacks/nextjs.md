@@ -80,6 +80,61 @@ test('renders home page', () => {
 npx vitest run
 ```
 
+## E2E (Playwright) — MANDATORY for web archetypes
+
+Install Playwright **unconditionally** during scaffold. The install command below is stable and does NOT require a context7 lookup — do not skip this step just because context7 is unavailable.
+
+```bash
+npm install -D @playwright/test
+npx playwright install --with-deps chromium
+npx playwright install chromium   # fallback if --with-deps needs sudo
+```
+
+Minimal config (`playwright.config.ts` — committed):
+
+```typescript
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: 'tests/e2e',
+  use: { baseURL: 'http://localhost:3000' },
+  webServer: {
+    command: 'npm run dev -- -H 0.0.0.0 -p 3000',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000,
+  },
+})
+```
+
+First smoke spec (`tests/e2e/smoke.spec.ts`):
+
+```typescript
+import { test, expect } from '@playwright/test'
+
+test('home page renders', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('body')).toBeVisible()
+})
+```
+
+Run:
+
+```bash
+npx playwright test
+```
+
+Write `e2e_framework` into `test-harness.json`:
+
+```json
+"e2e_framework": {
+  "name": "playwright",
+  "run_command": "npx playwright test"
+}
+```
+
+**Use context7 only if** you need to look up a specific matcher or assertion API while writing the first spec — query `mcp__context7__query-docs` with `libraryName="playwright"`. Missing context7 is NOT a reason to skip install or scaffold.
+
 ## Build & Verify
 
 ```bash
