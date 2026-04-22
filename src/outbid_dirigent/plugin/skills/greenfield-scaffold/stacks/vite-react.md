@@ -189,8 +189,21 @@ npx serve dist  # verify production build
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
+
+PORT="${PORT:-5173}"
+
 npm install
-exec npm run dev -- --host 0.0.0.0 --port 5173
+
+cat <<BANNER
+──────────────────────────────────────────
+  App URL        : http://localhost:${PORT}
+  Test login     : admin@test.local / testpass123
+                   (seeded by backend; dev-mode banner on every page)
+  Override port  : PORT=4000 ./start.sh
+──────────────────────────────────────────
+BANNER
+
+exec npm run dev -- --host 0.0.0.0 --port "$PORT"
 ```
 
 ## Pairing

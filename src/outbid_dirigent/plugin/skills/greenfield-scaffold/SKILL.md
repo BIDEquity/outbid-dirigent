@@ -439,28 +439,48 @@ For multi-stack combos, `commands.dev` should be the primary frontend/UI command
 
 Every greenfield project MUST produce a `start.sh` at the repo root. Use the "Start Script Pattern" from each stack file in the combo.
 
-For multi-stack combos, the start script starts all services:
+For multi-stack combos, the start script starts all services and honours a `PORT` env var for the frontend (plus stack-specific env vars for backends, e.g. `POCKETBASE_PORT`):
 
 ```bash
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
 
+PORT="${PORT:-{frontend default}}"
+BACKEND_PORT="${BACKEND_PORT:-{backend default}}"
+
 # Install dependencies
 {install commands from each stack file}
 
-# Start backend (if any)
-{backend start command} &
+# Start backend (if any) — seed migration runs on first boot, idempotent
+{backend start command honouring BACKEND_PORT} &
 
-# Start frontend
-exec {frontend start command}
+# Wait for backend health before printing credentials (prevents "try to log in, backend still booting")
+for i in $(seq 1 15); do
+  curl -sf "http://localhost:${BACKEND_PORT}/api/health" > /dev/null 2>&1 && break
+  sleep 1
+done
+
+cat <<BANNER
+──────────────────────────────────────────
+  App URL        : http://localhost:${PORT}
+  Backend        : http://localhost:${BACKEND_PORT}
+  Test login     : admin@test.local / testpass123
+                   (seeded on first run; dev-mode banner on every page)
+  Override ports : PORT=4000 BACKEND_PORT=9000 ./start.sh
+──────────────────────────────────────────
+BANNER
+
+exec {frontend start command honouring PORT}
 ```
 
 The start script must:
 - Be self-contained (installs deps, starts everything)
 - Bind to `0.0.0.0` (not localhost) for port-forwarding
-- Print the URLs/ports on startup
+- **Honour a `PORT` env var** (frontend) and a matching env var for each backend (`POCKETBASE_PORT`, `SUPABASE_PORT`, etc.) — default to the stack file's documented port
+- Print the URLs/ports **AND the seeded test credentials** on startup (the banner is the operator's ground truth — a dev who reads start.sh output MUST know how to log in)
 - Use `exec` for the foreground process
+- **Do NOT print production secrets** — the credentials in the banner are the seeded test-only ones; if the stack also has production-only secrets, they never touch start.sh
 
 ## Step 8: Validate
 
@@ -493,6 +513,14 @@ Before committing:
    (grep -rlE 'admin@test\.local|testpass123' pb_migrations supabase src 2>/dev/null | head -1) || echo "MISSING seed for test user"
    ```
    Any MISSING message means the developer opening the app will not know how to log in — go back and complete Steps 4.5a/4.5b.
+10. **start.sh honours PORT and prints credentials (Step 7)** — run these checks:
+    ```bash
+    # PORT env var is read with a default
+    grep -qE 'PORT="?\$\{PORT:-' start.sh || echo "MISSING — start.sh does not honour PORT env var"
+    # Test login is echoed on startup
+    grep -qE 'admin@test\.local' start.sh || echo "MISSING — start.sh does not print test credentials"
+    ```
+    Any MISSING message means the start script fights a port conflict or hides the login — fix Step 7 before committing.
 
 ## Step 9: Commit
 
@@ -516,6 +544,8 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 <rule>Create test-harness.json in ${DIRIGENT_RUN_DIR} — the test step and planner depend on it</rule>
 <rule>Every greenfield project MUST produce a start.sh that starts the full app</rule>
 <rule>start.sh MUST bind to 0.0.0.0 for port-forwarding access</rule>
+<rule>start.sh MUST honour a `PORT` env var for the frontend (and a matching env var per backend, e.g. `POCKETBASE_PORT`). Defaults come from the stack file. This is the lightweight port-conflict escape hatch — a dev on a machine with port 3000 taken should not have to edit start.sh.</rule>
+<rule>start.sh MUST print the seeded test credentials (admin@test.local / testpass123) in its startup banner. A dev reading the terminal output must know how to log in without grepping files.</rule>
 <rule>For any web archetype (browser-observable UI), Playwright install is mandatory in Step 4.5. The install commands are stable and do NOT require context7. Missing context7 / MCP is NOT a valid reason to skip this step. Downstream contract negotiators rely on the resulting `e2e_framework` entry in test-harness.json.</rule>
 <rule>For any web archetype with auth, seed at least one deterministic test user (`admin@test.local` / `testpass123`) at scaffold time (Step 4.5a). The seed MUST be idempotent. Downstream Playwright specs cannot log in without it.</rule>
 <rule>Document the seeded test credentials in README.md `## Local Development` AND in a dev-mode banner on the home page (Step 4.5b). Production builds MUST NOT render the banner.</rule>
