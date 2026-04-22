@@ -546,3 +546,197 @@ class TestGrepPatterns:
     )
     def test_allows_cat_on_non_source_files(self, cmd):
         assert not self.PATTERN.search(cmd), f"Expected no match for: {cmd!r}"
+
+
+# ══════════════════════════════════════════
+# TestE2ERunnerPattern — user-facing contracts must use a real browser runner
+# ══════════════════════════════════════════
+
+
+class TestE2ERunnerPattern:
+    """ContractManager._E2E_RUNNER_PATTERN detects real e2e-framework verifications."""
+
+    PATTERN = ContractManager._E2E_RUNNER_PATTERN
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "npx playwright test --grep 'smoke'",
+            "npx cypress run",
+            "detox test -c ios.sim.debug",
+            "maestro test flows/smoke.yaml",
+            "node puppeteer-run.js",
+            "NPX PLAYWRIGHT TEST",  # case-insensitive
+        ],
+    )
+    def test_detects_real_e2e_runners(self, cmd):
+        assert self.PATTERN.search(cmd), f"Expected match for: {cmd!r}"
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "curl -sf http://localhost:3000/health",
+            "npx vitest run src/users/validators.test.ts",
+            "pnpm jest --testPathPattern=users",
+            "pytest tests/unit/test_users.py",
+        ],
+    )
+    def test_does_not_match_non_e2e_runners(self, cmd):
+        assert not self.PATTERN.search(cmd), f"Expected no match for: {cmd!r}"
+
+
+class TestValidateContractQualityE2EWarning:
+    """_validate_contract_quality warns when user-facing contract has no e2e runner."""
+
+    def _make_manager(self, tmp_path):
+        from unittest.mock import Mock
+
+        return ContractManager(repo_path=tmp_path, runner=Mock(), dirigent_dir=tmp_path / "d")
+
+    def _user_facing_contract(self, e2e_verification: str | None):
+        from outbid_dirigent.contract_schema import PhaseKind
+
+        verification = e2e_verification or "Run: curl -sf http://localhost:3000/health"
+        return Contract(
+            phase_id="04",
+            phase_name="User mgmt",
+            phase_kind=PhaseKind.USER_FACING,
+            objective="An admin can manage users",
+            acceptance_criteria=[
+                AcceptanceCriterion(
+                    id="AC-04-01",
+                    description="App compiles",
+                    verification="Run: npm run build",
+                    layer=CriterionLayer.STRUCTURAL,
+                ),
+                AcceptanceCriterion(
+                    id="AC-04-02",
+                    description="Admin sees user list",
+                    verification=verification,
+                    layer=CriterionLayer.USER_JOURNEY,
+                ),
+                AcceptanceCriterion(
+                    id="AC-04-03",
+                    description="Admin adds a user and sees row",
+                    verification=verification,
+                    layer=CriterionLayer.USER_JOURNEY,
+                ),
+                AcceptanceCriterion(
+                    id="AC-04-04",
+                    description="Admin sees 'already exists' error",
+                    verification=verification,
+                    layer=CriterionLayer.EDGE_CASE,
+                ),
+            ],
+        )
+
+    @staticmethod
+    def _capture_loguru():
+        """Return (records, attach_ctx) — attach the ctx via `with`.
+
+        Uses loguru.logger.add(sink) since contract.py logs via loguru, which
+        does NOT propagate to stdlib logging / pytest caplog.
+        """
+        from contextlib import contextmanager
+        from loguru import logger as _loguru_logger
+
+        records: list[str] = []
+
+        @contextmanager
+        def ctx(level: str = "WARNING"):
+            sink_id = _loguru_logger.add(
+                lambda msg: records.append(str(msg)),
+                level=level,
+                format="{level} {message}",
+            )
+            try:
+                yield records
+            finally:
+                _loguru_logger.remove(sink_id)
+
+        return records, ctx
+
+    def test_warns_when_no_e2e_runner_on_user_facing(self, tmp_path):
+        manager = self._make_manager(tmp_path)
+        contract = self._user_facing_contract(e2e_verification=None)
+
+        records, ctx = self._capture_loguru()
+        with ctx("WARNING"):
+            manager._validate_contract_quality(contract)
+
+        assert any(
+            "none use an e2e framework" in r or "no user-journey criterion uses" in r
+            for r in records
+        ), f"Expected e2e-missing warning; got: {records}"
+
+    def test_no_warning_when_playwright_used(self, tmp_path):
+        manager = self._make_manager(tmp_path)
+        contract = self._user_facing_contract(
+            e2e_verification="Run: npx playwright test --grep 'admin flow'"
+        )
+
+        records, ctx = self._capture_loguru()
+        with ctx("WARNING"):
+            manager._validate_contract_quality(contract)
+
+        assert not any(
+            "e2e framework" in r for r in records
+        ), f"Did not expect e2e warning; got: {records}"
+
+    def test_no_warning_when_phase_is_integration(self, tmp_path):
+        """Integration phases legitimately use curl probes — no e2e warning."""
+        from outbid_dirigent.contract_schema import PhaseKind
+
+        records, ctx = self._capture_loguru()
+        manager = self._make_manager(tmp_path)
+        contract = Contract(
+            phase_id="02",
+            phase_name="Auth",
+            phase_kind=PhaseKind.INTEGRATION,
+            objective="Downstream features can require an authenticated session",
+            acceptance_criteria=[
+                AcceptanceCriterion(
+                    id="AC-02-01",
+                    description="App compiles",
+                    verification="Run: npm run build",
+                    layer=CriterionLayer.STRUCTURAL,
+                ),
+                AcceptanceCriterion(
+                    id="AC-02-02",
+                    description="Token verifier roundtrip",
+                    verification="Run: pytest tests/test_session.py -k roundtrip",
+                    layer=CriterionLayer.UNIT,
+                ),
+                AcceptanceCriterion(
+                    id="AC-02-03",
+                    description="Session verifier rejects tampered token",
+                    verification="Run: pytest tests/test_session.py -k tampered",
+                    layer=CriterionLayer.UNIT,
+                ),
+                AcceptanceCriterion(
+                    id="AC-02-04",
+                    description="Sign-in returns usable token",
+                    verification="Run: curl -sf http://localhost:3000/api/auth/login",
+                    layer=CriterionLayer.USER_JOURNEY,
+                ),
+                AcceptanceCriterion(
+                    id="AC-02-05",
+                    description="Unauth request rejected",
+                    verification="Run: curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/me",
+                    layer=CriterionLayer.USER_JOURNEY,
+                ),
+                AcceptanceCriterion(
+                    id="AC-02-06",
+                    description="Disabled account rejected",
+                    verification="Run: curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/auth/login",
+                    layer=CriterionLayer.EDGE_CASE,
+                ),
+            ],
+        )
+
+        with ctx("WARNING"):
+            manager._validate_contract_quality(contract)
+
+        assert not any(
+            "e2e framework" in r for r in records
+        ), f"Integration contracts should not trigger e2e warning; got: {records}"

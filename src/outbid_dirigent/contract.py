@@ -134,6 +134,16 @@ class ContractManager:
         r"\[\s*-[fed]\s+",  # [ -f file ] checks
     )
 
+    # E2E runners that count as real browser/device verification. If a
+    # user-facing contract has zero criteria whose verification mentions
+    # one of these, we warn — downstream agents otherwise rationalise the
+    # missing framework ("falling back to vitest / curl") instead of
+    # flagging it as a scaffold-phase bug.
+    _E2E_RUNNER_PATTERN = re.compile(
+        r"\b(playwright|cypress|detox|maestro|puppeteer)\b",
+        re.IGNORECASE,
+    )
+
     def _validate_contract_quality(self, contract: Contract):
         """Soft validation: warn about weak contract patterns. Never blocks."""
         from outbid_dirigent.contract_schema import PhaseKind
@@ -177,6 +187,23 @@ class ContractManager:
                 logger.warning(
                     f"Contract {contract.phase_id} [{c.id}]: {c.layer.value} criterion "
                     f"uses structural verification pattern: {c.verification[:80]}..."
+                )
+
+        # Warn when a user-facing contract has no e2e-framework-backed criterion.
+        # This catches the failure mode where the scaffold skipped Playwright
+        # install (often because context7/MCP was unavailable) and downstream
+        # contract negotiators fell back to vitest/curl without flagging it.
+        if contract.phase_kind == PhaseKind.USER_FACING and user_journey:
+            e2e_backed = [
+                c for c in user_journey if self._E2E_RUNNER_PATTERN.search(c.verification)
+            ]
+            if not e2e_backed:
+                logger.warning(
+                    f"Contract {contract.phase_id}: user-facing phase with "
+                    f"{len(user_journey)} user-journey criteria but none use an "
+                    f"e2e framework (playwright/cypress/detox). If the scaffold "
+                    f"skipped e2e install, fix that at scaffold — do not paper "
+                    f"over it with curl/vitest probes."
                 )
 
     # ══════════════════════════════════════════

@@ -22,6 +22,15 @@ VALID_PHASE_KINDS = {"user-facing", "integration", "infrastructure"}
 # Map legacy layer values (pre-UX-reframe) to current ones, for warnings only.
 LEGACY_LAYER_RENAMES = {"behavioral": "user-journey", "boundary": "edge-case"}
 
+# Runners that count as real browser/device e2e. Used for a warning on
+# user-facing contracts that ship without any such criterion — catches
+# contracts that silently fell back to curl/vitest because the scaffold
+# skipped the e2e framework install.
+E2E_RUNNER_PATTERN = re.compile(
+    r"\b(playwright|cypress|detox|maestro|puppeteer)\b",
+    re.IGNORECASE,
+)
+
 
 def validate(path: str):
     errors = []
@@ -134,6 +143,21 @@ def validate(path: str):
             warnings.append(
                 "user-facing: no unit criterion — "
                 "if this phase adds pure logic (validators, transformers, state machines), add one"
+            )
+
+        # Warn if none of the user-journey criteria use a real e2e runner.
+        # Signals the scaffold may have skipped Playwright install and the
+        # negotiator rationalised it with curl/vitest instead.
+        user_journey_criteria = [
+            c for c in ac if isinstance(c, dict) and c.get("layer") == "user-journey"
+        ]
+        if user_journey_criteria and not any(
+            E2E_RUNNER_PATTERN.search(c.get("verification", "")) for c in user_journey_criteria
+        ):
+            warnings.append(
+                "user-facing: no user-journey criterion uses an e2e framework "
+                "(playwright/cypress/detox). If the scaffold skipped e2e install, "
+                "fix that at scaffold — do not paper over it with curl/vitest probes."
             )
 
     elif phase_kind == "integration":
