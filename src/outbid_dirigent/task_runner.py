@@ -86,6 +86,29 @@ class TaskRunner:
     MAX_RETRIES = 3
     DEFAULT_TIMEOUT = 1800  # 30 min
 
+    # Central allow-list for every Claude Code subprocess spawned by dirigent.
+    # MCP tool naming: Claude Code exposes MCP tools as `mcp__<server>__<tool>`.
+    # Plugin-installed MCPs get an extra namespace: `mcp__plugin_<server>_<tool>__<tool>`.
+    # allowed_tools uses exact/wildcard matching, not prefix fallback — a bare
+    # `mcp__context7` silently filters out every real context7 call even when
+    # the server is `✓ Connected`. Enumerate both install shapes explicitly.
+    DEFAULT_ALLOWED_TOOLS = [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        # Docs lookup — referenced by greenfield-scaffold + every stack file
+        "mcp__context7__*",
+        "mcp__plugin_context7_context7__*",
+        # Browser probes — useful for reviewer "does the UI actually render?" checks
+        "mcp__playwright__*",
+        "mcp__plugin_playwright_playwright__*",
+    ]
+
     def __init__(
         self,
         repo_path: Path,
@@ -200,17 +223,7 @@ class TaskRunner:
 
         # "Agent" is always needed: plugin agents (contract-negotiator, reviewer, implementer)
         # are available whenever plugins are loaded — they must not be passed inline.
-        allowed_tools = [
-            "Read",
-            "Write",
-            "Edit",
-            "Bash",
-            "Glob",
-            "Grep",
-            "WebFetch",
-            "WebSearch",
-            "mcp__context7",
-        ]
+        allowed_tools = list(self.DEFAULT_ALLOWED_TOOLS)
         if plugins:
             allowed_tools.append("Agent")
 

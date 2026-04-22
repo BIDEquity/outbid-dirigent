@@ -1,6 +1,56 @@
 """Unit tests for TaskRunner static helpers and TaskResult data class."""
 
+import re
+
 from outbid_dirigent.task_runner import TaskResult, TaskRunner
+
+
+class TestDefaultAllowedTools:
+    """Every Claude Code subprocess spawned by dirigent flows through _run_claude,
+    which uses TaskRunner.DEFAULT_ALLOWED_TOOLS as its whitelist. Wrong entries here
+    silently block skill-referenced MCP tools (context7, playwright) at the filter
+    even when the servers are ✓ Connected — we observed exactly this in a greenfield
+    run where `mcp__context7` alone was listed and no context7 call ever succeeded.
+    """
+
+    def test_core_tools_present(self):
+        for t in ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]:
+            assert t in TaskRunner.DEFAULT_ALLOWED_TOOLS, f"missing core tool {t}"
+
+    def test_context7_entries_use_wildcard_suffix(self):
+        """`mcp__context7` alone matches nothing — must be `mcp__<server>__*` shape."""
+        ctx7 = [t for t in TaskRunner.DEFAULT_ALLOWED_TOOLS if "context7" in t]
+        assert ctx7, "no context7 entry at all"
+        for t in ctx7:
+            assert re.fullmatch(
+                r"mcp__[a-zA-Z0-9_]+__\*", t
+            ), f"context7 entry {t!r} is not an mcp__<server>__* pattern"
+
+    def test_covers_flat_and_plugin_namespaced_installs(self):
+        """context7 and playwright can be installed either as flat MCP servers or
+        via Claude Code plugins (which add an extra `plugin_<name>_<name>` namespace).
+        Both shapes must be whitelisted so skill prose works in either environment.
+        """
+        required = {
+            "mcp__context7__*",
+            "mcp__plugin_context7_context7__*",
+            "mcp__playwright__*",
+            "mcp__plugin_playwright_playwright__*",
+        }
+        missing = required - set(TaskRunner.DEFAULT_ALLOWED_TOOLS)
+        assert not missing, f"missing MCP patterns: {missing}"
+
+    def test_no_bare_mcp_prefix_without_wildcard(self):
+        """Regression guard: `mcp__context7` (no `__*`) matches nothing in Claude
+        Code's allowed_tools filter. Every mcp__-prefixed entry must either be a
+        fully-qualified tool name or end with `__*`.
+        """
+        bad = [
+            t
+            for t in TaskRunner.DEFAULT_ALLOWED_TOOLS
+            if t.startswith("mcp__") and not t.endswith("__*") and t.count("__") < 2
+        ]
+        assert not bad, f"bare mcp__ prefixes without __* or full tool name: {bad}"
 
 
 class TestExtractDeviations:
