@@ -195,8 +195,21 @@ npm run start   # production server
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
+
+PORT="${PORT:-3000}"
+
 npm install
-exec npm run dev -- -H 0.0.0.0 -p 3000
+
+cat <<BANNER
+──────────────────────────────────────────
+  App URL        : http://localhost:${PORT}
+  Test login     : admin@test.local / testpass123
+                   (seeded on first run; dev-mode banner on every page)
+  Override port  : PORT=4000 ./start.sh
+──────────────────────────────────────────
+BANNER
+
+exec npm run dev -- -H 0.0.0.0 -p "$PORT"
 ```
 
 ## Pairing

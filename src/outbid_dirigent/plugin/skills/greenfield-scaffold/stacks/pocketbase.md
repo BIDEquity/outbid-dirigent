@@ -131,7 +131,20 @@ The `try/catch` on `findAuthRecordByEmail` keeps the migration idempotent — re
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
-exec pocketbase serve --http 0.0.0.0:8090
+
+PORT="${POCKETBASE_PORT:-8090}"
+
+cat <<BANNER
+──────────────────────────────────────────
+  PocketBase API : http://localhost:${PORT}
+  Admin UI       : http://localhost:${PORT}/_/
+  Test login     : admin@test.local / testpass123
+                   (seeded by pb_migrations/*_seed_test_user.js)
+  Override port  : POCKETBASE_PORT=9000 ./start.sh
+──────────────────────────────────────────
+BANNER
+
+exec pocketbase serve --http "0.0.0.0:${PORT}"
 ```
 
 ## Pairing
