@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
       - name: Install ruff
         run: uv tool install ruff
       - name: Check style and lint
@@ -30,7 +30,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
       - name: Export resolved production dependencies from uv.lock
         # pip-audit scans a requirements file; uv export produces a resolved
         # transitive-closure requirements file from uv.lock so the audit
@@ -53,7 +53,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v7
 
       - name: Install bump-my-version
         run: uv tool install "bump-my-version>=0.28.0"
