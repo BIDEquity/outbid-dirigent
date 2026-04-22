@@ -135,6 +135,53 @@ Write `e2e_framework` into `test-harness.json`:
 
 **Use context7 only if** you need to look up a specific matcher or assertion API while writing the first spec — query `mcp__context7__query-docs` with `libraryName="playwright"`. Missing context7 is NOT a reason to skip install or scaffold.
 
+## Dev Credentials Banner
+
+Add a server component that renders the test credentials in dev builds and disappears in production:
+
+```tsx
+// src/components/DevCredentialsBanner.tsx
+export function DevCredentialsBanner() {
+  if (process.env.NODE_ENV === 'production') return null
+  return (
+    <div
+      role="note"
+      className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900"
+    >
+      <strong>Dev mode test login:</strong>{' '}
+      <code className="rounded bg-amber-100 px-1 py-0.5">admin@test.local</code>{' '}
+      /{' '}
+      <code className="rounded bg-amber-100 px-1 py-0.5">testpass123</code>
+      {' '}— seeded by <code>pb_migrations/_seed_test_user.js</code> (or your backend equivalent). Never rendered in production.
+    </div>
+  )
+}
+```
+
+Wire it into the root layout (`src/app/layout.tsx`) above `{children}`:
+
+```tsx
+import { DevCredentialsBanner } from '@/components/DevCredentialsBanner'
+// ...
+<body>
+  <DevCredentialsBanner />
+  {children}
+</body>
+```
+
+README.md `## Local Development` section — copy verbatim:
+
+```markdown
+## Local Development
+
+Test login (seeded automatically on first run):
+
+- Email: `admin@test.local`
+- Password: `testpass123`
+
+Credentials also shown as a dev-mode banner at the top of every page; banner is stripped from production builds.
+```
+
 ## Build & Verify
 
 ```bash

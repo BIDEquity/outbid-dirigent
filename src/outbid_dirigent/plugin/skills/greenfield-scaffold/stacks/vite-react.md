@@ -134,6 +134,48 @@ Write `e2e_framework` into `test-harness.json`:
 
 **Use context7 only if** you need to look up a specific matcher or assertion API while writing the first spec — query `mcp__context7__query-docs` with `libraryName="playwright"`. Missing context7 is NOT a reason to skip install or scaffold.
 
+## Dev Credentials Banner
+
+Add a component that renders the test credentials only in dev:
+
+```tsx
+// src/components/DevCredentialsBanner.tsx
+export function DevCredentialsBanner() {
+  if (!import.meta.env.DEV) return null
+  return (
+    <div
+      role="note"
+      style={{
+        borderBottom: '1px solid #fcd34d',
+        background: '#fffbeb',
+        color: '#78350f',
+        padding: '8px 16px',
+        fontSize: 12,
+      }}
+    >
+      <strong>Dev mode test login:</strong>{' '}
+      <code>admin@test.local</code> / <code>testpass123</code>
+      {' '}— seeded by the backend. Never rendered in production.
+    </div>
+  )
+}
+```
+
+Mount it at the top of `src/App.tsx` (or your root component), before the main content.
+
+README.md `## Local Development` section — copy verbatim:
+
+```markdown
+## Local Development
+
+Test login (seeded automatically on first run):
+
+- Email: `admin@test.local`
+- Password: `testpass123`
+
+Credentials also shown as a dev-mode banner at the top of the app; banner is stripped from production builds (`import.meta.env.DEV`).
+```
+
 ## Build & Verify
 
 ```bash

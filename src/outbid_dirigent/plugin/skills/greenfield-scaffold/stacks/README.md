@@ -14,6 +14,7 @@ These are non-negotiable. Don't deliberate, don't pick alternatives.
   npx playwright install --with-deps chromium
   ```
   Write `e2e_framework` into `test-harness.json` so downstream contract negotiators see it. Use context7 _only_ for API/syntax recall when writing the first spec — missing context7 is NOT a reason to skip the install.
+- **Seed test credentials (web archetypes with auth)**: Every scaffold with a login surface seeds `admin@test.local / testpass123` at init time via an idempotent migration or seed script in the backend stack. Credentials MUST be documented in README.md AND shown as a dev-mode banner on the home page (stripped in production builds). Without a seeded user, Playwright specs cannot log in and a new developer cannot open the app.
 - **Process orchestration**: Start servers with `&`, wait with `curl --retry-connrefused --retry 5 http://localhost:PORT/health`, then test.
 - **Port conflicts**: `lsof -i :PORT` to find, `kill -9 <PID>` to clear.
 - **Secrets**: `.env` files, never committed. Frameworks load them automatically.
