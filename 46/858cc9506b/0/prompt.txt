@@ -1,1 +1,46 @@
 This is an example of a greenfield app built with the dirigent. It is severely broken. Examine it!
+
+---
+
+how much effort would it be to make that an actually working prototype?
+
+---
+
+So: e22-testing would have closed all these gaps is what you say?
+
+---
+
+i put the claude logs under @../little-erp/projects/-home-coder-little-erp/ 
+
+See if e2e testint was attempted anywhere.
+
+---
+
+how did claude detect that "playwright is not installed"
+
+---
+
+was it not part of greenfield scaffold?
+
+---
+
+did ANYTHING in the whole run call context7?
+
+---
+
+let us not be lazy and assume "AI was just dum"
+
+---
+
+i have an explanation. there is simply no context7 installed on the workspace.
+
+---
+
+was folgt daraus für den dirigenten: 
+
+1. greenfield-scaffold muss noch zwingender playwright mitinstallieren (Punkt1)
+2. dirigent sollte einmal am anfang per subprocess.run die Ausgabe von "claude plugin list" und "claude mcp lsit" ausgeben -> programmatisches Debugging
+3. ggf. (nur wenn sauber und einfach möglich) -> im Contract Negitiation step einen Stop Hook einbauen, der warnt, wenn Contract _keinen_ E2E-Step enthält und Phase zw. Task user-facing ist.
+
+
+Plane das eigenständig, baue einen feature branch und stelle keine rückfragen. halte dich an commit-regeln
