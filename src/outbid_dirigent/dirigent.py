@@ -125,6 +125,77 @@ def _install_info() -> str:
     return f"v{__version__} (installed)"
 
 
+def _log_toolbox_snapshot(run_dir_path: Optional[Path]) -> None:
+    """Probe `claude plugin list` + `claude mcp list` once at startup.
+
+    Writes full output to ``<run_dir>/toolbox-snapshot.txt`` and logs a
+    one-line summary. Agents downstream rely on specific MCP servers (notably
+    ``context7``); when the sandbox has none of them wired up, the skill
+    prose quietly degrades. Recording the toolbox at startup gives operators
+    a single artefact to check when "the scaffolder skipped Playwright"
+    turns out to be "context7 wasn't installed so half the skill prose was
+    unreachable".
+
+    Safe on missing ``claude`` CLI, subprocess errors, or missing run dir —
+    logs a warning and returns. Never raises.
+    """
+    import subprocess
+    from outbid_dirigent.logger import get_logger
+
+    logger = get_logger()
+    snapshot_sections: list[str] = []
+    summary_parts: list[str] = []
+
+    probes = [
+        ("plugins", ["claude", "plugin", "list"]),
+        ("mcp", ["claude", "mcp", "list"]),
+    ]
+
+    for label, cmd in probes:
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except FileNotFoundError:
+            snapshot_sections.append(f"# {label}\n\n(claude CLI not on PATH)\n")
+            summary_parts.append(f"{label}=cli-missing")
+            continue
+        except subprocess.TimeoutExpired:
+            snapshot_sections.append(f"# {label}\n\n(timed out after 15s)\n")
+            summary_parts.append(f"{label}=timeout")
+            continue
+        except Exception as e:
+            snapshot_sections.append(f"# {label}\n\n(probe error: {e})\n")
+            summary_parts.append(f"{label}=error")
+            continue
+
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        body = stdout or stderr or "(empty output)"
+        snapshot_sections.append(
+            f"# {label} (exit={result.returncode})\n\n$ {' '.join(cmd)}\n\n{body}\n"
+        )
+        if result.returncode != 0:
+            summary_parts.append(f"{label}=exit{result.returncode}")
+            continue
+        line_count = len([line for line in stdout.splitlines() if line.strip()])
+        summary_parts.append(f"{label}={line_count}-lines")
+
+    if run_dir_path is not None:
+        try:
+            run_dir_path.mkdir(parents=True, exist_ok=True)
+            (run_dir_path / "toolbox-snapshot.txt").write_text(
+                "\n---\n\n".join(snapshot_sections), encoding="utf-8"
+            )
+        except Exception as e:
+            logger.warn(f"toolbox snapshot: failed to write: {e}")
+
+    logger.info(f"toolbox snapshot: {', '.join(summary_parts)}")
+
+
 def validate_inputs(spec_path: Path, repo_path: Path) -> bool:
     """Validiert die Eingabepfade."""
     errors = []
@@ -912,6 +983,7 @@ Beispiele:
     logger = init_logger(str(repo_path), verbose, output_json, dirigent_dir=run_dir.path)
     logger.start()
     logger.info(f"dirigent {_install_info()}")
+    _log_toolbox_snapshot(run_dir.path)
 
     # Portal Reporter initialisieren (für Events an Portal)
     has_credentials = args.portal_url and args.execution_id and args.reporter_token
