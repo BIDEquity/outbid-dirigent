@@ -98,6 +98,33 @@ def test_create_and_list():
 uv run pytest tests/ -v
 ```
 
+## Test User Seed (mandatory for web archetypes with auth)
+
+Idempotent migration that creates `admin@test.local / testpass123` on first run:
+
+```javascript
+// pb_migrations/1700000000_seed_test_user.js
+migrate((app) => {
+  const users = app.findCollectionByNameOrId("users")
+  try {
+    app.findAuthRecordByEmail("users", "admin@test.local")
+    return  // already seeded
+  } catch (_) {
+    // fall through and create
+  }
+  const record = new Record(users, {
+    email: "admin@test.local",
+    emailVisibility: true,
+    verified: true,
+    name: "Test Admin",
+  })
+  record.setPassword("testpass123")
+  app.save(record)
+})
+```
+
+The `try/catch` on `findAuthRecordByEmail` keeps the migration idempotent — re-running `pocketbase serve` never errors and never creates duplicates. Document the resulting credentials in README.md and the dev-mode banner (see `stacks/nextjs.md` → "Dev Credentials Banner").
+
 ## Start Script Pattern
 
 ```bash

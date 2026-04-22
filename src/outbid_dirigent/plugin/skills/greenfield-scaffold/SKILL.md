@@ -202,11 +202,39 @@ npx playwright install chromium
 
 Then commit a minimal `playwright.config.ts` and a first smoke spec at `tests/e2e/smoke.spec.ts`. The exact config/spec templates live in the stack file (`stacks/nextjs.md` → "E2E (Playwright)" section, `stacks/vite-react.md` → "E2E (Playwright)" section). Copy them verbatim and adjust only the `baseURL` / `webServer.command` to match the chosen port.
 
+### 4.5a — Seed deterministic test credentials
+
+Playwright specs cannot log in if nobody exists. Every web archetype with auth MUST seed at least one test user at scaffold time. Default credentials (use these exact values — downstream tests reference them):
+
+```
+admin@test.local / testpass123
+```
+
+Implementation per backend stack:
+
+| Backend | Seed mechanism |
+|---|---|
+| PocketBase | Migration file in `pb_migrations/*_seed_test_user.js` using `app.save(new Record(...))` on the `users` collection. |
+| Supabase Local | SQL in `supabase/seed.sql` — `INSERT INTO auth.users (...)`. Runs on `supabase db reset`. |
+| FastAPI + SQLModel | Function `seed_test_users()` called from the `startup` lifespan hook when `ENV != "production"`. |
+| Next.js API routes + SQLite | Module `src/lib/seed.ts` called from `start.sh` before the dev server starts. |
+
+The seed MUST be idempotent — running the scaffold twice must not fail or duplicate users.
+
+### 4.5b — Document the test credentials
+
+The credentials from Step 4.5a MUST be visible to a new developer without grep:
+
+1. **README.md `## Local Development` section** — a three-line block showing the credentials and where they come from.
+2. **Dev-mode banner on the home page (strongly recommended)** — a small, dismissable component that reads `process.env.NODE_ENV === 'development'` (Next.js) or `import.meta.env.DEV` (Vite) and renders the test credentials inline. Never rendered in production builds. Templates in `stacks/nextjs.md` ("Dev Credentials Banner") and `stacks/vite-react.md` ("Dev Credentials Banner").
+
+Why both? README is greppable but easy to miss. The on-page banner makes the failure "I don't know the test password" impossible — the next developer to open the app sees it in the first second.
+
 **Rule:** if you do not finish Step 4.5, you do not proceed to Step 5. The contract negotiator downstream uses the presence of `e2e_framework` in `test-harness.json` (Step 6) to decide whether to write user-journey criteria backed by real browser tests or to fall back to weaker curl-based probes. Skipping this step silently degrades every downstream phase.
 
-**Mobile archetypes (Expo):** Playwright is not the right tool — defer to `stacks/expo.md` for the Expo-specific e2e approach (Detox / Maestro).
+**Mobile archetypes (Expo):** Playwright is not the right tool — defer to `stacks/expo.md` for the Expo-specific e2e approach (Detox / Maestro). The seed-data + documentation rules still apply (seed a test account in the backend, document credentials in README).
 
-**Non-web archetypes (pure ETL, batch jobs):** No e2e framework needed — record `"e2e_framework": null` in `test-harness.json` and move on.
+**Non-web archetypes (pure ETL, batch jobs):** No e2e framework needed — record `"e2e_framework": null` in `test-harness.json` and move on. Seed data and credential documentation are not required when there is no login surface.
 
 ## Step 5: Write ARCHITECTURE.md
 
@@ -457,6 +485,14 @@ Before committing:
    python3 -c "import json; d=json.load(open('${DIRIGENT_RUN_DIR}/test-harness.json')); assert d.get('e2e_framework'), 'e2e_framework missing'" || echo "MISSING e2e_framework in harness"
    ```
    Any MISSING message means Step 4.5 was skipped — go back and complete it before proceeding.
+9. **Test credentials seeded and documented (Steps 4.5a + 4.5b)** — run these checks when the archetype includes auth:
+   ```bash
+   # README documents the test credentials
+   grep -qE 'admin@test\.local|testpass123' README.md || echo "MISSING test credentials in README"
+   # Seed migration / seed script exists somewhere in the repo
+   (grep -rlE 'admin@test\.local|testpass123' pb_migrations supabase src 2>/dev/null | head -1) || echo "MISSING seed for test user"
+   ```
+   Any MISSING message means the developer opening the app will not know how to log in — go back and complete Steps 4.5a/4.5b.
 
 ## Step 9: Commit
 
@@ -481,6 +517,8 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 <rule>Every greenfield project MUST produce a start.sh that starts the full app</rule>
 <rule>start.sh MUST bind to 0.0.0.0 for port-forwarding access</rule>
 <rule>For any web archetype (browser-observable UI), Playwright install is mandatory in Step 4.5. The install commands are stable and do NOT require context7. Missing context7 / MCP is NOT a valid reason to skip this step. Downstream contract negotiators rely on the resulting `e2e_framework` entry in test-harness.json.</rule>
+<rule>For any web archetype with auth, seed at least one deterministic test user (`admin@test.local` / `testpass123`) at scaffold time (Step 4.5a). The seed MUST be idempotent. Downstream Playwright specs cannot log in without it.</rule>
+<rule>Document the seeded test credentials in README.md `## Local Development` AND in a dev-mode banner on the home page (Step 4.5b). Production builds MUST NOT render the banner.</rule>
 <rule>Match recommendations to project scale — a weekend project doesn't need the same architecture as a SaaS platform</rule>
 <rule>Every recommendation must have a concrete reason tied to the spec</rule>
 <rule>If the repo already has a framework config, skip scaffolding and work with what exists</rule>
