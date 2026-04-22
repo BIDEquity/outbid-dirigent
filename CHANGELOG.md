@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.2.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.1.0...outbid-dirigent-v2.2.0) (2026-04-22)
+
+
+### Features
+
+* **contract:** warn when user-facing phase has no e2e-framework criterion ([a3e6bb4](https://github.com/BIDEquity/outbid-dirigent/commit/a3e6bb404b1e2db2cd2c7e79163cf21123e11fed))
+* **dirigent:** probe claude plugin/mcp toolbox at startup ([8cebe11](https://github.com/BIDEquity/outbid-dirigent/commit/8cebe11d9380357af76ccaf67a00607d6611d336))
+* **scaffold:** mandate Playwright install for web archetypes ([4b3470a](https://github.com/BIDEquity/outbid-dirigent/commit/4b3470a1d054bae8de385b7158305903cb3b67a9))
+* **scaffold:** replace stock create-next-app / vite landing immediately ([31c9aaa](https://github.com/BIDEquity/outbid-dirigent/commit/31c9aaac39408db11b93b625b21130b0d2346356))
+* **scaffold:** seed test credentials and document them visibly ([9179544](https://github.com/BIDEquity/outbid-dirigent/commit/917954472afe3f96e58d934cc944465097ad436d))
+* **scaffold:** smoke spec asserts zero console and page errors ([7a36a81](https://github.com/BIDEquity/outbid-dirigent/commit/7a36a81bfb6d2596f88def93ab4be6805fbc5776))
+* **scaffold:** start.sh honours PORT env and prints test credentials ([8d6023a](https://github.com/BIDEquity/outbid-dirigent/commit/8d6023a50f6ad808e33edcf72e6f2f7484b35120))
+
 ## [2.1.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.0.0...outbid-dirigent-v2.1.0) (2026-04-21)
 
 
