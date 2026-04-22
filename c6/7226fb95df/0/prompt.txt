@@ -1,0 +1,86 @@
+This is an example of a greenfield app built with the dirigent. It is severely broken. Examine it!
+
+---
+
+how much effort would it be to make that an actually working prototype?
+
+---
+
+So: e22-testing would have closed all these gaps is what you say?
+
+---
+
+i put the claude logs under @../little-erp/projects/-home-coder-little-erp/ 
+
+See if e2e testint was attempted anywhere.
+
+---
+
+how did claude detect that "playwright is not installed"
+
+---
+
+was it not part of greenfield scaffold?
+
+---
+
+did ANYTHING in the whole run call context7?
+
+---
+
+let us not be lazy and assume "AI was just dum"
+
+---
+
+i have an explanation. there is simply no context7 installed on the workspace.
+
+---
+
+was folgt daraus für den dirigenten: 
+
+1. greenfield-scaffold muss noch zwingender playwright mitinstallieren (Punkt1)
+2. dirigent sollte einmal am anfang per subprocess.run die Ausgabe von "claude plugin list" und "claude mcp lsit" ausgeben -> programmatisches Debugging
+3. ggf. (nur wenn sauber und einfach möglich) -> im Contract Negitiation step einen Stop Hook einbauen, der warnt, wenn Contract _keinen_ E2E-Step enthält und Phase zw. Task user-facing ist.
+
+
+Plane das eigenständig, baue einen feature branch und stelle keine rückfragen. halte dich an commit-regeln
+
+---
+
+zwei weitere kleinigkeiten anpassen:
+
+e2e muss auch dafür sorgen, dass seed-daten da sind (bspw. test-logins) UND DAS DOKUMENTIEREN (in der README bspw ist fein, besser sogar als kleiner Callout auf bspw. der Startseite).
+
+Das start.sh-Skript sollte eine Port-Env-Var akzeptieren. Auch das sollte Test-Loiging ausgeben.
+
+---
+
+was hast du bei den letzten 2 commits genau gemeacht?
+
+---
+
+klasse!
+
+---
+
+fehlt noch was aus deiner sucht, was wir aus little erp gelernt haben?
+
+---
+
+mach 1+3, finde ich gut. Greenfield-Apps sollen am Ende so aussehen, wie ein Nutzer ads erwartten würde
+
+---
+
+push
+
+---
+
+im docker continer 8065 läuft jetzt lokal ein run mit dem ajtuellen dirigent. nutzte docker exec... -- tail -f dirigent-run.log was jetzt alles besser ist
+
+---
+
+wird denn irgendwo context7 auch mal gecallt?
+
+---
+
+ah stark, ja das wird denke ich ein patch werden. bitte direkt pushen auch, danke! Gilt die Liste für alle Skulls?
