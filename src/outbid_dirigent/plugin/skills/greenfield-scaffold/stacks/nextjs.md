@@ -29,6 +29,38 @@ Flags: `--yes` makes it fully non-interactive. `--no-git` avoids nested `.git`.
 
 **CRITICAL:** Never write `next.config.*` manually — the scaffold generates the version-correct config.
 
+## Stock Landing Replacement
+
+Immediately after `create-next-app`, overwrite `src/app/page.tsx`. The stock file is a Vercel tutorial with logos, "Get started by editing…", and Deploy-Now buttons — it MUST go before the first real phase starts, otherwise every e2e smoke passes against framework-starter content.
+
+Minimal template (adjust the `<h1>` text to the SPEC's working title, `/login` to the first real route):
+
+```tsx
+// src/app/page.tsx
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <main className="mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-xl flex-col items-center justify-center gap-6 px-6 text-center">
+      <h1 className="text-3xl font-semibold tracking-tight">{APP_TITLE}</h1>
+      <p className="text-sm text-zinc-600">
+        {ONE_LINE_DESCRIPTION_FROM_SPEC}
+      </p>
+      <Link
+        href="/login"
+        className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+      >
+        Sign in
+      </Link>
+    </main>
+  )
+}
+```
+
+Also delete the scaffold's `src/app/page.module.css` if it exists — the template above uses Tailwind utility classes only.
+
+Auth-less apps: swap the `/login` link for the first nav target the SPEC mentions (e.g. `/dashboard`, `/search`). The point is that clicking leads somewhere real, not to a 404.
+
 ## Run
 
 ```bash
