@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.2.0...outbid-dirigent-v2.2.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* **task-runner:** whitelist MCP tools with proper __* wildcards ([4594fd3](https://github.com/BIDEquity/outbid-dirigent/commit/4594fd3f91b570cd45afb1147034a200fa042097))
+
 ## [2.2.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.1.0...outbid-dirigent-v2.2.0) (2026-04-22)
 
 
