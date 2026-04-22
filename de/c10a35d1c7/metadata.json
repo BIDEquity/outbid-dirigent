@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "dec10a35d1c7",
+  "strategy": "manual-commit",
+  "branch": "feat/scaffold-e2e-hardening",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/de/c10a35d1c7/0/metadata.json",
+      "transcript": "/de/c10a35d1c7/0/full.jsonl",
+      "content_hash": "/de/c10a35d1c7/0/content_hash.txt",
+      "prompt": "/de/c10a35d1c7/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 271,
+    "cache_creation_tokens": 530161,
+    "cache_read_tokens": 28371551,
+    "output_tokens": 86533,
+    "api_call_count": 196
+  }
+}
