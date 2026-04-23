@@ -162,3 +162,7 @@ Idee: call am anfang (als Pre-Step, den du danach auskommentierst einmal explizi
 ---
 
 ja. bitte einmal mit der dirigent-CLI (hier lokal) testen und einen Step "MCP health" ganz am Anfang einfügen und direkt danach exit 0 (danach auskommentiereen)
+
+---
+
+überzeugt. oasse die prompts an, frtage vorher einen subagenten wo am Besten.
