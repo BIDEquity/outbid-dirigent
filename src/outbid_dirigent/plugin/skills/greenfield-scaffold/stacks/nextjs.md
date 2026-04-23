@@ -61,6 +61,105 @@ Also delete the scaffold's `src/app/page.module.css` if it exists — the templa
 
 Auth-less apps: swap the `/login` link for the first nav target the SPEC mentions (e.g. `/dashboard`, `/search`). The point is that clicking leads somewhere real, not to a 404.
 
+## Authenticated Entry (NavShell + Dashboard)
+
+For SPECs that name authenticated user roles, scaffold the navigable shell at `/dashboard` before any feature phase starts. The shell is intentionally minimal — one role-gated link per primary feature surface. Downstream phases flesh out the linked pages; the shell keeps the navigation surface present from day one so e2e specs have something real to assert against.
+
+`src/components/NavShell.tsx` — reads the current user's role and renders the matching link set. Replace `ROLES` and `LINKS` with what the SPEC actually names.
+
+```tsx
+// src/components/NavShell.tsx
+import Link from 'next/link'
+import type { ReactNode } from 'react'
+
+// Derive these from the SPEC's role model — do not invent roles.
+type Role = 'admin' | 'project_manager' | 'resource_manager' | 'employee'
+
+// One entry per primary feature surface named in the SPEC.
+// `roles` is the allowlist; routes may 404 until their feature lands —
+// that is fine, the shell exists so feature phases have a target.
+const LINKS: ReadonlyArray<{ href: string; label: string; roles: readonly Role[] }> = [
+  { href: '/skills',             label: 'Manage Skills',     roles: ['admin', 'resource_manager'] },
+  { href: '/team',               label: 'My Team',           roles: ['resource_manager'] },
+  { href: '/projects',           label: 'Projects',          roles: ['project_manager'] },
+  { href: '/requests',           label: 'Resource Requests', roles: ['project_manager', 'resource_manager'] },
+  { href: '/time',               label: 'My Time',           roles: ['employee'] },
+  { href: '/admin/sync-log',     label: 'HRIS Sync Log',     roles: ['admin'] },
+]
+
+export function NavShell({ role, children }: { role: Role; children: ReactNode }) {
+  const visible = LINKS.filter((l) => l.roles.includes(role))
+  return (
+    <div className="flex min-h-screen">
+      <nav
+        aria-label="Main navigation"
+        className="flex w-56 shrink-0 flex-col border-r border-zinc-200 bg-white px-3 py-6"
+      >
+        <p className="mb-4 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          Navigation
+        </p>
+        <ul className="flex flex-col gap-0.5">
+          {visible.map((l) => (
+            <li key={l.href}>
+              <Link
+                href={l.href}
+                className="block rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900"
+                data-testid={`nav-${l.href.slice(1).replace(/\//g, '-')}`}
+              >
+                {l.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    </div>
+  )
+}
+```
+
+`src/app/dashboard/page.tsx` — the authenticated landing that uses the shell. Adjust the auth lookup to match the chosen backend (Supabase SSR / PocketBase / custom).
+
+```tsx
+// src/app/dashboard/page.tsx
+import { redirect } from 'next/navigation'
+import { NavShell } from '@/components/NavShell'
+// import { getCurrentUser } from '@/lib/auth'  // ← stack-specific; fill in
+
+export default async function DashboardPage() {
+  // Stack-specific: resolve the authenticated user and role.
+  // Example shape:
+  //   const user = await getCurrentUser()
+  //   if (!user) redirect('/login')
+  const user = { email: 'admin@test.local', role: 'admin' as const }  // replace with real lookup
+  if (!user) redirect('/login')
+
+  return (
+    <NavShell role={user.role}>
+      <section className="mx-auto max-w-3xl">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          Signed in as <strong>{user.email}</strong>
+        </p>
+        <p className="mt-6 text-sm text-zinc-500">
+          Use the navigation on the left to access the app.
+        </p>
+      </section>
+    </NavShell>
+  )
+}
+```
+
+**Do not feature-build the dashboard here.** Widgets, charts, activity feeds — all of that belongs in feature phases. The scaffold only produces:
+
+- The `/dashboard` route that auth redirects to
+- The `NavShell` with role-gated links to every surface the SPEC names
+- A placeholder body that proves auth + routing work
+
+Every nav link should point to a route the planner will populate in a later phase. If a SPEC-named feature has no link in `LINKS`, the planner has no target — add it. If a link points to a route no phase will populate, remove it from the SPEC or the shell before committing.
+
+**Verify before moving on:** `curl -sf http://localhost:3000/dashboard` returns HTML containing at least one `data-testid="nav-..."` element per role the SPEC names.
+
 ## Run
 
 ```bash

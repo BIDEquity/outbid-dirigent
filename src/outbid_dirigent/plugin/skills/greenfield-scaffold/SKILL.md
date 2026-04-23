@@ -206,6 +206,26 @@ The landing stays deliberately minimal — it's a placeholder that proves naviga
 
 **Why this is a scaffold-phase concern, not a task-01 concern:** every downstream phase assumes the app has a reachable home. A nav component that `Link`s to `/` should land on *something*, not on a Vercel tutorial. Leaving it until later means every e2e smoke spec passes against garbage, and the "app works" signal becomes a lie.
 
+### Step 4b — Scaffold the authenticated entry (dashboard + nav shell) (MANDATORY for web archetypes with auth)
+
+Every web archetype whose SPEC describes authenticated user roles MUST produce a reachable authenticated entry — typically `/dashboard` (Next.js App Router) or the root of the authenticated router (Vite + client-side router). **Leaving this as a bare `<h1>Dashboard</h1>` stub is the failure mode this step prevents.** We shipped exactly that: a dashboard that rendered only `<h1>Dashboard</h1>` + "Signed in as admin@test.local", no nav, no feature links. Every downstream phase happily added code behind routes nobody could reach from the UI.
+
+The scaffold-phase deliverable is a **navigable shell**, not a feature-complete dashboard. Concretely:
+
+1. **An authenticated entry page** (e.g. `src/app/dashboard/page.tsx` for Next.js) that renders when the user is logged in.
+2. **A `NavShell` component** that lists **one link per primary feature surface named in the SPEC**, gated by role:
+   - For each role the SPEC names (Admin / PM / Resource Manager / Employee / whatever), enumerate the routes that role should reach.
+   - Render the links that apply to the current user; hide the others.
+   - Dead-link placeholder routes for features not yet built are acceptable — they'll 404 until the feature lands, but the nav surface is present from day one so later phases have a target to hang features off of.
+3. **A "Signed out / wrong role" handling** that routes unauthorised access back to `/login` or shows a friendly "access denied" message.
+
+Concrete per-stack templates live in the stack file:
+- Next.js App Router → `stacks/nextjs.md` → "Authenticated Entry (NavShell + Dashboard)" section
+
+**Why this is a scaffold-phase concern:** the planner produces 3–5 phases, each focused on a feature vertical (auth, skills, requests, etc.). No phase is naturally responsible for "build out the dashboard / navigation shell" — it falls through the cracks. We observed this pathology: phases 01–05 completed, and `/dashboard` remained an empty stub because no task's description explicitly said "flesh out dashboard". By producing the shell during scaffold, every later phase has somewhere to add its surface, and the navigation assertion in e2e specs (`expect(nav).toContainText('Skills')`) has something to match against.
+
+**The shell MUST enumerate every role from the SPEC.** If the SPEC says four roles and the shell only handles two, downstream user-journey criteria for the missing roles will either fail (blocked at shell level) or be silently softened to pass against the stub.
+
 ## Step 4.5: Install E2E framework (MANDATORY for web archetypes)
 
 If the chosen archetype has a browser-observable surface (any combo in the "Web Apps" table of `stacks/README.md`, plus all archetypes that include Next.js, Vite+React, Streamlit, or Gradio), install Playwright **unconditionally**.
@@ -542,6 +562,16 @@ Before committing:
     ! grep -qE 'Vite \+ React|count is \{|Edit <code>src/App\.tsx' src/App.tsx 2>/dev/null || echo "MISSING — Vite stock landing not replaced"
     ```
     Any MISSING message means a user opening the app will see a framework tutorial instead of the application — go back and complete Step 4a.
+10b. **Authenticated entry + nav shell present (Step 4b)** — run these checks for web archetypes with auth:
+    ```bash
+    # Next.js: authenticated dashboard route exists and is not a bare stub
+    ls src/app/dashboard/page.tsx 2>/dev/null || echo "MISSING — /dashboard route not scaffolded"
+    # Nav shell component exists
+    ls src/components/NavShell.tsx src/components/nav-shell.tsx src/app/_components/NavShell.tsx 2>/dev/null | head -1 || echo "MISSING — NavShell component not scaffolded"
+    # Dashboard is not a bare <h1>Dashboard</h1> stub — it must reference the nav shell or at least one role-gated feature link
+    grep -qE 'NavShell|<nav|role.*===.*|Link href=' src/app/dashboard/page.tsx 2>/dev/null || echo "MISSING — dashboard has no nav / role gating / feature links"
+    ```
+    Any MISSING message means downstream phases have no navigation target and user-journey specs will assert against an empty page — go back and complete Step 4b.
 11. **start.sh honours PORT and prints credentials (Step 7)** — run these checks:
     ```bash
     # PORT env var is read with a default
@@ -576,6 +606,7 @@ Note: test-harness.json lives in `${DIRIGENT_RUN_DIR}`, not the repo — do not 
 <rule>start.sh MUST honour a `PORT` env var for the frontend (and a matching env var per backend, e.g. `POCKETBASE_PORT`). Defaults come from the stack file. This is the lightweight port-conflict escape hatch — a dev on a machine with port 3000 taken should not have to edit start.sh.</rule>
 <rule>start.sh MUST print the seeded test credentials (admin@test.local / testpass123) in its startup banner. A dev reading the terminal output must know how to log in without grepping files.</rule>
 <rule>For any web archetype, Step 4a MUST replace the stock create-next-app / Vite landing with a minimal app-branded home that links to the first real route. Leaving the Vercel tutorial / Vite logo in place means a user opening the finished app sees a framework starter instead of the application.</rule>
+<rule>For any web archetype whose SPEC names authenticated user roles, Step 4b MUST scaffold an authenticated entry (typically `/dashboard`) and a `NavShell` component that enumerates role-gated links to every primary feature surface named in the SPEC. A bare `<h1>Dashboard</h1>` stub is not acceptable — downstream phases need a navigable shell to hang features off of, and e2e specs need a real nav surface to assert against.</rule>
 <rule>The Step 4.5 smoke spec MUST collect `console` errors and `pageerror` events and assert both are empty. `expect(body).toBeVisible()` on its own is insufficient — it passes against hydration mismatches, React runtime errors, and missing imports that break interactivity while leaving the DOM rendered.</rule>
 <rule>For any web archetype (browser-observable UI), Playwright install is mandatory in Step 4.5. The install commands are stable and do NOT require context7. Missing context7 / MCP is NOT a valid reason to skip this step. Downstream contract negotiators rely on the resulting `e2e_framework` entry in test-harness.json.</rule>
 <rule>For any web archetype with auth, seed at least one deterministic test user (`admin@test.local` / `testpass123`) at scaffold time (Step 4.5a). The seed MUST be idempotent. Downstream Playwright specs cannot log in without it.</rule>
