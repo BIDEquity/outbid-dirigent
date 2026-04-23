@@ -1,0 +1,26 @@
+Use the implementer agent to do the following: list every tool name you have in your immediate toolbox, one per line, no commentary. Do not use TodoWrite. Then call mcp__context7__resolve-library-id with libraryName='nextjs' and report the result.
+# Replicate dirigent's setup exactly, with plugin loaded. Ask the implementer to enumerate its tools.
+import subprocess, json, os
+plugin_dir = os.path.abspath("src/outbid_dirigent/plugin")
+cmd = [
+    "claude", "-p",
+    "Use the implementer agent to do the following: list every tool name you have in your immediate toolbox, one per line, no commentary. Do not use TodoWrite. Then call mcp__context7__resolve-library-id with libraryName='nextjs' and report the result.",
+    "--plugin-dir", plugin_dir,
+    "--allowedTools", "Agent,Read,Write,Edit,Bash,Glob,Grep,Skill,mcp__context7__*,mcp__plugin_context7_context7__*,mcp__playwright__*,mcp__plugin_playwright_playwright__*",
+    "--output-format", "json",
+    "--model", "claude-haiku-4-5-20251001",
+    "--permission-mode", "bypassPermissions",
+]
+r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+print("exit:", r.returncode)
+try:
+    data = json.loads(r.stdout)
+    print("--- result ---")
+    print(data.get("result", "")[:3000])
+    print("--- turns ---", data.get("num_turns"))
+except Exception as ex:
+    print("parse err:", ex)
+    print(r.stdout[:3000])
+if r.stderr.strip():
+    print("---stderr (first 600)---")
+    print(r.stderr[:600])
