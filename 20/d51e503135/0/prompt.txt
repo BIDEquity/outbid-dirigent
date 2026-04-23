@@ -1,0 +1,185 @@
+This is an example of a greenfield app built with the dirigent. It is severely broken. Examine it!
+
+---
+
+how much effort would it be to make that an actually working prototype?
+
+---
+
+So: e22-testing would have closed all these gaps is what you say?
+
+---
+
+i put the claude logs under @../little-erp/projects/-home-coder-little-erp/ 
+
+See if e2e testint was attempted anywhere.
+
+---
+
+how did claude detect that "playwright is not installed"
+
+---
+
+was it not part of greenfield scaffold?
+
+---
+
+did ANYTHING in the whole run call context7?
+
+---
+
+let us not be lazy and assume "AI was just dum"
+
+---
+
+i have an explanation. there is simply no context7 installed on the workspace.
+
+---
+
+was folgt daraus für den dirigenten: 
+
+1. greenfield-scaffold muss noch zwingender playwright mitinstallieren (Punkt1)
+2. dirigent sollte einmal am anfang per subprocess.run die Ausgabe von "claude plugin list" und "claude mcp lsit" ausgeben -> programmatisches Debugging
+3. ggf. (nur wenn sauber und einfach möglich) -> im Contract Negitiation step einen Stop Hook einbauen, der warnt, wenn Contract _keinen_ E2E-Step enthält und Phase zw. Task user-facing ist.
+
+
+Plane das eigenständig, baue einen feature branch und stelle keine rückfragen. halte dich an commit-regeln
+
+---
+
+zwei weitere kleinigkeiten anpassen:
+
+e2e muss auch dafür sorgen, dass seed-daten da sind (bspw. test-logins) UND DAS DOKUMENTIEREN (in der README bspw ist fein, besser sogar als kleiner Callout auf bspw. der Startseite).
+
+Das start.sh-Skript sollte eine Port-Env-Var akzeptieren. Auch das sollte Test-Loiging ausgeben.
+
+---
+
+was hast du bei den letzten 2 commits genau gemeacht?
+
+---
+
+klasse!
+
+---
+
+fehlt noch was aus deiner sucht, was wir aus little erp gelernt haben?
+
+---
+
+mach 1+3, finde ich gut. Greenfield-Apps sollen am Ende so aussehen, wie ein Nutzer ads erwartten würde
+
+---
+
+push
+
+---
+
+im docker continer 8065 läuft jetzt lokal ein run mit dem ajtuellen dirigent. nutzte docker exec... -- tail -f dirigent-run.log was jetzt alles besser ist
+
+---
+
+wird denn irgendwo context7 auch mal gecallt?
+
+---
+
+ah stark, ja das wird denke ich ein patch werden. bitte direkt pushen auch, danke! Gilt die Liste für alle Skulls?
+
+---
+
+wie sioeht der run mittlerweile aus?
+
+---
+
+what happened now?
+
+---
+
+läuft wieder von vorne in einem anderen container. bitte checken
+
+---
+
+was machen wir etzt?
+
+---
+
+schau nochmal in die logs
+
+---
+
+ja.
+
+---
+
+ok. läuft wioeder. schauen wir mal, ob wir jetzt tool calls sehen. check mal regelmäßig nach.
+
+---
+
+Check dirigent run in Docker container 5e5a71a899da (nifty_kalam). Specifically:
+
+1. `docker exec 5e5a71a899da sh -c 'tail -20 /home/coder/.dirigent/runs/*/logs/*.log'` — how far has the run progressed? which phase/task?
+2. `docker cp 5e5a71a899da:/home/coder/.claude/projects /tmp/run-logs-poll` (overwrite), then python3 grep for `tool_use` entries with `name` starting `mcp__`. Count total MCP calls and break down by tool name.
+3. If MCP calls > 0: report which agent made them and what they asked about — that's the success signal we've been waiting for (fixes 4594fd3 + 2843cfe took effect).
+4. If MCP calls == 0: report how many implementer subagents have run so far (from .meta.json files). If at least one implementer task is done with zero MCP calls, the fix likely didn't take effect and we need another angle.
+
+Then call ScheduleWakeup again for another 1500s iff the run is still active and we haven't yet got a clear signal. If run is done OR we have 2+ implementer tasks done with clear result, stop polling and summarise.
+
+Context for you (future-me): user asked to poll until we see whether context7/playwright MCP tools get called in the fresh run. Background is the little-erp post-mortem — two fixes landed (task_runner.py allowed_tools + implementer.md frontmatter tools list) to enable MCP calls that were previously filtered out by bare `mcp__context7` dead strings. v2.2.2 is the release that bundles both.
+
+---
+
+Check dirigent run in Docker container 5e5a71a899da (nifty_kalam). Specifically:
+
+1. `docker exec 5e5a71a899da sh -c 'grep -E "✅ Task|🔨 Task" /home/coder/.dirigent/runs/*/logs/*.log | tail -10'` — which tasks are done, which is running?
+2. `rm -rf /tmp/run-logs-poll && docker cp 5e5a71a899da:/home/coder/.claude/projects /tmp/run-logs-poll` then python3 — count total MCP tool calls across all JSONLs, break down by tool name and by subagent type.
+3. If MCP calls > 0: jackpot — report which agent, which tool, and the input payload (topic/libraryName). That's the success signal confirming fixes 4594fd3 + 2843cfe worked. Stop polling.
+4. If MCP calls == 0 AND at least 2 implementer tasks have completed AND at least one is a non-schema task (e.g. App Router page, Server Action, Playwright spec): the fix didn't take effect in practice. Investigate why (check if `dirigent:implementer` agent frontmatter is actually loaded from v2.2.2 install path, check allowed_tools in agent options at runtime). Stop polling, surface the finding.
+5. If MCP calls == 0 but the run is still on infrastructure-heavy tasks (schema, RLS, migrations): keep polling. Call ScheduleWakeup for another 1500s.
+6. If run has exited / container is gone / run has errored out: stop polling, report final state.
+
+Context (future-me): user has been watching this for an hour+. We shipped two fixes (v2.2.2: `mcp__context7__*` wildcards in task_runner.py allowed_tools and in implementer.md / plugin-writer.md frontmatter). Zero MCP calls so far across 2 runs at v2.2.2 and earlier. Run in container 5e5a71a899da is the first at v2.2.2 with both fixes active. Goal: confirm MCP calls happen, OR diagnose why they still don't.
+
+---
+
+schau nun nochmal was passiert ist
+
+---
+
+wurden denn playwright-tests ausgeführt? und waren sie sinnvoll?
+
+---
+
+parken. ich will erst mal den context7 bug beheben. 
+
+du gehst denke ich wieder eine abkürzung "hey lass uns den prompt besser machen", aber das ist quatsch. es MUSS ein Berechtigungsthema sein. BITTE schaue ganz genau rein.,
+
+---
+
+hast du beim docker-laufg in den claude-logs geschaut? 
+
+Idee: call am anfang (als Pre-Step, den du danach auskommentierst einmal explizit Claude mit "schaue mit contecxt7 irgendwas nach" und lasse dann den Dirigetnen einmal laufen (mach exit 0 dahinter).
+
+---
+
+ja. bitte einmal mit der dirigent-CLI (hier lokal) testen und einen Step "MCP health" ganz am Anfang einfügen und direkt danach exit 0 (danach auskommentiereen)
+
+---
+
+überzeugt. oasse die prompts an, frtage vorher einen subagenten wo am Besten.
+
+---
+
+[Image #2] -> ein angeopasster e2e-tests hat jetzt das durchgehen lassen. Ja, da rendert eine Seite, aber das ist doch NULL hilfreich. Ich vermute, dass die Routen alle funktionieren, aber das ist 0,0 hilfreich.
+
+---
+
+fixe loch 2. Wir müssen bitte im Greenfield-Path das auch hart als Requirement angeben: wenn web-lastig, dann muss der entrypoint (dashboard-seite mit lnks, nav) mitgedacht werden.
+
+---
+
+nun bitte noch einmal hinzufügen im greenfield-ding: wenn supabase _nicht_ verfügbar ist (kein Docker etc.) und sich nicht starten lässt: ausweichen auf 
+
+: postgres on docker
+: in memory db (sqlite, duckdb)
+
+NICHT sagen "geht nicht" hund dann happy weitermachen
