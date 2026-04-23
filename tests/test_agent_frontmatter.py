@@ -102,3 +102,65 @@ def test_implementer_has_context7_and_playwright_wildcards():
     }
     missing = required - set(tools)
     assert not missing, f"implementer.md missing MCP wildcards: {missing}"
+
+
+def test_implementer_context7_instruction_is_unconditional():
+    """Regression guard: the context7 instruction must not regress to weak/conditional wording.
+
+    The previous soft wording "Before guessing at API shapes..." let the model decide
+    it wasn't guessing and skip the tool every time. After v2.2.2 a real run shipped a
+    stale-Server-Component bug because context7 was never called. The fix is
+    unconditional imperative wording — these assertions keep that in place.
+    """
+    body = (AGENTS_DIR / "implementer.md").read_text(encoding="utf-8")
+
+    # Must NOT contain the old soft phrasing
+    assert "Before guessing at API shapes" not in body, (
+        "implementer.md regressed to conditional 'Before guessing' wording — "
+        "this was the exact phrasing that produced zero context7 calls across 13 tasks."
+    )
+
+    # MUST carry an unconditional marker and explicit framework list
+    must_contain = [
+        "MANDATORY",  # imperative marker
+        "mcp__context7__resolve-library-id",  # the call is spelled out
+        "mcp__context7__query-docs",
+        "Next.js",  # version-sensitive framework named
+        "Supabase",  # version-sensitive framework named
+    ]
+    for phrase in must_contain:
+        assert phrase in body, (
+            f"implementer.md missing required phrase {phrase!r} in context7 "
+            f"instruction — may have regressed."
+        )
+
+
+def test_implement_task_skill_context7_instruction_is_unconditional():
+    """Mirror of the above for the skill-level instruction.
+
+    The skill body is loaded into the implementer's prompt upstream of the agent
+    frontmatter — both must carry imperative wording so the instruction isn't
+    reasoned away before the agent sees it.
+    """
+    skill_path = (
+        AGENTS_DIR.parent
+        / "skills"
+        / "implement-task"
+        / "SKILL.md"
+    )
+    assert skill_path.exists(), f"expected {skill_path} to exist"
+    body = skill_path.read_text(encoding="utf-8")
+
+    # Must NOT contain the old soft gating
+    for weak_phrase in [
+        "Use it for any tool you're about to install",  # conditional on install
+    ]:
+        assert weak_phrase not in body, (
+            f"implement-task/SKILL.md regressed to weak wording: {weak_phrase!r}"
+        )
+
+    # MUST carry imperative markers
+    for phrase in ["MANDATORY", "Not optional", "mcp__context7__resolve-library-id"]:
+        assert phrase in body, (
+            f"implement-task/SKILL.md missing required phrase {phrase!r}"
+        )

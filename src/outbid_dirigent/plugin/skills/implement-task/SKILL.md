@@ -83,10 +83,10 @@ If any of these are missing, **set them up as your FIRST action, before writing 
 
 ### Where to get setup instructions
 
-- **`mcp__context7`** — the authoritative source for current, version-correct setup instructions. Use it for any tool you're about to install:
-  1. `mcp__context7__resolve-library-id` with `libraryName="@playwright/test"` (or `"vitest"`, `"cypress"`, etc.) → get libraryId
-  2. `mcp__context7__query-docs` with `libraryId=<result>` and `topic="Next.js App Router setup"` (or whatever fits the target stack) → get docs
-  Tool setup instructions go stale fast; don't rely on training knowledge for config syntax or package names.
+- **`mcp__context7` — MANDATORY before writing any version-sensitive code.** Not optional. Not "if you're unsure." Not "when you're about to install." **Every time** your task touches a framework's API surface (Next.js App Router, React 19, Supabase SSR, Playwright, Tailwind v4, Expo Router, or any library that has had breaking changes since early 2024), call context7 first:
+  1. `mcp__context7__resolve-library-id` with `libraryName="<framework>"` → get libraryId
+  2. `mcp__context7__query-docs` with `libraryId=<result>` and `topic="<the specific API you're about to use>"` → read the result before writing the code
+  Your training cutoff is older than these frameworks' current shapes. Writing from recall has already produced shipped bugs. The non-negotiable list + procedure is in `agents/implementer.md` → "Library/Framework Docs (context7)". Read that once, then apply it on every task.
 - **Stack defaults** — `skills/greenfield-scaffold/stacks/README.md` in the dirigent plugin names the opinionated tool for each stack (Playwright for web e2e, Vitest for JS unit tests, pytest for Python, etc.) and the individual `stacks/*.md` files cover project scaffolding. If your target matches a stack there, follow its conventions — don't re-deliberate the tool choice.
 
 ### When NOT to bootstrap here

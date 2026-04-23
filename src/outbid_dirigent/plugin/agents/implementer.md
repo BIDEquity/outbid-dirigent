@@ -34,12 +34,28 @@ Before writing any code, discover what the codebase already provides to help you
 - If `.claude/CLAUDE.md` exists, read it — it has project instructions.
 - If `<conventions>` block is in your task prompt, follow those patterns exactly. Consistency with the existing codebase is more important than your preference.
 
-### Library/Framework Docs (context7)
+### Library/Framework Docs (context7) — MANDATORY for version-sensitive code
 
-Before guessing at API shapes or config syntax for any library/framework in the task, fetch curated docs:
+Your training-data recall is **older than the APIs you're writing against**. Next.js, React, Supabase SSR, Tailwind, Playwright, Expo, and their peers ship breaking changes on a monthly cadence. Relying on memory for any of these has already produced shipped bugs in this project (e.g. stale Server-Component values in a controlled-input boundary). Do not do it again.
 
-1. `mcp__context7__resolve-library-id` with `libraryName="<framework>"` → get libraryId
-2. `mcp__context7__query-docs` with `libraryId=<result>` and `topic="<specific topic>"` → get docs
+**Rule — non-negotiable.** Before you write or modify code that touches any of the following, call context7 to confirm the current API shape:
+
+- **Next.js App Router**: Server/Client Component boundaries, Server Actions, `cookies()` / `headers()`, `middleware.ts` / `proxy.ts`, `redirect()`, `revalidatePath`, `generateMetadata`, route handlers
+- **React 19**: hooks that changed (`use`, `useActionState`, `useOptimistic`, `useFormStatus`), suspense patterns, RSC rules
+- **Supabase (`@supabase/ssr`, `@supabase/supabase-js`)**: cookie-based auth, server vs. browser clients, RLS helpers
+- **Playwright**: `defineConfig`, `webServer`, locator API, fixture semantics
+- **Tailwind v4**: config file format (no more `tailwind.config.js`), `@theme`, CSS-first directives
+- **Expo Router / React Native 0.75+**: file-based routing, `expo-router` API
+- Any other library in the task's stack where you are not 100% certain the API has not changed since early 2024
+
+**Procedure** (two calls, always in this order):
+
+1. `mcp__context7__resolve-library-id` with `libraryName="<framework>"` → capture the libraryId
+2. `mcp__context7__query-docs` with `libraryId=<result>` and `topic="<specific API you need>"` → read the result before writing code
+
+**Do not skip these calls** because the code "looks obvious" or because you "already know this framework." That was the failure mode. The correct heuristic is: if the task touches a framework in the list above, context7 fires. Period. The cost is ~2 seconds per lookup; the cost of shipping stale-API code is a failed review iteration.
+
+If context7 is genuinely unavailable in this environment (you get a tool error, not a permission denial), fall back to reading `node_modules/<package>/dist/docs/` or the package's README — but log `DEVIATION: no-context7` in your task summary so the operator sees it.
 
 ### Knowledge Store
 If `<knowledge-store>` is present, it has domain knowledge from `.brv/context-tree/`. Use `/dirigent:query-brv <question>` for deeper queries. After establishing new patterns, curate them via `/dirigent:query-brv`. Do not modify `.brv/` directly.
