@@ -19,6 +19,98 @@ supabase --version
 docker info > /dev/null 2>&1 && echo "Docker OK" || echo "Docker NOT running"
 ```
 
+If either command fails, **do not stop** — follow the Fallback chain below.
+
+## Fallback chain
+
+When `supabase start` cannot run (no Docker daemon, no `supabase` CLI, image pulls blocked, port conflicts that can't be freed), fall back through these tiers in order. Record the active tier in `ARCHITECTURE.md` → `### Backend Fallback Level` per Step 2 of SKILL.md. Do not silently continue with the primary as if it worked — the e2e suite won't run and reviews will mask it as `warn — infra not running`.
+
+### Tier 1: primary (Supabase Local)
+
+```bash
+supabase start
+```
+
+If that prints connection URLs: use the stack as documented. Done.
+
+### Tier 2: Postgres on Docker (lose Supabase Auth, keep Postgres)
+
+When Docker works but Supabase's bundled services (Auth, Storage, Studio, Edge Functions) can't start — commonly image-pull failures, disk-space limits, or workspace port restrictions.
+
+Start a plain Postgres container:
+
+```bash
+docker run -d --name app-pg \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=app \
+  -p 54322:5432 \
+  postgres:16
+```
+
+Wait for readiness with a pg_isready loop (see the NextJS stack file for a portable `until pg_isready` snippet).
+
+Apply migrations with `psql` piped into the container — one file at a time — then feed `supabase/seed.sql` in the same way. The exact shell pipeline lives next to the per-stack docs; keep this skill file declarative.
+
+**What you lose vs Tier 1** (must be captured in `ARCHITECTURE.md` → Future Considerations):
+
+- **Supabase Auth gone.** Roll a minimal email/password auth: hash passwords with `bcryptjs` at the Server Action layer, store sessions in a `sessions` table, set an HTTP-only cookie. Test user (`admin@test.local` / `testpass123`) gets inserted by the seed script with a pre-hashed password.
+- **No realtime, no storage, no Edge Functions.** If the SPEC relies on these, flag as `DEVIATION: tier-2-fallback — realtime feature deferred until Docker/Supabase are available`.
+- **RLS still works** (it's a Postgres feature), but `auth.uid()` does not exist — replace with your session-table lookup function.
+
+`NEXT_PUBLIC_SUPABASE_URL` stays pointed at a local API you write yourself (Next.js Route Handlers hitting Postgres directly). Or simpler: skip `@supabase/ssr` entirely and use the `postgres` npm package from Server Components.
+
+### Tier 3: SQLite in-process (no external dependencies)
+
+When Docker itself is not available on the workspace — common in strict sandboxes, CI ephemeral runners with no Docker-in-Docker, or locked-down corporate environments.
+
+For Next.js:
+
+```bash
+npm install better-sqlite3
+npm install -D @types/better-sqlite3
+```
+
+Create a thin DB module (`src/lib/db.ts`) that instantiates `better-sqlite3`, enables WAL journal mode, enforces foreign keys, and exports a single `db` handle. Keep it small — ~10 lines.
+
+Translate the Supabase migrations to SQLite dialect at scaffold time:
+
+- `UUID` → `TEXT` (generate with `crypto.randomUUID()` in the app layer)
+- `TIMESTAMPTZ DEFAULT now()` → `TEXT DEFAULT (datetime('now'))`
+- `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` → drop (enforce access control in Server Actions)
+- `gen_random_uuid()` → application-side `crypto.randomUUID()`
+- `jsonb` → `TEXT` + `JSON.stringify` / `JSON.parse` helpers
+- `pg_cron` → `node-cron` or a simple `setInterval` in a long-running process
+
+Apply migrations at boot using an idempotent loop: create a `_migrations` tracking table on first run, then replay each `.sql` file that isn't already recorded there. Keep the loop in `src/lib/migrate.ts`; call it once from app startup. No ORMs, no migration frameworks.
+
+**What you lose vs Tier 2** (must be captured in `ARCHITECTURE.md`):
+
+- **Single-writer only.** SQLite serialises writes; fine for prototype, not for production.
+- **No network database access** — everything runs in the Next.js process. Good for dev, but you can't point a second service at the same DB without contention.
+- **No Postgres extensions** — if the SPEC calls out `pg_trgm`, `pgvector`, `postgis`, flag as `DEVIATION: tier-3-fallback — <extension> requires Postgres, feature deferred`.
+- **No Postgres-specific SQL** — watch for `UPSERT` syntax differences, `jsonb_path_query`, window functions with unsupported framing.
+
+### Tier 4 (analytical only): DuckDB in-process
+
+Only use DuckDB if the SPEC is overwhelmingly read-heavy (dashboards over columnar data) and has no concurrent-write requirement. For transactional / auth-bearing apps, go SQLite at Tier 3 instead. DuckDB is documented here for completeness, not as a general fallback.
+
+### Record the active tier
+
+After the fallback resolves, write this block into `ARCHITECTURE.md` `<architecture-decisions>`:
+
+```markdown
+### Backend Fallback Level
+
+- Primary (Supabase Local) attempted: FAILED — {reason}
+- Tier 2 (Postgres on Docker) attempted: {OK|FAILED — reason|SKIPPED}
+- Tier 3 (SQLite in-process) attempted: {OK|SKIPPED}
+- **Active backend:** {Supabase Local | Postgres on Docker | SQLite in-process}
+- **Lost capabilities vs primary:** {e.g. "Supabase Auth replaced by hand-rolled session cookies; no realtime; no storage"}
+- **Upgrade path:** When Docker becomes available, migrate to Supabase Local by running `supabase init && supabase db reset` and re-wiring `NEXT_PUBLIC_SUPABASE_URL`. Migrations are compatible; only the auth layer needs to swap back to `@supabase/ssr`.
+```
+
+Update `test-harness.json` `notes` with the active tier so the contract negotiator writes realistic verification commands.
+
 ## Scaffold
 
 ```bash

@@ -145,9 +145,9 @@ Capture these in the `### Future Considerations` block of `<architecture-decisio
 
 **Do NOT deliberate beyond 2 minutes.** Match SPEC signals → stack + pattern → verify compatibility → note future hints → move on.
 
-## Step 2: Verify Stack Availability
+## Step 2: Verify Stack Availability (with documented fallback chain)
 
-Read the stack files for your chosen combo. Run the "Check Installation" commands from each file. If a tool is missing, report it and stop — do not proceed with a broken stack.
+Read the stack files for your chosen combo. Run the "Check Installation" commands from each file.
 
 ```bash
 # Example for Streamlit + DuckDB combo:
@@ -155,6 +155,41 @@ uv --version
 python -c "import streamlit; print(streamlit.__version__)"
 python -c "import duckdb; print(duckdb.__version__)"
 ```
+
+### If the primary backend check fails — **fall back, don't bail**
+
+**Anti-pattern we're killing here:** "Docker isn't available → log it → pass review with `warn — Supabase not running` → ship an app whose e2e tests were never actually executed." The entire Step-5 ARCHITECTURE.md becomes a lie when the backend it assumes doesn't exist.
+
+When the primary backend's Check Installation fails, **enter the stack's documented fallback chain**. Every backend stack file with non-trivial infra (Docker, system services, cloud accounts) MUST document a fallback chain. Current chains:
+
+| Primary | Fallback 1 | Fallback 2 | Fallback 3 |
+|---|---|---|---|
+| Supabase Local (needs Docker) | Postgres on Docker (lose Supabase Auth, keep Postgres + hand-rolled auth via `@supabase/ssr`-compatible wrapper) | SQLite via `better-sqlite3` / `sqlalchemy+sqlite` (in-process, no external deps) | DuckDB (analytical only — not suitable for auth/transactional; use only if the SPEC is read-heavy) |
+| PocketBase (needs binary) | Download platform-correct binary via `uname -s -m` | SQLite direct (PocketBase is SQLite underneath — skip the wrapper) | — |
+| Postgres on Docker | Postgres via Colima / Rancher Desktop | SQLite | DuckDB |
+
+See `stacks/supabase-local.md` → "Fallback chain" section for the concrete Supabase→Postgres→SQLite transitions.
+
+### Process
+
+1. Run the primary Check Installation. On success: proceed to Step 3 as normal.
+2. On primary failure: try Fallback 1 — install / start it, run its own Check Installation.
+3. On Fallback 1 failure: try Fallback 2. And so on.
+4. **First fallback that works wins.** Record which level is active in `ARCHITECTURE.md` `<architecture-decisions>` → new subsection `### Backend Fallback Level` with the form:
+   ```
+   Primary (Supabase Local) attempted: FAILED — Docker not available on workspace
+   Fallback 1 (Postgres on Docker) attempted: FAILED — docker daemon not running
+   Fallback 2 (SQLite) attempted: OK — using better-sqlite3 / sqlite3 in-process
+   Active backend: SQLite (in-process)
+   Limitations: no auth provider, no realtime, no RLS — hand-rolled middleware guards access control
+   ```
+5. Every downstream phase reads this section. Tasks that would have relied on Postgres-only features (RLS, `gen_random_uuid()`, full-text search extensions, `pg_cron`) must either degrade gracefully or be flagged as DEVIATION.
+6. `test-harness.json` records the active backend so the contract negotiator can write realistic verification commands (e.g. skip `supabase db reset` if the active backend is SQLite).
+7. **Only if every documented fallback fails**: report and stop. Never silently continue with a broken backend and hope the reviewer masks it.
+
+### Why fall back instead of stop?
+
+The "stop and wait for human" option sounds disciplined but in practice produces the happy-continue pathology we've observed: operator sees the halt, concludes "well the spec still compiles, let's try anyway", hand-edits `test-harness.json` to fake a backend, and reviews rubber-stamp phases because nobody runs the e2e suite. Falling back to SQLite guarantees a usable app at some reduced-capability tier — and the `<architecture-decisions>` entry makes the reduction visible, auditable, and upgradable later.
 
 ## Step 3: Assess What Already Exists
 
