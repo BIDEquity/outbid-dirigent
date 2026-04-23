@@ -265,23 +265,24 @@ def _generate_spec_interactive(repo_path: Path, description: str) -> Path:
     dirigent_dir.mkdir(parents=True, exist_ok=True)
 
     context = _gather_repo_context(repo_path)
+    spec_path = dirigent_dir / "SPEC.md"
 
-    # Write a seed file with what we know so the skill can read it
-    seed = {
+    config = {
+        "output_path": str(spec_path),
         "user_description": description,
         "repo_context": context[:8000],
+        "mode": "interactive",
     }
-    seed_path = dirigent_dir / "spec-seed.json"
-    seed_path.write_text(json.dumps(seed, indent=2, ensure_ascii=False), encoding="utf-8")
+    config_path = dirigent_dir / "spec-config.json"
+    config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    runner = TaskRunner(repo_path, str(dirigent_dir / "SPEC.md"))
+    runner = TaskRunner(repo_path, str(spec_path))
     success, _, stderr = runner._run_claude(
-        "Run /dirigent:generate-spec",
+        f"Run /dirigent:generate-spec {config_path}",
         timeout=300,
         component="generate-spec",
     )
 
-    spec_path = dirigent_dir / "SPEC.md"
     if spec_path.exists() and spec_path.stat().st_size > 0:
         return spec_path
 

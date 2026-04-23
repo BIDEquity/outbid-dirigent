@@ -36,16 +36,18 @@ Tell the user: "Writing to `.dirigent-onboarding/` — this is gitignored, nothi
 
 ### Step 3 — Invoke `dirigent:generate-spec`
 
-Set `DIRIGENT_RUN_DIR=.dirigent-onboarding` in the environment (or equivalent mechanism matching how sibling skills resolve the run dir). Create a `spec-seed.json`:
+Write `.dirigent-onboarding/spec-config.json` with the skill's config schema:
 
 ```json
 {
+  "output_path": ".dirigent-onboarding/SPEC.md",
   "user_description": "<what the user typed>",
-  "repo_context": "<auto-gathered from ARCHITECTURE.md, README.md, CLAUDE.md if present>"
+  "repo_context": "<auto-gathered from ARCHITECTURE.md, README.md, CLAUDE.md if present>",
+  "mode": "interactive"
 }
 ```
 
-Then invoke `dirigent:generate-spec`. It will ask at most 2-3 clarifying questions and produce `.dirigent-onboarding/SPEC.md`.
+Then invoke `/dirigent:generate-spec .dirigent-onboarding/spec-config.json`. The skill reads the config, asks at most 3 clarifying questions if any trigger fires (see the skill's Step 2), and writes `.dirigent-onboarding/SPEC.md`.
 
 ### Step 4 — Invoke `dirigent:create-plan`
 
