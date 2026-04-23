@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.3.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.2.2...outbid-dirigent-v2.3.0) (2026-04-23)
+
+
+### Features
+
+* **scaffold:** backend fallback chain — Supabase → Postgres → SQLite ([c08a962](https://github.com/BIDEquity/outbid-dirigent/commit/c08a9624f62ba3a7c66e4bb9e3555a111def9908))
+* **scaffold:** mandate navigable entry (dashboard + nav shell) for web archetypes with auth ([bc56ed3](https://github.com/BIDEquity/outbid-dirigent/commit/bc56ed3b1aed3a67e697f4b43307d9e0b423d583))
+
+
+### Bug Fixes
+
+* **implementer:** forbid loosening test assertions during review-fix ([d617819](https://github.com/BIDEquity/outbid-dirigent/commit/d6178191c963cde79136eb294fd238f3f239ae5b))
+* **prompts:** make context7 lookup unconditional for version-sensitive APIs ([7c633f2](https://github.com/BIDEquity/outbid-dirigent/commit/7c633f2771d14ba07d6536e0adffdb38afe58416))
+
 ## [2.2.2](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.2.1...outbid-dirigent-v2.2.2) (2026-04-22)
 
 
