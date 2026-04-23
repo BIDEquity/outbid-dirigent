@@ -1,0 +1,18 @@
+refactor the spec generation skill. add a spec template to it and reference it. 
+
+Steps:
+1. check if generate-spec skill is used anywhere in the dirigent run? 
+
+If not: remove all references to the run dir and any files that might be in there. 
+
+get rid of the spec-writer agent. add an interactive and a non-interactive mode (e.g. questions/no questinos).
+
+if it *is* used: come back to me.
+
+---
+
+3
+
+---
+
+add a note saying "if the users says "generaet spec from this codebase to reverse-engineer the spec from a codebase, looking at notorioues files (architecture, readma, adrs or by grep if they dont exist or do not contain sufficient info)

@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "04784e37f83f",
+  "session_id": "8be81d4f-307e-42b3-a362-d079185f9c16",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-23T20:43:21.509451Z",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/outbid_dirigent/dirigent.py",
+    "src/outbid_dirigent/plugin/agents/spec-writer.md",
+    "src/outbid_dirigent/plugin/skills/generate-spec/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/generate-spec/templates/SPEC.template.md",
+    "src/outbid_dirigent/plugin/skills/hi/lanes/plan-mine.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-7[1m]",
+  "turn_id": "672d18e00eb3",
+  "token_usage": {
+    "input_tokens": 4180,
+    "cache_creation_tokens": 100137,
+    "cache_read_tokens": 3327125,
+    "output_tokens": 31129,
+    "api_call_count": 37
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-23T20:43:21.308399Z",
+    "agent_lines": 199,
+    "human_added": 16,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 215,
+    "agent_percentage": 92.55813953488372
+  }
+}
