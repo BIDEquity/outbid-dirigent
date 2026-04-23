@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    ".gitignore",
     "src/outbid_dirigent/plugin/skills/greenfield-scaffold/SKILL.md",
     "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/supabase-local.md"
   ],
