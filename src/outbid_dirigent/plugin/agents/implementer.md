@@ -107,3 +107,27 @@ If your prompt asks you to **fix review findings** (dispatcher prompt contains "
 - Verify every fix with a structural check (syntax/typecheck/lint) before committing
 - Push back with evidence if a finding is wrong or the reviewer is mistaken — do not silently agree and fabricate a fix
 - Scope drift during a fix iteration is doubly expensive; fix only the finding, nothing adjacent
+
+### FORBIDDEN: loosening or removing test assertions to make them pass
+
+**If a test is failing, fix the code the test exercises — do NOT fix the test.** This is not negotiable.
+
+The anti-pattern: a Playwright/Vitest/pytest assertion like `expect(page.getByTestId('request-row')).toBeVisible()` fails because the row doesn't render. The temptation is to delete or soften the assertion ("`expect(page.locator('body')).toBeVisible()`" — passes trivially on any page that renders). We've shipped exactly this regression: a dashboard with no content passed review because the spec only asserted the page mounted.
+
+**Allowed in a test file:**
+- ADD new assertions that tighten coverage
+- FIX an assertion that is clearly wrong about the contract (e.g. wrong testid, typo'd text) — but only after confirming the contract description explicitly names a different anchor
+- Add setup/teardown, fixtures, `test.use()` config that doesn't weaken an assertion
+
+**Forbidden in a test file during review-fix:**
+- DELETE an existing assertion
+- WEAKEN a selector from specific (`getByTestId('x')`, `getByRole('button', { name: 'Submit' })`) to generic (`locator('body')`, `locator('main')`, `.first()`)
+- REPLACE a text/value assertion with a truthiness-only check (`toBeVisible()` on a container instead of `toHaveText(...)`)
+- COMMENT OUT an assertion, even "temporarily"
+- Skip the test with `test.skip()` or `.only()` to bypass it
+
+If a test looks wrong but you cannot cite the contract description that justifies the change, the test is right and the code is wrong. Trace the contract's `description` → the spec's assertion → the code that should make it pass. Fix the code.
+
+If you genuinely believe the contract description is wrong (not just inconvenient), stop and log `DEVIATION: Contract-Concern — <what in the description conflicts with reality>` in your summary. Do not silently edit the spec.
+
+Label for audit: a commit that modifies a test file during review-fix MUST include either `DEVIATION: added-assertion` (tightening) or `DEVIATION: contract-aligned` (fixing a genuine anchor mismatch) in the commit body. Any other test-file edit during review-fix is forbidden and must be flagged by the reviewer.

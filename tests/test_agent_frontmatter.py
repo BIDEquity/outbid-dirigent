@@ -135,6 +135,32 @@ def test_implementer_context7_instruction_is_unconditional():
         )
 
 
+def test_implementer_review_fix_forbids_loosening_tests():
+    """Regression guard: the review-fix loop must forbid test-assertion loosening.
+
+    The failure mode we shipped: implementer sees a spec assertion fail during
+    review-fix, deletes/weakens the assertion instead of fixing the code, review
+    passes on an empty dashboard. The implementer.md Review-Fix section now
+    enumerates this as forbidden; these assertions keep that in place.
+    """
+    body = (AGENTS_DIR / "implementer.md").read_text(encoding="utf-8")
+
+    # Hard-forbid section must name the anti-pattern explicitly
+    must_contain = [
+        "FORBIDDEN",  # imperative marker in the section heading
+        "loosening or removing test assertions",
+        "WEAKEN",
+        "DELETE",
+        "fix the code",  # the positive alternative
+        "DEVIATION: Contract-Concern",  # escape hatch when contract is genuinely wrong
+    ]
+    for phrase in must_contain:
+        assert phrase in body, (
+            f"implementer.md review-fix section missing {phrase!r} — "
+            f"test-loosening forbid may have regressed."
+        )
+
+
 def test_implement_task_skill_context7_instruction_is_unconditional():
     """Mirror of the above for the skill-level instruction.
 
