@@ -262,6 +262,96 @@ Concrete per-stack templates live in the stack file:
 
 **The shell MUST enumerate every role from the SPEC.** If the SPEC says four roles and the shell only handles two, downstream user-journey criteria for the missing roles will either fail (blocked at shell level) or be silently softened to pass against the stub.
 
+### Step 4c — Apply BID Equity design system (MANDATORY for web archetypes)
+
+Every greenfield web archetype (Next.js, Vite+React, Astro, Expo) MUST fetch
+the BID Equity design system zip and apply it during scaffolding. This
+happens BEFORE Step 4.5 so the e2e smoke spec runs against a branded
+prototype, not a Vercel-tutorial-with-Tailwind-defaults.
+
+**Why it's a scaffold-phase concern:** brand application is global state
+(fonts in `public/`, tokens in the global stylesheet, components imported
+from a shared path). Doing it after the first feature task means every
+later phase inherits framework defaults and drifts from the brand. Fixing
+that retroactively touches every file that styled anything.
+
+#### Fetch + cache
+
+```bash
+DESIGN_SYSTEM_URL="https://bid-equity-design-system.s3.eu-central-1.amazonaws.com/design-system.zip"
+CACHE_DIR="${HOME}/.cache/dirigent"
+CACHE_FILE="${CACHE_DIR}/design-system.zip"
+
+mkdir -p "${CACHE_DIR}"
+
+# Refresh if cache absent, older than 24h, or DIRIGENT_DESIGN_SYSTEM_REFRESH=1
+if [ ! -f "${CACHE_FILE}" ] \
+   || [ -n "${DIRIGENT_DESIGN_SYSTEM_REFRESH:-}" ] \
+   || [ "$(find "${CACHE_FILE}" -mtime +1 -print 2>/dev/null)" ]; then
+  curl -fSL --retry 3 --retry-delay 2 -o "${CACHE_FILE}.tmp" "${DESIGN_SYSTEM_URL}" \
+    && mv "${CACHE_FILE}.tmp" "${CACHE_FILE}"
+fi
+```
+
+**If fetch fails** (network down, 403, S3 unavailable): warn loudly, set
+`DEVIATION: design-system-fetch-failed` in the scaffold deviations log,
+proceed with scaffolding without the brand. Do NOT abort the run — the
+prototype is still useful, just unbranded.
+
+#### Extract + delegate to embedded SKILL.md
+
+```bash
+EXTRACT_DIR="$(mktemp -d)/design-system"
+mkdir -p "${EXTRACT_DIR}"
+unzip -q "${CACHE_FILE}" -d "${EXTRACT_DIR}"
+```
+
+Then read `${EXTRACT_DIR}/SKILL.md`. **That file is the source of truth for
+how to apply the brand.** It documents:
+
+- Colors (Coral #FF564F, Stoney, Navy, …) and where to drop the tokens
+- Typography (Bebas + Swis721) and the @font-face block to wire
+- Iconography rules (Lucide, 24px, coral chip)
+- File map: which files in the zip go where in the new project
+- Do/Don't rules
+
+Apply the rules per stack. Concretely:
+
+| Stack | Wire-up |
+|---|---|
+| Next.js (App Router) | `colors_and_type.css` → import in `src/app/layout.tsx` global CSS. Fonts → `public/fonts/`. Logos → `public/assets/`. Components from `components/ui/` → `src/components/ui/` (skip `components/` custom BID components unless the SPEC asks for the bidequity.de marketing site specifically). |
+| Vite + React | `colors_and_type.css` → import in `src/main.tsx` after `index.css`. Fonts → `public/fonts/`. Logos → `public/assets/`. Components → `src/components/ui/`. |
+| Astro | Tokens → `src/styles/tokens.css` linked from `src/layouts/BaseLayout.astro`. Fonts → `public/fonts/`. Logos → `public/assets/`. |
+| Expo | Tokens become a TypeScript theme object (`src/theme.ts`) — fonts loaded via `expo-font` from `assets/fonts/`. The shadcn components don't apply to React Native; skip. |
+
+#### Document in the new project's README
+
+Add a `## Branding` section to the new project's `README.md`:
+
+```markdown
+## Branding
+
+This prototype uses the **BID Equity design system**
+([s3://bid-equity-design-system/design-system.zip](https://bid-equity-design-system.s3.eu-central-1.amazonaws.com/design-system.zip)).
+
+- Tokens: `src/styles/tokens.css` (or stack-equivalent — see imports)
+- Fonts: `public/fonts/` (Bebas Neue Pro SemiExpanded + Swis721 family)
+- Logos: `public/assets/`
+- Brand rules: see `harness-docs/design-system.md` in this org's dirigent repo
+
+To refresh the brand from S3: `DIRIGENT_DESIGN_SYSTEM_REFRESH=1 dirigent ...`
+```
+
+#### When to skip
+
+- **Non-web archetypes** (FastAPI-only, CLI tool, batch job, AI agent without UI): the brand isn't applicable — skip silently.
+- **SPEC explicitly says "no custom branding"** or "use stack default styling": skip and record `DEVIATION: design-system-skipped-per-spec` in the deviations log.
+- **Target repo is a portfolio company prototype, not BID itself**: skip — the brand is BID's, not the portcos'. Determine this from the SPEC + repo name; when in doubt, ask.
+
+The full distribution + integration policy lives in
+`harness-docs/design-system.md` in the dirigent repo. The embedded `SKILL.md`
+inside the zip is the implementer's reference for HOW to apply the brand.
+
 ## Step 4.5: Install E2E framework (MANDATORY for web archetypes)
 
 If the chosen archetype has a browser-observable surface (any combo in the "Web Apps" table of `stacks/README.md`, plus all archetypes that include Next.js, Vite+React, Streamlit, or Gradio), install Playwright **unconditionally**.
