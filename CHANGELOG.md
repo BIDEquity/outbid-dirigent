@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.3.0...outbid-dirigent-v2.4.0) (2026-04-24)
+
+
+### Features
+
+* **executor:** add SPEC validator before compaction ([7e726ab](https://github.com/BIDEquity/outbid-dirigent/commit/7e726ab1b174a96a8a61d5bd4ac90eadfd41e19f))
+* **executor:** final commit sweep before ship ([c0d911c](https://github.com/BIDEquity/outbid-dirigent/commit/c0d911c3962380aa1d5beafed66dc2795c647d5c))
+* **executor:** final review step for greenfield route (structured output + fix loop) ([d3c60ba](https://github.com/BIDEquity/outbid-dirigent/commit/d3c60ba932cd1c0ff0611875eeee622510894fe3))
+* **greenfield:** add Clerk stack (managed auth, Keyless Mode) ([b26c29f](https://github.com/BIDEquity/outbid-dirigent/commit/b26c29f33dcf8815793cf5f25373affff9964269))
+* **greenfield:** mandate BID Equity design system for web archetypes ([a0dc4ab](https://github.com/BIDEquity/outbid-dirigent/commit/a0dc4ab15d7ede56a7dd107b017506764481312c))
+* **greenfield:** use Opus 4.7 for greenfield-scaffold ([284bed6](https://github.com/BIDEquity/outbid-dirigent/commit/284bed6106edf170c9816a614728cf9a3bda03b6))
+
+
+### Bug Fixes
+
+* **generate-spec:** sync category enum with spec_compactor ([abb21d6](https://github.com/BIDEquity/outbid-dirigent/commit/abb21d6d45cf1a9c3ab5168a44d631a30d7d942b))
+
 ## [2.3.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.2.2...outbid-dirigent-v2.3.0) (2026-04-23)
 
 
