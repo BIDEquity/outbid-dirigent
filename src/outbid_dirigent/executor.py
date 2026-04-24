@@ -856,11 +856,147 @@ class Executor:
             return False
 
     # ══════════════════════════════════════════
+    # FINAL COMMIT SWEEP (catch-all before ship)
+    # ══════════════════════════════════════════
+
+    # Directories that MUST NOT be committed by the sweep — scratch state, caches,
+    # and run artifacts. Even if they show up in `git status` (e.g. user forgot to
+    # add them to .gitignore), the sweep skips them. The shipper has its own
+    # history-rewrite logic for cleaning these out of prior commits.
+    _SWEEP_SCRATCH_PREFIXES = (
+        ".dirigent/",
+        ".dirigent-onboarding/",
+        ".planning/",
+        ".proteus/",
+        ".entire/",
+        ".firecrawl/",
+        ".serena/",
+        ".playwright-mcp/",
+        ".ruff_cache/",
+        ".pytest_cache/",
+        ".mypy_cache/",
+        ".venv/",
+        "venv/",
+        "node_modules/",
+        "__pycache__/",
+        ".DS_Store",
+    )
+
+    def final_commit_sweep(self) -> tuple[bool, list[str], Optional[str]]:
+        """Catch any files left uncommitted by tasks and commit them in one chore commit.
+
+        Per-task commits are the norm (atomic-commits-per-task playbook rule). This
+        sweep exists for the edge case where a skill or auto-generated file lands in
+        the working tree but no task claimed it. Without this, the user notices
+        leftovers only after `ship` opens a PR with dirty diffs.
+
+        Scratch dirs (`.dirigent/`, `.proteus/`, caches, …) are excluded — see
+        `_SWEEP_SCRATCH_PREFIXES`. They have their own scrubbing in the shipper.
+
+        Returns:
+            (success, files_committed, commit_hash). `success=False` only when
+            git itself errors — "nothing to commit" is a successful no-op.
+        """
+        try:
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.warning(
+                f"final_commit_sweep: git status failed ({e.returncode}); skipping"
+            )
+            return False, [], None
+
+        candidates: list[str] = []
+        for line in result.stdout.splitlines():
+            if len(line) < 4:
+                continue
+            # Format: XY <path>  (or "R  old -> new" for renames)
+            path = line[3:].strip()
+            if " -> " in path:
+                path = path.split(" -> ", 1)[1]
+            if path.startswith('"') and path.endswith('"'):
+                path = path[1:-1]
+            if any(path == p.rstrip("/") or path.startswith(p) for p in self._SWEEP_SCRATCH_PREFIXES):
+                continue
+            candidates.append(path)
+
+        if not candidates:
+            logger.info("final_commit_sweep: nothing to commit")
+            return True, [], None
+
+        if self.dry_run:
+            logger.info(
+                f"final_commit_sweep [DRY-RUN]: would commit {len(candidates)} file(s):"
+            )
+            for f in candidates:
+                logger.info(f"  - {f}")
+            return True, candidates, None
+
+        logger.warning(
+            f"final_commit_sweep: catching {len(candidates)} uncommitted file(s) "
+            f"left over from task execution"
+        )
+        for f in candidates:
+            logger.info(f"  - {f}")
+
+        try:
+            subprocess.run(
+                ["git", "add", "--"] + candidates,
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            body = "Files:\n" + "\n".join(f"- {f}" for f in candidates)
+            message = (
+                "chore(dirigent): final sweep — auto-committed leftover changes\n\n"
+                + body
+            )
+            subprocess.run(
+                ["git", "commit", "-m", message],
+                cwd=self.repo_path,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            stderr_excerpt = (e.stderr or "")[:500] if e.stderr else ""
+            logger.warning(
+                f"final_commit_sweep: git commit failed; ship will continue. "
+                f"stderr: {stderr_excerpt}"
+            )
+            return False, candidates, None
+
+        try:
+            sha_result = subprocess.run(
+                ["git", "log", "-1", "--format=%H"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            commit_hash = sha_result.stdout.strip() or None
+        except subprocess.CalledProcessError:
+            commit_hash = None
+
+        return True, candidates, commit_hash
+
+    # ══════════════════════════════════════════
     # SHIPPING
     # ══════════════════════════════════════════
 
     def ship(self) -> bool:
         """Create branch, push, and open PR."""
+        # Catch any uncommitted leftovers before shipping. Per-task commits are the
+        # norm; this sweep handles the edge case where a skill wrote files but no
+        # task claimed them. Failure here is non-fatal — ship continues regardless.
+        self.final_commit_sweep()
+
         plan = Plan.load(self.dirigent_dir / "PLAN.json")
         self._legacy_logger.ship_start("dirigent/...")
 
