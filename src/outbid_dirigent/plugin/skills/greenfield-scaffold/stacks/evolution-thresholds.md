@@ -46,8 +46,9 @@
 
 | Component | Prototype limit | Migration trigger | Next step |
 |---|---|---|---|
-| **PocketBase auth** | Email/password only | OAuth providers needed / SSO / MFA / audit log | Add Clerk, Auth0, or Supabase Auth |
-| **Supabase Auth (local)** | Full feature set, per-project | Enterprise SSO (SAML) / cross-product identity | Clerk, Auth0, WorkOS |
+| **PocketBase auth** | Email/password only | OAuth providers needed / SSO / MFA / audit log | Add [Clerk](clerk.md) (Keyless Mode for prototype), Auth0, or Supabase Auth |
+| **Supabase Auth (local)** | Full feature set, per-project | Enterprise SSO (SAML) / cross-product identity | [Clerk](clerk.md), Auth0, WorkOS |
+| **Clerk (Keyless Mode)** | No persistent dashboard, regenerated keys per restart | Production launch / claim a real Clerk account | Click "Configure your application" in the running app to claim keys; then set `*_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` in `.env` |
 | **Custom JWT** | Never do this for a prototype | Always | Don't — use PocketBase or Supabase |
 
 ### LLM / Agent

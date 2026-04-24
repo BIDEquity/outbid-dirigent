@@ -276,3 +276,16 @@ exec npm run dev -- --host 0.0.0.0 --port "$PORT"
 - **+ FastAPI** → React SPA + Python API (proxy in vite.config.ts)
 - **+ PocketBase** → React SPA + instant backend (pocketbase-js SDK)
 - **+ Supabase Local** → React SPA + Postgres backend (@supabase/supabase-js)
+- **+ Clerk** → managed auth via `@clerk/react-router`. **Requires React Router** — see "When paired with Clerk" below.
+
+## When paired with Clerk: install React Router unconditionally
+
+Clerk's Keyless Mode (no account, no env vars) only works with the `@clerk/react-router` SDK in a Vite project — the bare `@clerk/clerk-react` package is NOT keyless-capable as of Core 3 (March 2026). If the SPEC names Clerk, install React Router during scaffold even if the SPEC has only one page, so Keyless Mode is available:
+
+```bash
+npm install react-router @clerk/react-router
+```
+
+Wire `<ClerkProvider>` and `<BrowserRouter>` in `src/main.tsx` per the [React Router declarative-mode docs](https://clerk.com/docs/reference/react-router/overview). Do NOT set `VITE_CLERK_PUBLISHABLE_KEY` in `.env` — leaving it unset activates Keyless Mode.
+
+See `stacks/clerk.md` for the full Clerk setup including Test Mode for Playwright e2e (the standard `admin@test.local` seeding does not apply to Clerk-based scaffolds).

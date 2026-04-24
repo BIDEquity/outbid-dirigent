@@ -82,6 +82,7 @@ Only add a domain pattern when the SPEC's problem matches. Most prototypes need 
 | **PocketBase** | ✓ (built-in REST) | ✓ (Realtime subs) | ✓ (pb_hooks in JS, Realtime) | ✓ (made for it) | ✗ (no scheduler) |
 | **Supabase Local** | ✓ (PostgREST) | ✓ (Realtime) | ✓ (Triggers, Edge Fns) | ✓ (made for it) | ✓ (pg_cron) |
 | **Anthropic SDK** | ✓ | ✓ (`messages.stream`) | ✓ (tool_use callbacks) | △ | ✓ |
+| **Clerk** | auth-orthogonal — pairs with any frontend stack; does not constrain Interaction Shape | | | | |
 | **SQLite / DuckDB / LanceDB** | pattern-neutral — embedded storage used by any stack | | | | |
 
 **Key Takeaways:**

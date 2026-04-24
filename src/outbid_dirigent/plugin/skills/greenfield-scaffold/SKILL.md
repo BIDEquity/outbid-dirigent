@@ -85,6 +85,7 @@ Match the SPEC to an archetype from `stacks/README.md` and pick the stack combo.
 | "Scheduled report generator" | FastAPI + SQLite | Batch | `stacks/fastapi.md`, `stacks/sqlite.md` |
 | "Full-stack app with auth" (simple) | Next.js + PocketBase | Sync REST | `stacks/nextjs.md`, `stacks/pocketbase.md` |
 | "Full-stack app with auth" (production) | Next.js + Supabase Local | Sync REST | `stacks/nextjs.md`, `stacks/supabase-local.md` |
+| "Full-stack app with social login / SSO" | Next.js + Clerk + Supabase Local | Sync REST | `stacks/nextjs.md`, `stacks/clerk.md`, `stacks/supabase-local.md` |
 | "Collaborative whiteboard" | Next.js + Supabase Local | Real-time | `stacks/nextjs.md`, `stacks/supabase-local.md` |
 | "App with database" | FastAPI + SQLite | Sync REST | `stacks/fastapi.md`, `stacks/sqlite.md` |
 | "Chatbot / AI assistant" | Streamlit + Anthropic SDK | Streaming | `stacks/streamlit.md`, `stacks/anthropic-sdk.md` |

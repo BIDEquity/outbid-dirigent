@@ -14,7 +14,7 @@ These are non-negotiable. Don't deliberate, don't pick alternatives.
   npx playwright install --with-deps chromium
   ```
   Write `e2e_framework` into `test-harness.json` so downstream contract negotiators see it. Use context7 _only_ for API/syntax recall when writing the first spec — missing context7 is NOT a reason to skip the install.
-- **Seed test credentials (web archetypes with auth)**: Every scaffold with a login surface seeds `admin@test.local / testpass123` at init time via an idempotent migration or seed script in the backend stack. Credentials MUST be documented in README.md AND shown as a dev-mode banner on the home page (stripped in production builds). Without a seeded user, Playwright specs cannot log in and a new developer cannot open the app.
+- **Seed test credentials (web archetypes with auth)**: Every scaffold with a login surface seeds `admin@test.local / testpass123` at init time via an idempotent migration or seed script in the backend stack. Credentials MUST be documented in README.md AND shown as a dev-mode banner on the home page (stripped in production builds). Without a seeded user, Playwright specs cannot log in and a new developer cannot open the app. **Exception — Clerk-based scaffolds:** Keyless Mode regenerates keys on every restart, so no stable secret key exists for a seed script. Clerk scaffolds use Clerk Test Mode instead — `+clerk_test` email subaddress + verification code `424242`, plus `@clerk/testing/playwright` for e2e specs. Document the deviation per `stacks/clerk.md` → "Test User Seed (Clerk-specific deviation)".
 - **Process orchestration**: Start servers with `&`, wait with `curl --retry-connrefused --retry 5 http://localhost:PORT/health`, then test.
 - **Port conflicts**: `lsof -i :PORT` to find, `kill -9 <PID>` to clear.
 - **Secrets**: `.env` files, never committed. Frameworks load them automatically.
@@ -90,7 +90,7 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | ORM (Python) | `sqlmodel` when raw SQL gets tedious. Not SQLAlchemy + Alembic for prototypes. |
 | ORM (JS) | `prisma` when raw SQL gets tedious. Not TypeORM, Sequelize. |
 | API style | REST. Not GraphQL. Not tRPC. |
-| Auth | don't build it. PocketBase (local, lightweight) or Supabase Local (local, production-grade). Skip OAuth/SSO for prototypes — email+password is enough. |
+| Auth | don't build it. PocketBase (local, lightweight) or Supabase Local (local, production-grade) for plain email+password. **Clerk** (managed SaaS, Keyless Mode) only when the SPEC explicitly demands OAuth providers, SSO, social login, or organizations. Never custom JWT. |
 | File storage | use the backend's built-in: Supabase Storage or PocketBase file fields. Not a separate S3/MinIO for prototypes. |
 | NoSQL / documents | use Postgres JSONB (via Supabase) or DuckDB nested types. Not MongoDB for prototypes. |
 | Event-driven | don't for prototypes. Direct function calls. If you must: FastAPI BackgroundTasks or simple in-process callbacks. Not Kafka, RabbitMQ, Redis Pub/Sub. |
@@ -111,6 +111,7 @@ These apply to ALL greenfield projects. The agent follows these — no exception
 | Python Backend | [FastAPI](fastapi.md) | Django |
 | Backend + Auth (lightweight) | [PocketBase](pocketbase.md) | — |
 | Backend + Auth (production) | [Supabase Local](supabase-local.md) | — |
+| Auth (managed SaaS) | [Clerk](clerk.md) | — |
 | Database (OLTP) | [SQLite](sqlite.md) | Postgres (via Supabase) |
 | Database (Analytics) | [DuckDB](duckdb.md) | — |
 | ML/Model UI | [Gradio](gradio.md) | Streamlit |
@@ -151,6 +152,7 @@ Match the SPEC to one of these archetypes. Pick the first one that fits.
 | "Scheduled report generator" | FastAPI + SQLite | 8000 | Batch |
 | "Full-stack app with auth" (simple) | Next.js + PocketBase | 3000, 8090 | Sync REST |
 | "Full-stack app with auth" (production) | Next.js + Supabase Local | 3000, 54321, 54323 | Sync REST |
+| "Full-stack app with social login / SSO" | Next.js + Clerk + Supabase Local | 3000, 54321 | Sync REST |
 | "Collaborative whiteboard" | Next.js + Supabase Local | 3000, 54321 | Real-time |
 | "App with database" | FastAPI + SQLite | 8000 | Sync REST |
 | "Internal tool / form app" | Streamlit | 8501 | Sync REST |
