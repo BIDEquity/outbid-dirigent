@@ -1238,6 +1238,23 @@ Beispiele:
         sys.exit(130)
 
     except Exception as e:
+        # Spec validator rejected the spec — clean exit with the rationale and
+        # the path to SPEC.validation.json for the user to inspect.
+        from outbid_dirigent.spec_validator import SpecValidationError
+
+        if isinstance(e, SpecValidationError):
+            v = e.validation
+            logger.stop(
+                f"Spec rejected by validator ({v.rejection_reason or 'unspecified'}): "
+                f"{v.spec_ok_rationale}"
+            )
+            logger.error_json(
+                f"Spec rejected ({v.rejection_reason or 'unspecified'}): {v.spec_ok_rationale}",
+                fatal=True,
+            )
+            logger.run_complete(success=False)
+            sys.exit(2)
+
         logger.error(f"Unerwarteter Fehler: {e}", e)
         logger.error_json(str(e), fatal=True)
         logger.run_complete(success=False)

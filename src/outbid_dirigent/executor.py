@@ -150,6 +150,29 @@ class Executor:
         spec_cache = self.dirigent_dir / "SPEC.md"
         spec_cache.write_text(self.spec_content, encoding="utf-8")
 
+        # Validate spec — may raise SpecValidationError to abort the run.
+        # Reads ROUTE.json (written by run_routing in the CLI before executor init).
+        # Writes $DIRIGENT_RUN_DIR/SPEC.validation.json regardless of outcome.
+        from outbid_dirigent.spec_validator import (
+            SpecValidationError,
+            validate_spec,
+        )
+
+        route_type = self._load_route_type()
+        if route_type:
+            validation = validate_spec(
+                self.spec_content,
+                route_type=route_type,
+                repo_path=self.repo_path,
+                dirigent_dir=self.dirigent_dir,
+            )
+            if validation is not None and not validation.spec_ok:
+                raise SpecValidationError(validation)
+        else:
+            logger.info(
+                "Spec validator: no ROUTE.json yet (resume / standalone init); skipping"
+            )
+
         # Compact spec — best-effort, never aborts the run.
         # Writes $DIRIGENT_RUN_DIR/SPEC.compact.json which task_runner consumes.
         from outbid_dirigent.spec_compactor import compact_spec
@@ -854,6 +877,21 @@ class Executor:
         except Exception as e:
             logger.error(f"  ERROR: {name}: {e}")
             return False
+
+    def _load_route_type(self) -> Optional[str]:
+        """Read the route enum value from ROUTE.json. None if not yet written
+        (resume / standalone init flows where validation is skipped).
+        """
+        route_file = self.dirigent_dir / "ROUTE.json"
+        if not route_file.exists():
+            return None
+        try:
+            data = json.loads(route_file.read_text(encoding="utf-8"))
+            value = data.get("route")
+            return value if isinstance(value, str) else None
+        except Exception as e:
+            logger.warning(f"_load_route_type: ROUTE.json unreadable ({e}); skipping validation")
+            return None
 
     # ══════════════════════════════════════════
     # FINAL COMMIT SWEEP (catch-all before ship)
