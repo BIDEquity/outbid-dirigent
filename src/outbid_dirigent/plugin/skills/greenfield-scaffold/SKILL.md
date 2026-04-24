@@ -2,7 +2,7 @@
 name: greenfield-scaffold
 description: For greenfield projects, pick the opinionated stack, scaffold the project, and write architecture sections into ARCHITECTURE.md. Produces start.sh and test-harness.json.
 context: fork
-agent: infra-architect
+agent: greenfield-architect
 ---
 
 # Greenfield Scaffold
