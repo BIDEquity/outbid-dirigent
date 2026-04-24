@@ -1,0 +1,25 @@
+cool. lass mal den spec-compact-schritt besser machen. der kommt wann in der kette?
+
+---
+
+sonnet ist gut, anpassen.
+
+Ich will noch einen SPEC-validate-Schritt vorschalten. Wir kennen diort ja bereits die Route. Ich möchte ausschließen, ob offensichtliche Dinge fehlen, bspw. für Greenfield-Apps ein Navigation, Auth (zumindest mitgedacht) etc. Dabei geht es um Dinge, die in der Spec nicht drin sind. wenn sie explizit als Nicht-Entscheidungen getroffen wurden (bspw. "keine Authentifizierung"), soll es nicht überschrieben wwerden.
+
+Output wäre (bitte Struct Output nutzen):
+
+- Spec ok: bool -> ist diese Spec aussagekräftig genug, passt sie zum Code. Wenn nicht OK -> Abbruch. Auch wenn hier bspw. NSFW-Sachen, Glücksspiel, illegales drinsteht -> ablehnen. 
+- Spec ok rationale: Rationale (warum ist Spec NICHT ok)
+- spec_gaps: unterstruktur, denk dir eine aus.
+
+---
+
+wann wird am ende der git commit gemacht? wirklich ganz am ende?
+
+---
+
+ich will am ende (vor ship) einen programmatischen commit, der alles commitet, was vergessen wurde zu commiten.
+
+---
+
+jo

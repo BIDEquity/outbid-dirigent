@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "26942e760535",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/spec_compactor.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/26/942e760535/0/metadata.json",
+      "transcript": "/26/942e760535/0/full.jsonl",
+      "content_hash": "/26/942e760535/0/content_hash.txt",
+      "prompt": "/26/942e760535/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 52,
+    "cache_creation_tokens": 43744,
+    "cache_read_tokens": 5604212,
+    "output_tokens": 22005,
+    "api_call_count": 22
+  }
+}
