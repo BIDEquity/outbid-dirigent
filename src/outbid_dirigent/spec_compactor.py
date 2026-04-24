@@ -309,7 +309,7 @@ Aim for 30-50% of source token count. Drop prose. Keep behavior.
 
 def compact_spec(
     spec_content: str,
-    model: str = "claude-haiku-4-5",
+    model: str = "claude-sonnet-4-6",
     dirigent_dir: Optional[Path] = None,
     business_rules: Optional[str] = None,
 ) -> Optional[CompactSpec]:
@@ -317,7 +317,9 @@ def compact_spec(
 
     Args:
         spec_content: Full markdown spec text.
-        model: Model to use (haiku for speed/cost).
+        model: Model to use. Defaults to sonnet — haiku was dropping requirements
+            silently on dense specs (the "lossless on requirements" rule needs the
+            stronger model to hold under pressure).
         dirigent_dir: Where to save SPEC.compact.json. If None, no file is written.
         business_rules: Proteus-extracted business rules as JSON string (Legacy route).
             When provided, the compactor links rules to requirements and includes
