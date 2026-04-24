@@ -1,0 +1,15 @@
+USE FUCKING STRUCTURED OUTPUT
+
+---
+
+ok weiter
+
+---
+
+geht cloudflare-hosting dafür?
+
+---
+
+https://bid-equity-design-system.s3.eu-central-1.amazonaws.com/design-system.zip?X-Amz-Algorithm=AWS4-HMAC-SHA256&REDACTED%2F20260424%2Feu-central-1%2Fs3%2Faws4_request&X-Amz-Date=20260424T143152Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=8878e8eaab04398858f937e867ca9a69783b4f3303185ba508addae02a0f8e7c
+
+see for yourself.
