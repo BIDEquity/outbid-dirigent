@@ -35,6 +35,7 @@ class StepType(Enum):
     ADD_TRACKING = "add_tracking"
     PLANNING = "planning"
     EXECUTION = "execution"
+    FINAL_REVIEW = "final_review"
     ENTROPY_MINIMIZATION = "entropy_minimization"
     TEST = "test"
     SHIP = "ship"
@@ -130,6 +131,12 @@ class Router:
             step_type=StepType.EXECUTION,
             name="Ausführung",
             description="Tasks werden sequentiell ausgeführt mit frischem Kontext pro Task",
+        ),
+        RouteStep(
+            step_type=StepType.FINAL_REVIEW,
+            name="Final Review",
+            description="Boot the prototype, smoke-test SPEC requirements end-to-end, fix-loop max 2 rounds on fail",
+            required=False,
         ),
         RouteStep(
             step_type=StepType.ENTROPY_MINIMIZATION,

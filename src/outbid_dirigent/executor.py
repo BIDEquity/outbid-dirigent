@@ -878,6 +878,149 @@ class Executor:
             logger.error(f"  ERROR: {name}: {e}")
             return False
 
+    # ══════════════════════════════════════════
+    # FINAL REVIEW (Greenfield-only post-execution gate)
+    # ══════════════════════════════════════════
+
+    _FINAL_REVIEW_MAX_FIX_ROUNDS = 2
+
+    def final_review(self) -> bool:
+        """Boot the prototype, smoke-test against the SPEC, fix-loop on fail.
+
+        Greenfield-only step (router.py wires it into GREENFIELD_STEPS only).
+        Step is `required=False` — failure after the fix-loop logs a warning
+        and returns False but the run continues to entropy + ship. The PR
+        will land WITHOUT a committed final-review.json so the human
+        reviewer notices.
+
+        Returns True iff the report ultimately passed and was committed.
+        """
+        report_path = self.dirigent_dir / "final-review.json"
+
+        # Round 0 — initial review
+        logger.info("Final review: round 0 (initial smoke test)")
+        ok, report = self._run_final_reviewer(report_path)
+        if not ok:
+            logger.warning("Final review round 0: agent did not produce a usable report")
+            return False
+        assert report is not None  # parse_review_report returned non-None
+        if report.passed:
+            return self._handle_final_review_pass(report_path, round_n=0)
+
+        # Fix loop
+        for round_n in range(1, self._FINAL_REVIEW_MAX_FIX_ROUNDS + 1):
+            logger.warning(
+                f"Final review round {round_n - 1} failed — dispatching fix agent (round {round_n}/{self._FINAL_REVIEW_MAX_FIX_ROUNDS})"
+            )
+            self._run_final_review_fixer(report_path, round_n)
+
+            logger.info(f"Final review: re-running review after fix round {round_n}")
+            ok, report = self._run_final_reviewer(report_path)
+            if not ok:
+                logger.warning(
+                    f"Final review round {round_n}: agent did not produce a usable report"
+                )
+                continue
+            assert report is not None
+            if report.passed:
+                return self._handle_final_review_pass(report_path, round_n=round_n)
+
+        # Exhausted fix budget — log and continue (run still ships, but without a passing review)
+        logger.warning(
+            f"Final review: failed after {self._FINAL_REVIEW_MAX_FIX_ROUNDS} fix rounds. "
+            f"Run continues but no final-review.json was committed. "
+            f"Inspect {report_path} for details."
+        )
+        # Best-effort: remove a potentially stale final-review.json from the repo root
+        # so the final_commit_sweep does not pick up a failing report.
+        repo_root_report = self.repo_path / "final-review.json"
+        if repo_root_report.exists():
+            try:
+                repo_root_report.unlink()
+            except OSError as e:
+                logger.warning(f"Could not remove stale {repo_root_report}: {e}")
+        return False
+
+    def _run_final_reviewer(self, report_path: Path):
+        """Run the final reviewer via direct SDK call with structured output.
+
+        Returns (parse_ok, report). parse_ok=False means the SDK call
+        failed or the model produced non-conforming output — treat that
+        as a hard failure for this round.
+
+        Note: the structured-output schema is enforced at the SDK boundary,
+        so a non-None report is guaranteed to be schema-valid AND
+        internally consistent (`run_final_review` runs is_consistent
+        before returning).
+        """
+        from outbid_dirigent.final_review import run_final_review
+
+        # Wipe any previous round's report so a stale file can't masquerade
+        # as the current round's output if the SDK call errors before write.
+        if report_path.exists():
+            try:
+                report_path.unlink()
+            except OSError:
+                pass
+
+        report = run_final_review(
+            repo_path=self.repo_path,
+            dirigent_dir=self.dirigent_dir,
+        )
+        return (report is not None), report
+
+    def _run_final_review_fixer(self, report_path: Path, round_n: int) -> None:
+        """Dispatch the implementer agent with the failed review as input.
+
+        We reuse implementer because it has the right tool surface (Write,
+        Edit, Bash) and follows the atomic-commits-per-task convention.
+        The prompt frames the work as "fix what the reviewer flagged" and
+        passes the report verbatim for the agent to read.
+        """
+        if not report_path.exists():
+            logger.warning(
+                f"_run_final_review_fixer: {report_path} missing — skipping fix round {round_n}"
+            )
+            return
+
+        report_text = report_path.read_text(encoding="utf-8")
+        prompt = (
+            f"The final reviewer ran the prototype against the SPEC and the report failed.\n"
+            f"Read the report below and fix the underlying issues. After fixing, commit per\n"
+            f"the atomic-commits-per-task convention: `git add -A && git commit -m \"fix(final-review): "
+            f"address round {round_n} findings\"`. Do NOT modify final-review.json — the reviewer\n"
+            f"will rewrite it on the next pass.\n\n"
+            f"<final-review-report>\n{report_text}\n</final-review-report>\n\n"
+            f"Use /dirigent:implement-task as your guide. The SPEC is at "
+            f"${{DIRIGENT_RUN_DIR}}/SPEC.md."
+        )
+        success, _, stderr = self.runner._run_claude(
+            prompt,
+            timeout=900,
+            component=f"final-review-fixer:round-{round_n}",
+        )
+        if not success:
+            logger.warning(
+                f"final-review fixer round {round_n} returned non-success: {stderr[:200]}"
+            )
+
+    def _handle_final_review_pass(self, report_path: Path, round_n: int) -> bool:
+        """Move the passing report to repo root + commit. Always returns True."""
+        from outbid_dirigent.final_review import commit_passing_report
+
+        ok, sha = commit_passing_report(self.repo_path, self.dirigent_dir, round_n)
+        if ok:
+            logger.info(
+                f"Final review passed (round {round_n}); committed final-review.json"
+                + (f" as {sha[:8]}" if sha else "")
+            )
+        else:
+            logger.warning(
+                f"Final review passed (round {round_n}) but commit_passing_report failed; "
+                f"final-review.json may be uncommitted. Run continues."
+            )
+        return True
+
     def _load_route_type(self) -> Optional[str]:
         """Read the route enum value from ROUTE.json. None if not yet written
         (resume / standalone init flows where validation is skipped).

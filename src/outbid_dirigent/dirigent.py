@@ -650,6 +650,19 @@ def run_execution(
                     "Ausführung abgeschlossen" if success else "Ausführung fehlgeschlagen",
                 )
 
+        elif step.step_type == StepType.FINAL_REVIEW:
+            if reporter:
+                reporter.stage_start(
+                    "final_review",
+                    "Boot prototype, smoke-test SPEC, fix-loop max 2 rounds on fail",
+                )
+            success = executor.final_review()
+            if reporter:
+                reporter.stage_complete(
+                    "final_review",
+                    "Final review passed" if success else "Final review failed (run continues)",
+                )
+
         elif step.step_type == StepType.ENTROPY_MINIMIZATION:
             if reporter:
                 reporter.stage_start(
