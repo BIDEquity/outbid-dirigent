@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "97c12f9ec804",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/README.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/architecture-patterns/README.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/clerk.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/evolution-thresholds.md",
+    "src/outbid_dirigent/plugin/skills/greenfield-scaffold/stacks/vite-react.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/97/c12f9ec804/0/metadata.json",
+      "transcript": "/97/c12f9ec804/0/full.jsonl",
+      "content_hash": "/97/c12f9ec804/0/content_hash.txt",
+      "prompt": "/97/c12f9ec804/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2768,
+    "cache_creation_tokens": 504713,
+    "cache_read_tokens": 8774772,
+    "output_tokens": 39514,
+    "api_call_count": 52
+  }
+}

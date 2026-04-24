@@ -1,0 +1,37 @@
+what models are used for what step of the dirigent run?`
+
+---
+
+und das greenfield-scaffolgf?
+
+---
+
+talking of the greenfield agent: we would like to add clerk as authentication capability. where would this fit in the structure of the dirigent?
+
+---
+
+internet is given on the sandbox. is there an anonymous mode in clerk without requiring an account
+
+---
+
+internet is given on the sandbox. is there an anonymous mode in clerk without requiring an account. consult web search and context7
+
+---
+
+ich habs falsch beschrieben. ich will eine clerk-app anlegen, ohne clerk-uzugang zu haben. das ging neulich.
+
+---
+
+wieso nicht mit vite pairen?
+
+---
+
+ja, klingt her vor ragend!
+
+---
+
+drei mal a - klingt super.
+
+---
+
+implementier erstmal clerk.
