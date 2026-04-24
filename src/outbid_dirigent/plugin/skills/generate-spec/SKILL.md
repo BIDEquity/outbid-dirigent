@@ -151,7 +151,7 @@ with concrete content. Write the result to `output_path`. Overwrite if it exists
 When writing requirements:
 
 - Each `**Rn** (category/priority): text` line is one verifiable claim.
-- `category` MUST be one of: `data-model, api, ui, auth, integration, infra, policy, workflow, validation, other`.
+- `category` MUST be one of: `data-model, api, ui, auth, integration, infra, policy, workflow, validation, testing, other`. (Must match `spec_compactor.py` `ReqCategory` exactly — drift here breaks downstream Pydantic validation.)
 - `priority` MUST be one of: `must, should, may`.
 - IDs are sequential from R1, never reused, never renumbered. Split compound requirements.
 

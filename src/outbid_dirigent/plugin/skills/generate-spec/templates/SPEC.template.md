@@ -14,7 +14,7 @@ Format: `**Rn** (category/priority): text`
 
   Rn       sequential ID from R1, never reused, never renumbered.
   category one of: data-model, api, ui, auth, integration, infra, policy,
-                   workflow, validation, other
+                   workflow, validation, testing, other
   priority one of: must, should, may
 
 Rules:
