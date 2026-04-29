@@ -6,6 +6,7 @@ Extracted from the Executor god class. Handles:
 - Loading and validating the resulting PLAN.json
 """
 
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -59,6 +60,22 @@ class Planner:
             logger.error(f"Plan schema validation failed: {e}")
             return None
 
+        # ── Fallback: if structured output returned 0 phases, check whether
+        # Claude already wrote a valid PLAN.json to disk before the skill
+        # fork overwrote the structured output with an empty plan.
+        # This happens when Claude creates the plan manually, then calls the
+        # create-plan skill in a fork context that can't find SPEC.md —
+        # the fork returns phases=[] which becomes the last StructuredOutput.
+        if plan.total_tasks == 0:
+            disk_plan = self._try_load_plan_from_disk()
+            if disk_plan and disk_plan.total_tasks > 0:
+                logger.warning(
+                    "Structured output returned 0 tasks but PLAN.json on disk has %d tasks — "
+                    "using disk version (likely fork-context override bug)",
+                    disk_plan.total_tasks,
+                )
+                plan = disk_plan
+
         plan_file = self.dirigent_dir / "PLAN.json"
         plan_file.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
 
@@ -69,3 +86,15 @@ class Planner:
             logger.info(f"Out of scope: {len(plan.out_of_scope)}")
 
         return plan
+
+    def _try_load_plan_from_disk(self) -> Optional[Plan]:
+        """Try to load and validate PLAN.json from the run directory."""
+        plan_file = self.dirigent_dir / "PLAN.json"
+        if not plan_file.exists():
+            return None
+        try:
+            data = json.loads(plan_file.read_text(encoding="utf-8"))
+            return Plan.model_validate(data)
+        except Exception as e:
+            logger.debug(f"Could not load PLAN.json from disk: {e}")
+            return None
