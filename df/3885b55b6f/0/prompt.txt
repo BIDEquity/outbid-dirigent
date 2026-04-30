@@ -1,0 +1,45 @@
+kann ich ein claude-plugin einfach direkt unter .claude/plugins im aktuiellen Ordner installieren?
+
+---
+
+sicher?
+
+---
+
+kann ich claude ohne globale (userweite) plugins, skills etc laden?
+
+---
+
+is there a quick mode in the dirigen†?
+
+---
+
+is there a cli flag for this?
+
+---
+
+what overhead is there in the quick route? what steps happen?
+
+---
+
+how is quick different from hybrid route?
+
+---
+
+but execution is the same? we need to fix that
+
+---
+
+a plan would also probably have multiple phases, correct?
+
+---
+
+a plan would also probably have multiple phases, correct? Then, what we need is 2: spawn a Claude code process, give the plan as input and let it implement, mentioning existing test harnesses. this is option 1 (looks odd in portal UI), OR option 2: limit plan to 1 phase and more tasks per phase in quick mode. Are we aware of the mode at plan creatoin tmie?
+
+---
+
+Please B with 1 Phase max and 6 tasks. Review and AC can stay. They actually make sense.
+
+---
+
+1 ok, 2 -> yes make a pr.

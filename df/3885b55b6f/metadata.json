@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "df3885b55b6f",
+  "strategy": "manual-commit",
+  "branch": "feat/quick-route-plan-caps",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/plan_schema.py",
+    "src/outbid_dirigent/plugin/skills/create-plan/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/create-plan/scripts/validate_schema.py",
+    "tests/test_validate_schema.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/df/3885b55b6f/0/metadata.json",
+      "transcript": "/df/3885b55b6f/0/full.jsonl",
+      "content_hash": "/df/3885b55b6f/0/content_hash.txt",
+      "prompt": "/df/3885b55b6f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 139,
+    "cache_creation_tokens": 284833,
+    "cache_read_tokens": 8404674,
+    "output_tokens": 44192,
+    "api_call_count": 79
+  }
+}

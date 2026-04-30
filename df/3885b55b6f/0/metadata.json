@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.5.1",
+  "checkpoint_id": "df3885b55b6f",
+  "session_id": "2f85bcea-40d5-43fc-a858-f682e27bc2f6",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-30T19:09:26.987949Z",
+  "branch": "feat/quick-route-plan-caps",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/outbid_dirigent/plan_schema.py",
+    "src/outbid_dirigent/plugin/skills/create-plan/SKILL.md",
+    "src/outbid_dirigent/plugin/skills/create-plan/scripts/validate_schema.py",
+    "tests/test_validate_schema.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-7",
+  "turn_id": "416435f1bfc6",
+  "token_usage": {
+    "input_tokens": 139,
+    "cache_creation_tokens": 284833,
+    "cache_read_tokens": 8404674,
+    "output_tokens": 44192,
+    "api_call_count": 79
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-30T19:09:26.778075Z",
+    "agent_lines": 225,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 225,
+    "agent_percentage": 100
+  }
+}
