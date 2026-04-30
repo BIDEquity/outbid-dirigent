@@ -4,6 +4,7 @@ Shipper — handles branch creation, push, and PR creation.
 Extracted from the Executor god class.
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -71,6 +72,12 @@ class Shipper:
             logger.info("[DRY-RUN] Would create branch and push")
             return True
 
+        # Capture the base branch BEFORE we cut the feature branch — once we
+        # `git checkout -b` we lose the upstream context that the PR should
+        # target (develop, etc.).
+        base_branch = self._resolve_base_branch()
+        logger.info(f"PR base branch resolved to: {base_branch}")
+
         try:
             # Remove .dirigent/ and .planning/ from git history on the PR branch.
             # These are execution artifacts — useful as logs, not as code changes.
@@ -101,18 +108,27 @@ class Shipper:
             # Create PR if gh available
             if shutil.which("gh"):
                 pr_body = self._generate_pr_body()
+                pr_args = [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--title",
+                    f"feat: {spec_title}",
+                    "--body",
+                    pr_body,
+                    "--head",
+                    branch_name,
+                ]
+                # Without --base, gh defaults to the repo's default branch
+                # (typically master/main). That's wrong when the FR was
+                # created against another branch (e.g. develop) — the PR
+                # would carry every commit between develop and master plus
+                # the actual feature work, and merging it would dump
+                # develop's history onto master.
+                if base_branch:
+                    pr_args.extend(["--base", base_branch])
                 result = subprocess.run(
-                    [
-                        "gh",
-                        "pr",
-                        "create",
-                        "--title",
-                        f"feat: {spec_title}",
-                        "--body",
-                        pr_body,
-                        "--head",
-                        branch_name,
-                    ],
+                    pr_args,
                     cwd=self.repo_path,
                     capture_output=True,
                     text=True,
@@ -129,6 +145,50 @@ class Shipper:
         except Exception as e:
             logger.error(f"Shipping failed: {e}")
             return False
+
+    def _resolve_base_branch(self) -> Optional[str]:
+        """Determine the branch the PR should target.
+
+        Priority:
+          1. ``GIT_BRANCH`` env (set by outbid-portal/launch-workspace from the
+             feature_request.branch column — the user's explicit choice).
+          2. The current branch name from ``git rev-parse --abbrev-ref HEAD``,
+             since the workspace was cloned with ``git clone --branch <X>`` so
+             HEAD points at the right place before we cut the feature branch.
+          3. ``None`` — caller should then omit ``--base`` and let gh fall back
+             to the repository default.
+
+        We resolve this *before* ``git checkout -b`` because afterwards HEAD
+        points at the brand-new feature branch and the upstream context is
+        gone.
+        """
+        env_branch = os.environ.get("GIT_BRANCH", "").strip()
+        if env_branch:
+            return env_branch
+
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            logger.warning(f"Could not resolve base branch via git: {exc}")
+            return None
+
+        if result.returncode != 0:
+            logger.warning(
+                f"git rev-parse --abbrev-ref HEAD failed: {result.stderr.strip()}"
+            )
+            return None
+
+        head = result.stdout.strip()
+        # Detached HEAD ("HEAD") is meaningless as a base — bail to fallback.
+        if not head or head == "HEAD":
+            return None
+        return head
 
     # Directories that are execution artifacts and must not appear in PRs
     ARTIFACT_DIRS = [".dirigent", ".planning"]
