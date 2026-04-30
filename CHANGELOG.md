@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.4.0...outbid-dirigent-v2.4.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* **shipper:** open PR against the FR's base branch instead of repo default ([bc57277](https://github.com/BIDEquity/outbid-dirigent/commit/bc57277735623974b9d2ed52c575be476f1afc30))
+
 ## [2.4.0](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.3.0...outbid-dirigent-v2.4.0) (2026-04-24)
 
 
