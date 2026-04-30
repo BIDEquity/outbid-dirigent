@@ -82,13 +82,14 @@ Read all available context files:
 1. **Required:** `${DIRIGENT_RUN_DIR}/SPEC.md` — the feature specification (just written or pre-existing)
 2. **Optional:** `${DIRIGENT_RUN_DIR}/BUSINESS_RULES.md` — business rules to preserve (Legacy route)
 3. **Optional:** `${DIRIGENT_RUN_DIR}/CONTEXT.md` — relevant file analysis (Hybrid route)
-4. **Optional:** `${DIRIGENT_RUN_DIR}/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
-5. **Optional:** `ARCHITECTURE.md` — system architecture with XML-tagged sections. Key sections for planning:
+4. **Optional:** `${DIRIGENT_RUN_DIR}/route.json` — selected route (`quick`, `hybrid`, `legacy`, `greenfield`, `testability`, `tracking`). Drives plan-shape caps; see "Quick route override" below.
+5. **Optional:** `${DIRIGENT_RUN_DIR}/test-harness.json` — e2e test harness (base URL, auth, seed data, verification commands)
+6. **Optional:** `ARCHITECTURE.md` — system architecture with XML-tagged sections. Key sections for planning:
    - `<testing-verification>` — build/test/e2e commands, test strategy. Tasks must follow this.
    - `<architecture-decisions>` — patterns, file organization, scaffold decisions. Tasks must follow these.
    - `<key-patterns>` — coding conventions and patterns. Task descriptions MUST reference relevant patterns.
-6. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
-10. **Optional:** `.brv/context-tree/` — if this directory exists and `brv` CLI is available, run `brv query "What are the key domain patterns, rules, and architectural decisions for this project?"` to gather domain knowledge. Incorporate relevant findings into task descriptions so coder instances have domain context.
+7. **Optional:** `.opencode/skills/` — if this directory exists, list available skills by reading their SKILL.md frontmatter (the `name` and `description` fields). For each task, set the `convention_skills` array to skill names the coder should load. Match based on task content: Ruby files → `ruby-code-writing`, forms → `form-builder`, API endpoints → `api-v1-endpoints`, React → `react-components`, tests → `selenium-tests`, etc.
+8. **Optional:** `.brv/context-tree/` — if this directory exists and `brv` CLI is available, run `brv query "What are the key domain patterns, rules, and architectural decisions for this project?"` to gather domain knowledge. Incorporate relevant findings into task descriptions so coder instances have domain context.
 
 ## Step 2: Analyze the Repo
 
@@ -254,9 +255,25 @@ can evaluate the expansion. Don't use `large` to avoid thinking; use it when a
 Max 1 infrastructure phase and "final phase ≠ infrastructure" apply regardless
 of size.
 
+## Quick route override
+
+When `${DIRIGENT_RUN_DIR}/route.json` reports `route: "quick"`, the plan shape
+is constrained — regardless of `size`:
+
+- **Max 1 phase, max 6 tasks** in that phase.
+- The single phase has no `merge_justification` (it's also the last phase).
+- Pick `kind: "user-facing"` or `"integration"` — never `"infrastructure"` (the
+  "final phase ≠ infrastructure" rule still holds, and quick has only one phase).
+- Do not set `"size": "large"`. The route override wins; the validator enforces
+  the 1×6 cap regardless.
+
+If the feature genuinely doesn't fit 1×6, the route was misjudged — surface that
+to the user and recommend re-running with a different route (`hybrid` for feature
+work on an existing repo, `greenfield` for new projects).
+
 ## Rules
 
-1. **Max 4 phases × 4 tasks per phase** (default). Pydantic and the validator both reject violations. Set `"size": "large"` to raise caps to 5×5 when genuinely needed — otherwise split the SPEC into multiple dirigent runs.
+1. **Plan caps depend on route and size.** Quick route: 1 phase × 6 tasks (overrides size). Standard size: 4 phases × 4 tasks. Large size: 5 phases × 5 tasks. Pydantic and the validator both reject violations. Set `"size": "large"` only on non-quick routes when 4×4 genuinely doesn't fit — otherwise split the SPEC into multiple dirigent runs.
 2. **Every phase has a `kind`** — `user-facing`, `integration`, or `infrastructure`. Required. See the table above.
 3. **Every phase except the last has a `merge_justification`** — one sentence, see the rule above.
 4. **Max 1 infrastructure phase.** Scaffolds, migrations, and CI setup almost always belong together.
