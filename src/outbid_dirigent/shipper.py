@@ -4,12 +4,12 @@ Shipper — handles branch creation, push, and PR creation.
 Extracted from the Executor god class.
 """
 
+import json
 import os
 import re
 import shutil
 import subprocess
 import unicodedata
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -49,21 +49,18 @@ class Shipper:
         self.pr_url: Optional[str] = None
 
     def ship(self) -> bool:
-        """Create branch, push, create PR."""
+        """Create branch, push, create PR.
+
+        Idempotent across re-runs of the same FR: a second invocation in the
+        same workspace (resume, manual re-trigger) reuses the same
+        ``dirigent/<slug>`` branch and the same PR rather than producing a
+        timestamp-suffixed duplicate. Force-push semantics are conditional —
+        we only force when the remote already has the branch from a previous
+        ship() — so plain first runs stay safe.
+        """
         spec_title = self.plan.title if self.plan else "Feature"
         slug = slugify(spec_title)
         branch_name = f"dirigent/{slug}"
-
-        # Deduplicate branch name
-        check = subprocess.run(
-            ["git", "rev-parse", "--verify", branch_name],
-            cwd=self.repo_path,
-            capture_output=True,
-            text=True,
-        )
-        if check.returncode == 0:
-            ts = datetime.now().strftime("%Y%m%d%H%M%S")
-            branch_name = f"dirigent/{slug}-{ts}"
 
         self.branch_name = branch_name
         logger.info(f"Shipping to branch: {branch_name}")
@@ -83,6 +80,37 @@ class Shipper:
             # These are execution artifacts — useful as logs, not as code changes.
             self._strip_artifacts()
 
+            # Re-run handling: if a previous ship() in this workspace already
+            # created the branch locally, drop it so we can recreate from the
+            # current HEAD with this run's commits. The previous version
+            # persists on origin and gets force-pushed below.
+            existing_local = subprocess.run(
+                ["git", "rev-parse", "--verify", branch_name],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+            )
+            had_local_branch = existing_local.returncode == 0
+            if had_local_branch:
+                logger.info(
+                    f"Branch {branch_name} already exists locally — dropping "
+                    "and recreating from current HEAD (re-run)"
+                )
+                # `git branch -D` on a checked-out branch fails; switch to a
+                # detached HEAD first so the delete always succeeds.
+                subprocess.run(
+                    ["git", "checkout", "--detach"],
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                )
+                subprocess.run(
+                    ["git", "branch", "-D", branch_name],
+                    cwd=self.repo_path,
+                    capture_output=True,
+                    text=True,
+                )
+
             # Create branch
             result = subprocess.run(
                 ["git", "checkout", "-b", branch_name],
@@ -94,15 +122,36 @@ class Shipper:
                 logger.error(f"Branch creation failed: {result.stderr}")
                 return False
 
-            # Push
+            # Push. Try fast-forward first; if the remote diverged (typical
+            # when a previous ship() pushed different commits), retry with
+            # --force so this run's HEAD becomes the PR's head.
+            push_args = ["git", "push", "-u", "origin", branch_name]
             result = subprocess.run(
-                ["git", "push", "-u", "origin", branch_name],
+                push_args,
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
             )
             if result.returncode != 0:
-                logger.warning(f"Push failed (maybe no remote): {result.stderr}")
+                stderr_lower = result.stderr.lower()
+                diverged = (
+                    "non-fast-forward" in stderr_lower
+                    or "rejected" in stderr_lower
+                    or had_local_branch
+                )
+                if diverged:
+                    logger.info(
+                        f"Branch {branch_name} diverged on origin — force-pushing "
+                        "this run's commits over the previous state"
+                    )
+                    result = subprocess.run(
+                        push_args + ["--force"],
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True,
+                    )
+            if result.returncode != 0:
+                logger.warning(f"Push failed: {result.stderr}")
                 return True
 
             # Create PR if gh available
@@ -137,7 +186,15 @@ class Shipper:
                     self.pr_url = result.stdout.strip()
                     logger.info(f"PR created: {self.pr_url}")
                 else:
-                    logger.warning(f"PR creation failed: {result.stderr}")
+                    # Most common failure on re-runs: a PR already exists for
+                    # this head. Don't create a new one — look up the
+                    # existing PR and surface its URL so the caller treats
+                    # the ship as a successful update of the same PR.
+                    logger.warning(f"gh pr create failed: {result.stderr.strip()}")
+                    existing_url = self._lookup_existing_pr_url(branch_name)
+                    if existing_url:
+                        self.pr_url = existing_url
+                        logger.info(f"Reusing existing PR for {branch_name}: {existing_url}")
             else:
                 logger.info("gh CLI not found, create PR manually")
 
@@ -145,6 +202,55 @@ class Shipper:
         except Exception as e:
             logger.error(f"Shipping failed: {e}")
             return False
+
+    def _lookup_existing_pr_url(self, branch_name: str) -> Optional[str]:
+        """Return the URL of the open PR whose head is ``branch_name``, if any.
+
+        Used by ``ship()`` to recover when ``gh pr create`` rejects a
+        re-run because a PR already exists. We treat the existing PR as the
+        canonical one and surface its URL to the caller — same idempotent
+        contract the rest of ship() upholds.
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--head",
+                    branch_name,
+                    "--state",
+                    "open",
+                    "--json",
+                    "url",
+                    "--limit",
+                    "1",
+                ],
+                cwd=self.repo_path,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            logger.warning(f"Could not look up existing PR for {branch_name}: {exc}")
+            return None
+
+        if result.returncode != 0:
+            logger.warning(
+                f"gh pr list for {branch_name} failed: {result.stderr.strip()}"
+            )
+            return None
+
+        try:
+            prs = json.loads(result.stdout or "[]")
+        except ValueError:
+            return None
+
+        if isinstance(prs, list) and prs:
+            url = prs[0].get("url") if isinstance(prs[0], dict) else None
+            if isinstance(url, str) and url:
+                return url
+        return None
 
     def _resolve_base_branch(self) -> Optional[str]:
         """Determine the branch the PR should target.
