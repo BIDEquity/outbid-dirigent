@@ -4,6 +4,7 @@
 import json
 import re
 import sys
+from pathlib import Path
 
 VALID_MODELS = {"", "haiku", "sonnet", "opus"}
 VALID_EFFORTS = {"", "low", "medium", "high"}
@@ -17,6 +18,10 @@ DEFAULT_MAX_TASKS_PER_PHASE = 4
 # Expanded caps (size="large") — opt-in escape hatch for genuinely large features
 LARGE_MAX_PHASES = 5
 LARGE_MAX_TASKS_PER_PHASE = 5
+# Quick route caps — single-phase, slightly wider task budget. Route override
+# wins over size: a quick-route plan with size="large" is still capped at 1×6.
+QUICK_MAX_PHASES = 1
+QUICK_MAX_TASKS_PER_PHASE = 6
 
 MAX_INFRASTRUCTURE_PHASES = 1  # independent of size — scaffolds always monolithize
 MAX_SETUP_TASKS = 1  # vertical slicing — scaffold belongs in greenfield-scaffold, not PLAN.json
@@ -54,6 +59,20 @@ SETUP_TASK_PATTERNS = [
 ]
 
 
+def _resolve_route(plan_path: str) -> str:
+    """Read route.json sitting next to PLAN.json. Returns route name or '' if absent.
+
+    Lets the validator apply route-specific caps without changing its CLI signature.
+    """
+    route_file = Path(plan_path).parent / "route.json"
+    if not route_file.exists():
+        return ""
+    try:
+        return json.loads(route_file.read_text()).get("route", "")
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+
 def validate(path: str):
     errors = []
     warnings = []
@@ -85,16 +104,31 @@ def validate(path: str):
         LARGE_MAX_TASKS_PER_PHASE if size == "large" else DEFAULT_MAX_TASKS_PER_PHASE
     )
 
+    # Route override — quick route is single-phase regardless of size.
+    route = _resolve_route(path)
+    if route == "quick":
+        max_phases = QUICK_MAX_PHASES
+        max_tasks_per_phase = QUICK_MAX_TASKS_PER_PHASE
+        cap_source = "route='quick'"
+    else:
+        cap_source = f"size='{size}'"
+
     if len(phases) < 1:
         errors.append("'phases' must have at least 1 item")
     if len(phases) > max_phases:
-        hint = (
-            " Or set 'size': 'large' to raise caps to 5×5 if the feature genuinely doesn't fit."
-            if size == "standard"
-            else ""
-        )
+        if route == "quick":
+            hint = (
+                " Quick route is single-phase by design — fold tasks into one phase, "
+                "or use a different route (--route hybrid) for multi-phase work."
+            )
+        elif size == "standard":
+            hint = (
+                " Or set 'size': 'large' to raise caps to 5×5 if the feature genuinely doesn't fit."
+            )
+        else:
+            hint = ""
         errors.append(
-            f"'phases' has {len(phases)} items; max is {max_phases} (size='{size}'). "
+            f"'phases' has {len(phases)} items; max is {max_phases} ({cap_source}). "
             f"If the feature genuinely needs more, split the SPEC into multiple runs.{hint}"
         )
 
@@ -174,9 +208,14 @@ def validate(path: str):
         if len(tasks) < 1:
             errors.append(f"{pprefix}.tasks: must have at least 1 task")
         if len(tasks) > max_tasks_per_phase:
+            split_hint = (
+                "Reduce the task count or fold smaller tasks together."
+                if route == "quick"
+                else "Split into a new phase or reduce the task count."
+            )
             errors.append(
-                f"{pprefix}.tasks: has {len(tasks)} tasks; max is {max_tasks_per_phase} (size='{size}'). "
-                f"Split into a new phase or reduce the task count."
+                f"{pprefix}.tasks: has {len(tasks)} tasks; max is "
+                f"{max_tasks_per_phase} ({cap_source}). {split_hint}"
             )
 
         for j, task in enumerate(tasks):

@@ -61,7 +61,7 @@ class Phase(BaseModel):
         default="",
         description="One sentence: why this phase can't be merged with the next. Empty only if this is the last phase.",
     )
-    tasks: list[Task] = Field(default_factory=list, max_length=5)
+    tasks: list[Task] = Field(default_factory=list, max_length=6)
 
     def model_post_init(self, __context):
         # Normalize: accept both "id" and "phase" field names
