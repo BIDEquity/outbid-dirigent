@@ -12,12 +12,15 @@ agent: infra-architect
 Check for an existing spec in this order:
 
 1. `${DIRIGENT_RUN_DIR}/SPEC.md` — written by the Dirigent CLI pipeline
-2. `SPEC.md` in repo root
-3. `.planning/SPEC.md`
+2. `${DIRIGENT_RUN_DIR}/SPEC.compact.json` — compacted spec with requirement IDs (if SPEC.md is missing, extract the `requirements` array from this JSON and use it as the spec)
+3. `SPEC.md` in repo root
+4. `.planning/SPEC.md`
 
 **If a spec file exists:** read it and skip to Step 1.
 
-**If no spec file exists:** generate one from user input.
+**If ONLY `SPEC.compact.json` exists (no SPEC.md):** read the JSON, extract the `requirements` array, and use those as the spec context. Do NOT return "no spec found" — the compact JSON IS the spec.
+
+**If no spec file exists at all:** generate one from user input.
 
 ### Generating a Spec
 
