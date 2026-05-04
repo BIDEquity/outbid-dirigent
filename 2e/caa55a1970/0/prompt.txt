@@ -1,0 +1,38 @@
+---
+  Root cause: the create-plan skill never tells Claude to populate StructuredOutput, so Claude calls
+  StructuredOutput({}) — an empty object that validates against Plan because every field has a default — and the
+  harness overwrites the correctly-written PLAN.json with that empty one.
+
+  The failure sequence
+
+  1. Planner.create_plan() calls _run_claude_structured() with a JSON schema → Claude Code harness requires Claude to
+   call StructuredOutput(...) before finishing
+  2. create-plan/SKILL.md Step 3 says only: "Write ${DIRIGENT_RUN_DIR}/PLAN.json" — no instruction to also return the
+   plan via StructuredOutput
+  3. Claude correctly writes PLAN.json (1 phase, 6 tasks) and describes it in text, then calls StructuredOutput({}) —
+   empty — because the skill never mentioned it
+  4. {} passes schema validation because Plan.phases defaults to []
+  5. plan = Plan.model_validate({}) → Plan(phases=[], ...) — 0 phases, 0 tasks
+  6. plan_file.write_text(plan.model_dump_json(...)) overwrites the correct PLAN.json with the empty one (line
+  planner.py:63)
+
+  The fix
+
+  Two-layer fix:
+
+  1. Skill (primary) — add to the end of create-plan/SKILL.md:
+
+  ▎ After the validation script passes, call StructuredOutput with the same JSON object you wrote to PLAN.json so the
+  ▎  harness can receive the plan.
+
+  2. Harness fallback (defensive) — in planner.py after plan = Plan.model_validate(structured), if plan.total_tasks
+  == 0, fall back to reading PLAN.json from disk before overwriting it. This prevents the overwrite race even if the
+  skill instruction is ever missed again.
+
+---
+
+what i just wrote
+
+---
+
+keep as is. push directly.
