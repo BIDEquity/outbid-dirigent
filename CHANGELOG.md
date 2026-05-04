@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.2](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.4.1...outbid-dirigent-v2.4.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **create-plan:** accept SPEC.compact.json as spec source ([226c960](https://github.com/BIDEquity/outbid-dirigent/commit/226c960fe12e83ee986c3a581bf7a273a492952c))
+* **planner:** prevent empty PLAN.json from overwriting on-disk plan ([ae7aa86](https://github.com/BIDEquity/outbid-dirigent/commit/ae7aa86ba874c5238411f741c71a8647252d4f23))
+* **shipper:** make ship() idempotent — one FR = one PR ([e039926](https://github.com/BIDEquity/outbid-dirigent/commit/e0399262583395dc92bfe948ed9dfc6bc1e8ee88))
+* **shipper:** treat push failure as failure, not success ([f3043d6](https://github.com/BIDEquity/outbid-dirigent/commit/f3043d644b4550d1ad81a056ec4fae4400b6157a))
+
 ## [2.4.1](https://github.com/BIDEquity/outbid-dirigent/compare/outbid-dirigent-v2.4.0...outbid-dirigent-v2.4.1) (2026-04-30)
 
 
