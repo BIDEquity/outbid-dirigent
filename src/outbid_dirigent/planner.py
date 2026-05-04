@@ -60,6 +60,29 @@ class Planner:
             return None
 
         plan_file = self.dirigent_dir / "PLAN.json"
+
+        # Defensive fallback: the skill writes PLAN.json AND is supposed to
+        # echo the same JSON via StructuredOutput. If the skill skips the
+        # StructuredOutput call, `structured` arrives as `{}` — which validates
+        # because every Plan field has a default — and we'd overwrite the
+        # correct file on disk with an empty plan. Prefer the on-disk plan
+        # when it has content and the structured payload is empty.
+        if plan.total_tasks == 0:
+            disk_plan = Plan.load(plan_file)
+            if disk_plan and disk_plan.total_tasks > 0:
+                logger.warning(
+                    "StructuredOutput returned empty plan; falling back to "
+                    f"PLAN.json on disk ({len(disk_plan.phases)} phases, "
+                    f"{disk_plan.total_tasks} tasks)"
+                )
+                plan = disk_plan
+            else:
+                logger.error(
+                    "Plan creation produced no tasks (structured output empty "
+                    "and PLAN.json missing or empty)"
+                )
+                return None
+
         plan_file.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
 
         logger.info(f"Plan: {len(plan.phases)} phases, {plan.total_tasks} tasks")

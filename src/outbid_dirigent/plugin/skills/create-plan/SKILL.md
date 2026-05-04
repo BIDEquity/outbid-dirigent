@@ -301,3 +301,15 @@ python ${CLAUDE_SKILL_DIR}/scripts/validate_schema.py ${DIRIGENT_RUN_DIR}/PLAN.j
 ```
 
 If validation fails, fix the errors and re-run until it passes.
+
+## Step 4: Return the plan via StructuredOutput (MANDATORY)
+
+Once validation passes, call `StructuredOutput` with the **exact same JSON
+object** you wrote to `${DIRIGENT_RUN_DIR}/PLAN.json`. The harness expects
+this — `_run_claude_structured` reads the structured output and persists it.
+If you skip this call, the harness receives an empty `{}`, the empty object
+passes Pydantic validation (every field has a default), and your PLAN.json
+gets silently overwritten with zero tasks.
+
+Do not modify the plan between writing the file and the `StructuredOutput`
+call. The two payloads MUST be byte-for-byte equivalent.
