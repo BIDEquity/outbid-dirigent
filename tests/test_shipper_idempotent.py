@@ -181,3 +181,32 @@ def test_lookup_returns_none_on_invalid_json(tmp_path: Path) -> None:
         "outbid_dirigent.shipper.subprocess.run", return_value=_ok("not-json")
     ):
         assert s._lookup_existing_pr_url("dirigent/foo") is None
+
+
+# ─── Push-failure semantics (403, auth, etc.) ───────────────────────────────
+
+
+def test_push_403_returns_false_and_pushed_stays_false(shipper: Shipper) -> None:
+    """A 403 (or any non-divergence push failure) is a real failure: ship()
+    must return False and `pushed` must stay False so the executor doesn't
+    emit a 'gepusht' success message."""
+
+    def side_effect(argv: List[str], **_: Any) -> MagicMock:
+        if argv[:3] == ["git", "rev-parse", "--verify"]:
+            return _err("not a valid ref")  # first run, no local branch
+        if argv[:3] == ["git", "push", "-u"]:
+            return _err(
+                "remote: Write access to repository not granted.\n"
+                "fatal: unable to access ...: The requested URL returned error: 403"
+            )
+        return _ok()
+
+    with patch(
+        "outbid_dirigent.shipper.shutil.which", return_value="/usr/bin/gh"
+    ), patch("outbid_dirigent.shipper.subprocess.run", side_effect=side_effect) as run_mock:
+        assert shipper.ship() is False
+
+    assert shipper.pushed is False, "pushed must stay False on 403"
+    assert shipper.pr_url is None, "no PR should be attempted after a failed push"
+    # gh pr create must NOT be invoked when the branch never reached origin.
+    assert not _has_call(run_mock, "gh", "pr", "create")

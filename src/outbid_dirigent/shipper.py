@@ -47,6 +47,11 @@ class Shipper:
         self.summaries_dir = self.dirigent_dir / "summaries"
         self.branch_name: Optional[str] = None
         self.pr_url: Optional[str] = None
+        # True only after `git push` succeeded. Distinguishes "branch was
+        # planned" (branch_name set early) from "branch is on origin"
+        # (push went through). The executor reads this to avoid emitting
+        # a success event after a 403/auth failure.
+        self.pushed: bool = False
 
     def ship(self) -> bool:
         """Create branch, push, create PR.
@@ -67,6 +72,7 @@ class Shipper:
 
         if self.dry_run:
             logger.info("[DRY-RUN] Would create branch and push")
+            self.pushed = True
             return True
 
         # Capture the base branch BEFORE we cut the feature branch — once we
@@ -151,8 +157,9 @@ class Shipper:
                         text=True,
                     )
             if result.returncode != 0:
-                logger.warning(f"Push failed: {result.stderr}")
-                return True
+                logger.error(f"Push failed: {result.stderr.strip()}")
+                return False
+            self.pushed = True
 
             # Create PR if gh available
             if shutil.which("gh"):

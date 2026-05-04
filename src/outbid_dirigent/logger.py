@@ -509,6 +509,12 @@ class DirigentLogger:
     def ship_pushed(self, branch_name: str):
         self._log("done", f"Branch {branch_name} gepusht (kein PR erstellt)")
 
+    def ship_failed(self, branch_name: str, reason: str = ""):
+        msg = f"Push fehlgeschlagen für {branch_name}"
+        if reason:
+            msg += f": {reason}"
+        self._log("error", msg, level=LogLevel.ERROR)
+
     def resume(self, task_id: str):
         self._log("resume", f"Fortsetzen bei Task {task_id}")
 
