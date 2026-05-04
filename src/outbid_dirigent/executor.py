@@ -1189,8 +1189,10 @@ class Executor:
 
         if shipper.pr_url:
             self._legacy_logger.ship_done(shipper.pr_url)
-        elif shipper.branch_name:
+        elif shipper.pushed and shipper.branch_name:
             self._legacy_logger.ship_pushed(shipper.branch_name)
+        elif shipper.branch_name:
+            self._legacy_logger.ship_failed(shipper.branch_name)
         return success
 
     # ══════════════════════════════════════════
