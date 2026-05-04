@@ -1,0 +1,17 @@
+what does github status 403 mean?
+
+---
+
+2026-05-03 14:39:11.812 | INFO     | outbid_dirigent.shipper:ship:79 - PR base branch resolved to: main
+Sun May  3 14:39:11 UTC 2026: [dirigent] [2026-05-03 14:39:11] 🚢 Shipping: Branch dirigent/...
+2026-05-03 14:39:12.116 | WARNING  | outbid_dirigent.shipper:ship:105 - Push failed (maybe no remote): remote: Write access to repository not granted.
+fatal: unable to access 'https://github.com/bidequity-ai/outbid-demo-contract-manager/': The requested URL returned error: 403
+
+Sun May  3 14:39:12 UTC 2026: [dirigent] [2026-05-03 14:39:12] 🎉 Branch dirigent/contract-manager-backoffice-contract-management gepusht (kein PR erstellt)
+ -> pls fix that on 403, no success message is printed? Thank you.
+
+While at it:  please check if there is a hardcoded master branch in the ship step
+
+---
+
+is it in now?
